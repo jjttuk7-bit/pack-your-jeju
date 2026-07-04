@@ -1,49 +1,103 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gaegu:wght@400;700&display=swap');
 
 /* ────────────────────────────────────────────────
-   Pack Your Jeju — 전역 스타일 시스템
-   Warm cream base + orange 감성. tailwind에 유틸 몇 개만 추가.
+   Pack Your Jeju — 제주 로컬 감성 시스템
+   -------------------------------------------------
+   Gowun Batang: 헤딩 감성 serif (고운바탕)
+   Gaegu:        손글씨/감정 액센트
+   Pretendard:   바디 (import 없음, fallback)
+
+   Palette:
+     #F7EFE1  paper (배경 base, 종이 톤)
+     #F1E4CE  paper-2 (배경 gradient)
+     #E7683A  citrus-primary (감귤 주황, 오렌지보다 톤다운)
+     #C24B26  citrus-deep (강조)
+     #2E3235  basalt (현무암, 다크 회흑)
+     #6D7376  basalt-2
+     #4A8779  sea-mint (바다 민트, 보조 액센트)
+     #C9A97F  earth (제주 흙, 세컨더리 border)
    ──────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    --pyj-cream:  #FEF9F3;
-    --pyj-cream-2:#FBF1E4;
-    --pyj-ink:    #24211E;
-    --pyj-ink-2:  #514842;
-    --pyj-sub:    #97867B;
+    --pyj-paper:   #F7EFE1;
+    --pyj-paper-2: #F1E4CE;
+    --pyj-citrus:  #E7683A;
+    --pyj-citrus-2:#C24B26;
+    --pyj-basalt:  #2E3235;
+    --pyj-basalt-2:#6D7376;
+    --pyj-mint:    #4A8779;
+    --pyj-earth:   #C9A97F;
   }
 
   html, body {
-    background: linear-gradient(180deg, var(--pyj-cream) 0%, var(--pyj-cream-2) 100%);
-    color: var(--pyj-ink);
+    background:
+      radial-gradient(1200px 500px at 20% -10%, rgba(231, 104, 58, 0.10), transparent 60%),
+      radial-gradient(900px 400px at 100% 10%, rgba(74, 135, 121, 0.09), transparent 60%),
+      linear-gradient(180deg, var(--pyj-paper) 0%, var(--pyj-paper-2) 100%);
+    color: var(--pyj-basalt);
     font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
+  /* 종이 결 느낌의 subtle noise (아주 옅게) */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.4;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.6 0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
   ::selection {
-    background: #FED7AA;
-    color: #7C2D12;
+    background: #F2C298;
+    color: var(--pyj-citrus-2);
   }
 }
 
 @layer utilities {
-  /* 두 겹 shadow — 카드가 살짝 뜨는 느낌 */
-  .shadow-pyj-card {
+  /* 헤딩용 감성 serif */
+  .font-serif-kr { font-family: 'Gowun Batang', 'Noto Serif KR', serif; }
+  .font-hand     { font-family: 'Gaegu', 'Nanum Pen Script', cursive; }
+
+  /* 카드 시스템 (Warm ivory · basalt-hint shadow) */
+  .card-jeju {
+    background: #FFFEFA;
+    border-radius: 22px;
+    border: 1px solid rgba(201, 169, 127, 0.28);
     box-shadow:
-      0 1px 2px rgba(28, 20, 12, 0.04),
-      0 8px 32px -12px rgba(213, 106, 46, 0.15);
+      0 1px 0 rgba(46, 50, 53, 0.03),
+      0 12px 32px -18px rgba(46, 50, 53, 0.18);
   }
-  .shadow-pyj-card-hover {
+
+  /* 강조 카드 (감귤 톤) */
+  .card-citrus {
+    background: linear-gradient(180deg, #FEF3E6 0%, #FDE8CE 100%);
+    border-radius: 22px;
+    border: 1px solid rgba(231, 104, 58, 0.22);
+  }
+
+  /* 인터랙션 shadow */
+  .shadow-jeju-chip {
     box-shadow:
-      0 1px 2px rgba(28, 20, 12, 0.04),
-      0 16px 40px -12px rgba(213, 106, 46, 0.22);
+      0 1px 1px rgba(194, 75, 38, 0.10),
+      0 6px 14px -6px rgba(194, 75, 38, 0.30);
   }
-  /* Chip 선택 상태에서 살짝 뜨는 그림자 */
-  .shadow-pyj-chip {
-    box-shadow:
-      0 1px 1px rgba(213, 106, 46, 0.08),
-      0 4px 12px -4px rgba(213, 106, 46, 0.25);
-  }
+
+  /* 컬러 유틸 (tailwind arbitrary 대신 명확한 alias) */
+  .text-basalt    { color: var(--pyj-basalt); }
+  .text-basalt-2  { color: var(--pyj-basalt-2); }
+  .text-citrus    { color: var(--pyj-citrus); }
+  .text-citrus-2  { color: var(--pyj-citrus-2); }
+  .text-mint      { color: var(--pyj-mint); }
+  .bg-citrus      { background-color: var(--pyj-citrus); }
+  .bg-citrus-2    { background-color: var(--pyj-citrus-2); }
+  .bg-mint        { background-color: var(--pyj-mint); }
+  .border-earth   { border-color: rgba(201, 169, 127, 0.4); }
+  .border-citrus  { border-color: var(--pyj-citrus); }
+  .border-mint    { border-color: var(--pyj-mint); }
 }

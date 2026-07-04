@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Luggage, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { TravelInfo, MomentId, SavedTravel } from './types';
 import TravelForm from './components/TravelForm';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
+import CitrusMark from './components/marks/CitrusMark';
+import WaveLine from './components/marks/WaveLine';
+import StoneWallPattern from './components/marks/StoneWallPattern';
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 
@@ -155,60 +158,77 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen text-stone-900 font-sans relative flex flex-col items-center px-4 py-10 antialiased" id="app-root">
+    <div className="min-h-screen text-basalt font-sans relative flex flex-col items-center px-4 pt-8 pb-4 antialiased" id="app-root">
 
-      {/* Warm decorative background layers */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] -z-10 overflow-hidden">
-        <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-orange-200/30 blur-3xl" />
-        <div className="absolute -top-32 right-0 w-[380px] h-[380px] rounded-full bg-amber-200/40 blur-3xl" />
+      {/* 하단 돌담 패턴 (지역감) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-40 -z-10 opacity-70">
+        <StoneWallPattern className="w-full h-full" />
       </div>
 
       {/* Container */}
       <div className="w-full max-w-lg flex flex-col flex-1" id="app-container">
 
-        {/* Header Block with App Identity */}
-        <header className="text-center pt-2 pb-8" id="app-header">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/70 backdrop-blur rounded-full border border-orange-100 mb-4 shadow-sm"
-          >
-            <Luggage className="w-3.5 h-3.5 text-orange-600" />
-            <span className="text-[10px] font-bold text-orange-700 uppercase tracking-[0.14em]">
-              Trust-Verified Jeju Trip Prep
-            </span>
-          </motion.div>
+        {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
+        <header className="pt-2 pb-8" id="app-header">
+          <div className="flex items-start gap-4 mb-2">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, rotate: -8 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 0.6, type: 'spring' }}
+              className="shrink-0 mt-1"
+            >
+              <CitrusMark className="w-14 h-14" />
+            </motion.div>
+            <div className="flex-1 min-w-0">
+              <motion.p
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.5 }}
+                className="text-[10px] font-bold text-citrus-2 tracking-[0.2em] uppercase mb-1"
+              >
+                제주 · 신뢰 여행 준비
+              </motion.p>
+              <motion.h1
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.15, duration: 0.5 }}
+                className="font-serif-kr text-[34px] font-bold text-basalt tracking-tight leading-[1.1]"
+                id="brand-name"
+              >
+                Pack Your Jeju
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.25, duration: 0.5 }}
+                className="text-[11px] text-basalt-2 mt-1.5 font-medium tracking-wide"
+              >
+                혼저옵서예. 짐 싸기 전에 확인부터.
+              </motion.p>
+            </div>
+          </div>
 
-          {/* Main Logo & Copy Title */}
-          <motion.h1
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-            className="text-4xl font-black text-stone-900 tracking-tight leading-tight"
-            id="brand-name"
-          >
-            Pack Your Jeju <span className="inline-block align-baseline">🍊</span>
-          </motion.h1>
+          <WaveLine className="w-full h-5 mt-3" />
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-[13.5px] text-stone-600 mt-3 max-w-[320px] mx-auto leading-[1.7] font-medium"
-            id="main-subtitle-copy"
+            transition={{ delay: 0.35, duration: 0.5 }}
+            className="font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-md"
           >
-            짐을 싸기 전에,<br />그 순간이 진짜인지부터 확인합니다.
+            우리는 <span className="text-citrus-2 font-bold">근거 있는 것만</span> 담고,
+            <br />
+            없는 건 <span className="text-mint font-bold">정직하게</span> 비워둡니다.
           </motion.p>
 
           {state.step !== 'setup' && (
-            <div className="mt-5 inline-flex items-center gap-0.5 p-1 bg-white/70 backdrop-blur rounded-full border border-orange-100 shadow-sm">
+            <div className="mt-5 inline-flex items-center gap-0.5 p-1 bg-white/80 backdrop-blur rounded-full border border-earth shadow-sm">
               <button
                 onClick={goToDashboard}
                 className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition ${
                   state.step === 'dashboard'
-                    ? 'bg-orange-600 text-white shadow-pyj-chip'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-citrus text-white shadow-jeju-chip'
+                    : 'text-basalt-2 hover:text-basalt'
                 }`}
               >
                 내 팩
@@ -217,8 +237,8 @@ export default function App() {
                 onClick={goToVerify}
                 className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition inline-flex items-center gap-1 ${
                   state.step === 'verify'
-                    ? 'bg-orange-600 text-white shadow-pyj-chip'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-citrus text-white shadow-jeju-chip'
+                    : 'text-basalt-2 hover:text-basalt'
                 }`}
               >
                 <ShieldCheck className="w-3 h-3" />
@@ -292,9 +312,9 @@ export default function App() {
         </main>
 
         {/* Footer */}
-        <footer className="text-center text-stone-400 text-[10px] py-12 mt-auto" id="app-footer">
-          <div className="w-8 h-px bg-stone-200 mx-auto mb-4" />
-          <p>© 2026 Pack Your Jeju. 근거 있는 것만, 정직하게.</p>
+        <footer className="text-center text-basalt-2/60 text-[10px] pt-16 pb-8 mt-auto" id="app-footer">
+          <p className="font-hand text-[15px] text-basalt-2 mb-2">고맙수다.</p>
+          <p>© 2026 Pack Your Jeju</p>
         </footer>
 
       </div>
@@ -312,13 +332,13 @@ export default function App() {
               id="reset-modal-content"
             >
               <div className="text-center space-y-2">
-                <div className="inline-flex p-3.5 rounded-full bg-orange-50 text-orange-600 mb-1" id="reset-modal-icon">
-                  <Luggage className="w-6 h-6 animate-pulse" />
+                <div className="inline-flex p-3 rounded-full bg-citrus/10 text-citrus mb-1" id="reset-modal-icon">
+                  <CitrusMark className="w-7 h-7" />
                 </div>
-                <h3 className="font-bold text-lg text-slate-900">새롭게 여행 준비하기</h3>
-                <p className="text-xs text-slate-500 leading-relaxed font-normal">
-                  정말로 새 여행 준비를 시작하시겠습니까?<br />
-                  기존에 준비 해둔 체크리스트와 기록들이 모두 정리됩니다.
+                <h3 className="font-serif-kr font-bold text-[17px] text-basalt">다시 시작하기</h3>
+                <p className="text-[11.5px] text-basalt-2 leading-relaxed">
+                  준비해둔 체크리스트가 초기화돼요.<br />
+                  괜찮으시겠어요?
                 </p>
               </div>
               
@@ -326,7 +346,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowResetConfirm(false)}
-                  className="py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs rounded-2xl border border-slate-200 transition cursor-pointer"
+                  className="py-3 bg-white hover:bg-earth/10 text-basalt-2 font-bold text-xs rounded-2xl border-2 border-earth transition cursor-pointer"
                 >
                   돌아가기
                 </button>
@@ -336,7 +356,7 @@ export default function App() {
                     setState(defaultState);
                     setShowResetConfirm(false);
                   }}
-                  className="py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-2xl transition shadow-md shadow-orange-100 cursor-pointer"
+                  className="py-3 bg-citrus hover:bg-citrus-2 text-white font-serif-kr font-bold text-[14px] rounded-2xl transition shadow-jeju-chip cursor-pointer"
                 >
                   새로 시작
                 </button>
