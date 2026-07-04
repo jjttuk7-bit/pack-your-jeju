@@ -1,0 +1,23 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: pack-your-jeju-db
+    environment:
+      POSTGRES_USER: jeju
+      POSTGRES_PASSWORD: jeju
+      POSTGRES_DB: jeju
+    ports:
+      # 로컬 5432는 jeju-faq-postgres-1이 점유 중이라 5433으로 노출.
+      # 컨테이너 내부 포트는 그대로 5432.
+      - "5433:5432"
+    volumes:
+      - jeju_pgdata:/var/lib/postgresql/data
+      - ./packages/schema/init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jeju -d jeju"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  jeju_pgdata:

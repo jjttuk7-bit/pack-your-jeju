@@ -1,0 +1,30 @@
+# --- secrets ---
+.env
+.env.local
+
+# --- Python 부산물 ---
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# --- Node 부산물 ---
+node_modules/
+
+# --- 데이터 부산물 ---
+data/raw/
+data/*.csv
+# ingest_visitjeju --probe 로 재생성 가능
+data/probe/
+# 게이트 리포트 원본 (재실행으로 재생성). .md만 커밋해 사람이 읽도록.
+data/eval/*.json
+
+# --- 데모 산출물 (재생성 가능) ---
+docs/slides.pdf
+docs/slides.pptx
+docs/slides_png/
+docs/donut.png
+docs/qr.png
+docs/qr-placeholder.png
