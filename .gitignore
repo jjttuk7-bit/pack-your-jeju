@@ -16,10 +16,12 @@ node_modules/
 # --- 데이터 부산물 ---
 data/raw/
 data/*.csv
+data/*.log
 # ingest_visitjeju --probe 로 재생성 가능
 data/probe/
 # 게이트 리포트 원본 (재실행으로 재생성). .md만 커밋해 사람이 읽도록.
 data/eval/*.json
+data/eval-reports/*.json
 
 # --- 데모 산출물 (재생성 가능) ---
 docs/slides.pdf
