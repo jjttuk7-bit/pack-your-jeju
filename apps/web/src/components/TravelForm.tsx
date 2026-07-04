@@ -68,10 +68,10 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
       className="w-full max-w-md mx-auto bg-white rounded-[28px] border border-orange-100/60 shadow-pyj-card p-6 sm:p-8"
       id="travel-form"
     >
-      <div className="flex items-center gap-1 mb-8" id="form-tab-nav">
+      <div className="relative flex items-center mb-8 pb-3" id="form-tab-nav">
         <button
           onClick={() => setActiveTab('basic')}
-          className={`relative flex-1 text-center py-2.5 text-[13px] font-semibold transition ${
+          className={`relative flex-1 text-center pb-2 text-[13px] font-semibold transition ${
             activeTab === 'basic' ? 'text-stone-900' : 'text-stone-400 hover:text-stone-600'
           }`}
           id="tab-basic-btn"
@@ -80,13 +80,13 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
           {activeTab === 'basic' && (
             <motion.div
               layoutId="tab-underline"
-              className="absolute left-2 right-2 -bottom-px h-[2px] bg-orange-600 rounded-full"
+              className="absolute left-1/4 right-1/4 -bottom-[7px] h-[2px] bg-orange-600 rounded-full z-10"
             />
           )}
         </button>
         <button
           onClick={handleNextToMoments}
-          className={`relative flex-1 text-center py-2.5 text-[13px] font-semibold transition ${
+          className={`relative flex-1 text-center pb-2 text-[13px] font-semibold transition ${
             activeTab === 'moments' ? 'text-stone-900' : 'text-stone-400 hover:text-stone-600'
           }`}
           id="tab-moments-btn"
@@ -98,12 +98,13 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
           {activeTab === 'moments' && (
             <motion.div
               layoutId="tab-underline"
-              className="absolute left-2 right-2 -bottom-px h-[2px] bg-orange-600 rounded-full"
+              className="absolute left-1/4 right-1/4 -bottom-[7px] h-[2px] bg-orange-600 rounded-full z-10"
             />
           )}
         </button>
+        {/* 회색 기본 트랙 (오렌지 밑줄이 이 위에 얹힘) */}
+        <div className="absolute left-0 right-0 bottom-0 h-px bg-stone-100" />
       </div>
-      <div className="h-px bg-stone-100 mb-7 -mt-6" />
 
       {activeTab === 'basic' ? (
         <motion.div
@@ -181,7 +182,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                     type="button"
                     id={`companion-btn-${item.value}`}
                     onClick={() => setCompanion(item.value)}
-                    className={`px-3 py-2.5 rounded-xl border text-[12.5px] text-left transition-all duration-200 flex items-center justify-between ${
+                    className={`px-3.5 py-2.5 rounded-xl border-2 text-[12.5px] text-left transition-all duration-200 flex items-center justify-between hover:-translate-y-px ${
                       active
                         ? 'border-orange-500 bg-orange-50 text-orange-950 font-semibold shadow-pyj-chip'
                         : 'border-stone-200 bg-white text-stone-600 hover:border-orange-200 hover:bg-orange-50/30'
@@ -212,7 +213,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                     type="button"
                     id={`purpose-btn-${item.value}`}
                     onClick={() => setPurpose(item.value)}
-                    className={`w-full px-4 py-3 rounded-xl border text-[13px] text-left transition-all duration-200 flex items-center justify-between ${
+                    className={`w-full px-4 py-3 rounded-xl border-2 text-[13px] text-left transition-all duration-200 flex items-center justify-between ${
                       active
                         ? 'border-orange-500 bg-orange-50 text-orange-950 font-semibold shadow-pyj-chip'
                         : 'border-stone-200 bg-white text-stone-600 hover:border-orange-200 hover:bg-orange-50/30'
@@ -220,11 +221,11 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                   >
                     <span>{item.label}</span>
                     <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${
                         active ? 'bg-orange-600 border-orange-600' : 'border-stone-300 bg-white'
                       }`}
                     >
-                      {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      {active && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                   </button>
                 );

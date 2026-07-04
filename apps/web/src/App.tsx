@@ -195,7 +195,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-[13px] text-stone-500 mt-3 max-w-[280px] mx-auto leading-relaxed"
+            className="text-[13.5px] text-stone-600 mt-3 max-w-[320px] mx-auto leading-[1.7] font-medium"
             id="main-subtitle-copy"
           >
             짐을 싸기 전에,<br />그 순간이 진짜인지부터 확인합니다.

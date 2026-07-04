@@ -33,10 +33,10 @@ export default function RegionChips({ value, onChange }: RegionChipsProps) {
               type="button"
               id={`region-chip-${r.value}`}
               onClick={() => onChange(r.value)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-200 flex items-center gap-1 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-200 flex items-center gap-1 cursor-pointer hover:-translate-y-px ${
                 active
-                  ? 'border-orange-500 bg-orange-600 text-white shadow-pyj-chip'
-                  : 'border-stone-200 bg-white text-stone-700 hover:border-orange-300 hover:text-orange-700'
+                  ? 'border-orange-600 bg-orange-600 text-white shadow-pyj-chip'
+                  : 'border-stone-200 bg-white text-stone-700 hover:border-orange-300 hover:text-orange-700 hover:shadow-sm'
               }`}
             >
               <span className="text-[11px]">{r.emoji}</span>
@@ -56,7 +56,7 @@ export default function RegionChips({ value, onChange }: RegionChipsProps) {
       <button
         type="button"
         onClick={() => setShowHints((v) => !v)}
-        className="mt-2 flex items-center gap-1 text-[10.5px] text-stone-500 hover:text-stone-800 transition"
+        className="mt-2 flex items-center gap-1 text-[10.5px] text-stone-500 hover:text-orange-700 transition"
       >
         <HelpCircle className="w-3 h-3" />
         관광지 이름으로 지역 찾기
