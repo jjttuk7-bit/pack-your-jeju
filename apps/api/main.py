@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
+from contextlib import asynccontextmanager
 from typing import Any
 
 import os
@@ -20,14 +21,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import text
 
-from apps.api import db
+from apps.api import bootstrap, db
 from apps.api.engine import assemble as assemble_mod
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
 
-app = FastAPI(title="Pack Your Jeju API")
+_bootstrap_result: dict = {"applied": 0, "failed": 0, "errors": []}
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Railway 신규 프로젝트에서 스키마 미적용으로 500 나는 사태 방지 (idempotent).
+    global _bootstrap_result
+    _bootstrap_result = bootstrap.apply_schema()
+    yield
+
+
+app = FastAPI(title="Pack Your Jeju API", lifespan=lifespan)
 
 # CORS — 프론트(Vercel)에서 크로스오리진 호출 허용.
 # CORS_ALLOW_ORIGINS 환경변수에 콤마 구분으로 세팅 (예: "https://pack-your-jeju.vercel.app,http://localhost:3000")
@@ -55,7 +67,14 @@ class PackBody(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "db": db.ping()}
+    return {
+        "status": "ok",
+        "db": db.ping(),
+        "bootstrap": {
+            "applied": _bootstrap_result["applied"],
+            "failed": _bootstrap_result["failed"],
+        },
+    }
 
 
 @app.get("/admin/metrics")
