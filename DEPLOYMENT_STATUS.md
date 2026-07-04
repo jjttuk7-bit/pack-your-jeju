@@ -105,7 +105,7 @@
 ### P2 — 배지·문구 완성도
 - [ ] **위생등급 CSV** — `--hygiene-csv <path>`. `place.hygiene_grade` 채워짐.
 - [ ] **`OPENAI_API_KEY` 세팅** — Railway `pack-your-jeju` 서비스 Variables에 추가. 이후 `intro.text` 감성 문구, `llm_used: true`.
-- [ ] **킥3 유형별 카운트** — 수정요청 CSV의 폐업/이전/시간변경 유형 분포. 오프닝 슬라이드 세부 수치.
+- [x] **킥3 유형별 카운트** — `scripts/kick3_stats.py` + `docs/kick3_stats.md`. 372건이 물리적 변화(폐업 20·이전 26·시간 235·주소 91), 톱3=591건(35%).
 
 ### P3 — 발표 리허설·백업
 - [ ] 데모 대본 전 구간 스크린 녹화 (킥1 · `/pack` · `/admin/metrics`)
