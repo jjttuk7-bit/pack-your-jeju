@@ -1,0 +1,6 @@
+{
+  "name": "Pack Your Moment",
+  "description": "사용자가 선택한 ‘여행에서 기대하는 순간’별 맞춤 준비물과 감성 체크리스트를 생성해주는 모바일 퍼스트 여행 준비 서비스",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,22 @@
+.git
+.gitignore
+.env
+.env.*
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+
+# 프론트 (별도 Vercel 배포)
+apps/web
+pack-your-moment
+
+# 데이터·문서·자산은 이미지에 필요 없음
+data
+docs
+scripts
+*.md
+*.CSV
+docker-compose.yml

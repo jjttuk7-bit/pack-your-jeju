@@ -28,3 +28,10 @@ docs/slides_png/
 docs/donut.png
 docs/qr.png
 docs/qr-placeholder.png
+
+# --- 프론트 부산물 / 원본 압축본 ---
+pack-your-moment.zip
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.env
+apps/web/.env.local

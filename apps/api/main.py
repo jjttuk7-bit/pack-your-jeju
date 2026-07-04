@@ -13,7 +13,10 @@ import uuid
 from collections import Counter
 from typing import Any
 
+import os
+
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import text
 
@@ -25,6 +28,20 @@ from apps.api.engine import verify as verify_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
 
 app = FastAPI(title="Pack Your Jeju API")
+
+# CORS — 프론트(Vercel)에서 크로스오리진 호출 허용.
+# CORS_ALLOW_ORIGINS 환경변수에 콤마 구분으로 세팅 (예: "https://pack-your-jeju.vercel.app,http://localhost:3000")
+# 미설정 시 로컬 개발용 기본값만 허용.
+_default_origins = "http://localhost:3000,http://localhost:5173"
+_origins = [o.strip() for o in os.environ.get("CORS_ALLOW_ORIGINS", _default_origins).split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",  # Vercel 미리보기 배포도 허용
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 class PackBody(BaseModel):
