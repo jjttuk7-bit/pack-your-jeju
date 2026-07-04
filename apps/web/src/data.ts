@@ -4,19 +4,38 @@ import { TravelMoment, RegionId, CompanionValue, PurposeValue } from './types';
 // 제주 12지역 (backend의 region_normalized 값과 1:1)
 // D-02 · CLAUDE.md 저장소 구조
 // ─────────────────────────────────────────────────────
-export const REGIONS: { value: RegionId; label: string; emoji: string }[] = [
-  { value: 'jeju_city', label: '제주시', emoji: '🏙️' },
-  { value: 'seogwipo',  label: '서귀포', emoji: '🌆' },
-  { value: 'aewol',     label: '애월',   emoji: '🌅' },
-  { value: 'hallim',    label: '한림',   emoji: '🌾' },
-  { value: 'seongsan',  label: '성산',   emoji: '🌋' },
-  { value: 'jocheon',   label: '조천',   emoji: '🌊' },
-  { value: 'gujwa',     label: '구좌',   emoji: '🧡' },
-  { value: 'andeok',    label: '안덕',   emoji: '⛰️' },
-  { value: 'daejeong',  label: '대정',   emoji: '🌾' },
-  { value: 'pyoseon',   label: '표선',   emoji: '🏖️' },
-  { value: 'namwon',    label: '남원',   emoji: '🌳' },
-  { value: 'udo',       label: '우도',   emoji: '🐚' },
+export interface RegionEntry {
+  value: RegionId;
+  label: string;
+  emoji: string;
+  landmarks: string[];   // 대표 관광지 3개 — "그 이름이면 이 지역이에요" 힌트용
+}
+
+export const REGIONS: RegionEntry[] = [
+  { value: 'jeju_city', label: '제주시',   emoji: '🏙️', landmarks: ['한라산', '용두암', '이호테우해변'] },
+  { value: 'seogwipo',  label: '서귀포',   emoji: '🌆', landmarks: ['정방폭포', '이중섭 거리', '매일올레시장'] },
+  { value: 'aewol',     label: '애월',     emoji: '🌅', landmarks: ['새별오름', '곽지해수욕장', '애월카페거리'] },
+  { value: 'hallim',    label: '한림',     emoji: '🌾', landmarks: ['협재해수욕장', '한림공원', '금오름'] },
+  { value: 'seongsan',  label: '성산',     emoji: '🌋', landmarks: ['성산일출봉', '섭지코지', '광치기해변'] },
+  { value: 'jocheon',   label: '조천',     emoji: '🌊', landmarks: ['함덕해수욕장', '사려니숲길', '조천만세동산'] },
+  { value: 'gujwa',     label: '구좌',     emoji: '🧡', landmarks: ['만장굴', '월정리해수욕장', '비자림'] },
+  { value: 'andeok',    label: '안덕',     emoji: '⛰️', landmarks: ['산방산', '안덕계곡', '오설록티뮤지엄'] },
+  { value: 'daejeong',  label: '대정',     emoji: '🌾', landmarks: ['송악산', '알뜨르비행장', '마라도 선착장'] },
+  { value: 'pyoseon',   label: '표선',     emoji: '🏖️', landmarks: ['표선해수욕장', '성읍민속마을', '붉은오름'] },
+  { value: 'namwon',    label: '남원',     emoji: '🌳', landmarks: ['큰엉해안경승지', '위미리 동백', '쇠소깍'] },
+  { value: 'udo',       label: '우도',     emoji: '🐚', landmarks: ['우도등대', '검멀레해수욕장', '서빈백사'] },
+];
+
+// 역방향 안내: 유명 관광지 → 어느 지역인지 즉시 알려주기 (하단 배너용 짧은 리스트)
+export const LANDMARK_HINTS: { name: string; regionLabel: string }[] = [
+  { name: '한라산',       regionLabel: '제주시' },
+  { name: '새별오름',     regionLabel: '애월' },
+  { name: '협재해수욕장', regionLabel: '한림' },
+  { name: '성산일출봉',   regionLabel: '성산' },
+  { name: '만장굴',       regionLabel: '구좌' },
+  { name: '산방산',       regionLabel: '안덕' },
+  { name: '송악산',       regionLabel: '대정' },
+  { name: '우도등대',     regionLabel: '우도' },
 ];
 
 export const COMPANIONS: { value: CompanionValue; label: string }[] = [
