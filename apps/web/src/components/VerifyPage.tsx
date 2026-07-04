@@ -40,15 +40,15 @@ export default function VerifyPage() {
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4" id="verify-page">
-      <div className="rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-100/50 p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex p-2 rounded-2xl bg-orange-50 text-orange-600">
-            <ShieldCheck className="w-4 h-4" />
+      <div className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex p-2.5 rounded-2xl bg-orange-50 text-orange-600 border border-orange-100 shrink-0">
+            <ShieldCheck className="w-5 h-5" />
           </span>
           <div>
-            <h2 className="font-bold text-slate-800">리뷰 검증</h2>
-            <p className="text-[10px] text-slate-500 leading-relaxed">
-              블로그·카카오 리뷰를 붙여넣으세요. 문장별로 공공데이터와 대조해 판정합니다.
+            <h2 className="font-bold text-[15px] text-stone-900 tracking-tight">리뷰 검증</h2>
+            <p className="text-[11.5px] text-stone-500 leading-relaxed mt-0.5">
+              블로그·카카오 리뷰를 붙여넣으면 문장별로 공공데이터와 대조해 판정합니다.
             </p>
           </div>
         </div>
@@ -57,30 +57,30 @@ export default function VerifyPage() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={6}
-          className="w-full px-3 py-2.5 rounded-2xl border border-slate-200 bg-[#FAF9F6] text-slate-800 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 transition resize-none"
+          className="w-full px-3.5 py-3 rounded-2xl border border-stone-200 bg-[#FDFBF7] text-stone-800 text-[12.5px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition resize-none placeholder:text-stone-400"
           placeholder="리뷰 원문을 붙여넣으세요."
         />
 
         <button
           onClick={handleSubmit}
           disabled={loading || !text.trim()}
-          className="w-full py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 disabled:bg-slate-300 text-white font-semibold text-sm transition-all shadow-md shadow-orange-100 flex items-center justify-center gap-1.5 cursor-pointer"
+          className="w-full py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 disabled:bg-stone-200 disabled:text-stone-400 text-white font-semibold text-sm transition shadow-pyj-chip disabled:shadow-none flex items-center justify-center gap-1.5 cursor-pointer"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-          검증하기
+          {loading ? '판정 중…' : '검증하기'}
         </button>
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 text-xs text-rose-800 font-mono break-all">
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 text-[11px] text-rose-800 font-mono break-all">
           {error}
         </div>
       )}
 
       {resp && (
         <div className="space-y-2">
-          <p className="text-[10px] text-slate-400 pl-1">
-            {resp.claims.length}개 문장 · log_id: {resp.log_id?.slice(0, 8) ?? '-'}
+          <p className="text-[10.5px] text-stone-400 pl-1">
+            {resp.claims.length}개 문장 · log_id {resp.log_id?.slice(0, 8) ?? '-'}
           </p>
           {resp.claims.map((c, i) => (
             <React.Fragment key={i}>
@@ -100,32 +100,32 @@ function ClaimCard({ idx, claim }: { idx: number; claim: VerifyResponse['claims'
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.05 }}
-      className={`rounded-2xl border p-3 space-y-1.5 ${style.wrap}`}
+      className={`rounded-2xl border p-4 ${style.wrap}`}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-3">
         <span className={`shrink-0 mt-0.5 ${style.iconColor}`}>{style.icon}</span>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs text-slate-800 leading-relaxed">{claim.text}</div>
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="text-[13px] text-stone-900 leading-relaxed font-medium">{claim.text}</div>
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${style.chip}`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${style.chip}`}
             >
               {style.label}
             </span>
             {claim.matched_name && (
-              <span className="text-[10px] text-slate-500">→ {claim.matched_name}</span>
+              <span className="text-[10.5px] text-stone-500 font-medium">→ {claim.matched_name}</span>
             )}
           </div>
-          <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{claim.reason}</p>
+          <p className="text-[11px] text-stone-600 leading-relaxed">{claim.reason}</p>
           {claim.sources.length > 0 && (
-            <div className="mt-1">
+            <div className="pt-1 border-t border-stone-100">
               {claim.sources.map((s, i) => (
                 <a
                   key={i}
                   href={s.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] text-orange-700 hover:underline"
+                  className="inline-flex items-center gap-1 text-[10.5px] font-medium text-orange-700 hover:underline"
                 >
                   <ExternalLink className="w-3 h-3" /> {s.name}
                 </a>
@@ -143,34 +143,34 @@ function verdictStyle(v: VerifyVerdict) {
     case 'verified':
       return {
         label: '확인됨',
-        icon: <CheckCircle2 className="w-4 h-4" />,
+        icon: <CheckCircle2 className="w-5 h-5" />,
         iconColor: 'text-emerald-600',
-        wrap: 'bg-emerald-50/40 border-emerald-100',
+        wrap: 'bg-white border-emerald-200 shadow-pyj-card',
         chip: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       };
     case 'outdated':
       return {
         label: '정보 낡음',
-        icon: <AlertTriangle className="w-4 h-4" />,
+        icon: <AlertTriangle className="w-5 h-5" />,
         iconColor: 'text-amber-600',
-        wrap: 'bg-amber-50/40 border-amber-100',
+        wrap: 'bg-white border-amber-200 shadow-pyj-card',
         chip: 'bg-amber-50 text-amber-700 border-amber-200',
       };
     case 'contradicted':
       return {
         label: '폐업/변경 확인',
-        icon: <XCircle className="w-4 h-4" />,
+        icon: <XCircle className="w-5 h-5" />,
         iconColor: 'text-rose-600',
-        wrap: 'bg-rose-50/40 border-rose-100',
+        wrap: 'bg-white border-rose-200 shadow-pyj-card',
         chip: 'bg-rose-50 text-rose-700 border-rose-200',
       };
     default:
       return {
-        label: '확인 불가',
-        icon: <HelpCircle className="w-4 h-4" />,
-        iconColor: 'text-slate-500',
-        wrap: 'bg-slate-50/40 border-slate-100',
-        chip: 'bg-slate-50 text-slate-700 border-slate-200',
+        label: '확인 안 됨',
+        icon: <HelpCircle className="w-5 h-5" />,
+        iconColor: 'text-stone-500',
+        wrap: 'bg-white border-stone-200 shadow-pyj-card',
+        chip: 'bg-stone-50 text-stone-700 border-stone-200',
       };
   }
 }

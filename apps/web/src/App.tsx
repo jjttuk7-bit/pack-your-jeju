@@ -155,24 +155,27 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans relative flex flex-col items-center px-4 py-8 antialiased selection:bg-orange-100 selection:text-orange-900" id="app-root">
-      
-      {/* Background Decorative Grayish Slate Accent */}
-      <div className="absolute top-0 left-0 w-full h-80 bg-gradient-to-b from-slate-100 to-transparent pointer-events-none -z-10" />
-      
+    <div className="min-h-screen text-stone-900 font-sans relative flex flex-col items-center px-4 py-10 antialiased" id="app-root">
+
+      {/* Warm decorative background layers */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] -z-10 overflow-hidden">
+        <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-orange-200/30 blur-3xl" />
+        <div className="absolute -top-32 right-0 w-[380px] h-[380px] rounded-full bg-amber-200/40 blur-3xl" />
+      </div>
+
       {/* Container */}
       <div className="w-full max-w-lg flex flex-col flex-1" id="app-container">
-        
+
         {/* Header Block with App Identity */}
-        <header className="text-center pt-4 pb-8" id="app-header">
+        <header className="text-center pt-2 pb-8" id="app-header">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-orange-50 rounded-full border border-orange-100 mb-3"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/70 backdrop-blur rounded-full border border-orange-100 mb-4 shadow-sm"
           >
-            <Luggage className="w-4 h-4 text-orange-650" />
-            <span className="text-[10px] font-bold text-orange-650 uppercase tracking-widest">
+            <Luggage className="w-3.5 h-3.5 text-orange-600" />
+            <span className="text-[10px] font-bold text-orange-700 uppercase tracking-[0.14em]">
               Trust-Verified Jeju Trip Prep
             </span>
           </motion.div>
@@ -182,40 +185,40 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.5 }}
-            className="text-3xl font-extrabold text-stone-900 tracking-tight"
+            className="text-4xl font-black text-stone-900 tracking-tight leading-tight"
             id="brand-name"
           >
-            Pack Your Jeju 🍊
+            Pack Your Jeju <span className="inline-block align-baseline">🍊</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-xs font-medium text-stone-500 mt-2 max-w-xs mx-auto leading-relaxed"
+            className="text-[13px] text-stone-500 mt-3 max-w-[280px] mx-auto leading-relaxed"
             id="main-subtitle-copy"
           >
-            "짐을 싸기 전에, 그 순간이 진짜인지부터 확인합니다."
+            짐을 싸기 전에,<br />그 순간이 진짜인지부터 확인합니다.
           </motion.p>
 
           {state.step !== 'setup' && (
-            <div className="mt-4 flex items-center justify-center gap-1.5">
+            <div className="mt-5 inline-flex items-center gap-0.5 p-1 bg-white/70 backdrop-blur rounded-full border border-orange-100 shadow-sm">
               <button
                 onClick={goToDashboard}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-semibold border transition ${
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition ${
                   state.step === 'dashboard'
-                    ? 'bg-orange-600 text-white border-orange-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    ? 'bg-orange-600 text-white shadow-pyj-chip'
+                    : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
                 내 팩
               </button>
               <button
                 onClick={goToVerify}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-semibold border transition inline-flex items-center gap-1 ${
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition inline-flex items-center gap-1 ${
                   state.step === 'verify'
-                    ? 'bg-orange-600 text-white border-orange-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    ? 'bg-orange-600 text-white shadow-pyj-chip'
+                    : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
                 <ShieldCheck className="w-3 h-3" />
@@ -288,8 +291,9 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        {/* Brand-consistent clean and humble footer (No low-quality slop telemetry or diagnostic print lines) */}
-        <footer className="text-center text-stone-400 text-[10px] py-10 mt-auto border-t border-stone-200/40" id="app-footer">
+        {/* Footer */}
+        <footer className="text-center text-stone-400 text-[10px] py-12 mt-auto" id="app-footer">
+          <div className="w-8 h-px bg-stone-200 mx-auto mb-4" />
           <p>© 2026 Pack Your Jeju. 근거 있는 것만, 정직하게.</p>
         </footer>
 

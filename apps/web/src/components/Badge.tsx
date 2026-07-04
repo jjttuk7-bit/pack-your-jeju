@@ -51,15 +51,17 @@ export default function Badge({
   };
   const b = map[kind];
   return (
-    <div className="inline-flex flex-col gap-0.5">
+    <div className="inline-flex flex-col gap-1 items-end">
       <span
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${b.bg} ${b.text} ${b.border}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border shrink-0 ${b.bg} ${b.text} ${b.border}`}
       >
         {b.icon}
         {b.label}
       </span>
       {note && (
-        <span className="text-[10px] text-slate-500 leading-tight">· {note}</span>
+        <span className="text-[10px] text-stone-500 leading-snug text-right max-w-[140px]">
+          {note}
+        </span>
       )}
     </div>
   );

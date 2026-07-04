@@ -65,33 +65,45 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
 
   return (
     <div
-      className="w-full max-w-md mx-auto bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50 p-6 sm:p-8"
+      className="w-full max-w-md mx-auto bg-white rounded-[28px] border border-orange-100/60 shadow-pyj-card p-6 sm:p-8"
       id="travel-form"
     >
-      <div className="flex items-center justify-between mb-8 pb-3 border-b border-slate-100" id="form-tab-nav">
+      <div className="flex items-center gap-1 mb-8" id="form-tab-nav">
         <button
           onClick={() => setActiveTab('basic')}
-          className={`flex-1 text-center pb-2 text-sm font-semibold transition-all duration-300 ${
-            activeTab === 'basic'
-              ? 'text-orange-650 border-b-2 border-orange-600'
-              : 'text-slate-400 font-normal hover:text-slate-600'
+          className={`relative flex-1 text-center py-2.5 text-[13px] font-semibold transition ${
+            activeTab === 'basic' ? 'text-stone-900' : 'text-stone-400 hover:text-stone-600'
           }`}
           id="tab-basic-btn"
         >
           1. 여행 계획하기
+          {activeTab === 'basic' && (
+            <motion.div
+              layoutId="tab-underline"
+              className="absolute left-2 right-2 -bottom-px h-[2px] bg-orange-600 rounded-full"
+            />
+          )}
         </button>
         <button
           onClick={handleNextToMoments}
-          className={`flex-1 text-center pb-2 text-sm font-semibold transition-all duration-300 ${
-            activeTab === 'moments'
-              ? 'text-orange-650 border-b-2 border-orange-600'
-              : 'text-slate-400 font-normal hover:text-slate-600'
+          className={`relative flex-1 text-center py-2.5 text-[13px] font-semibold transition ${
+            activeTab === 'moments' ? 'text-stone-900' : 'text-stone-400 hover:text-stone-600'
           }`}
           id="tab-moments-btn"
         >
-          2. 순간 고르기 ({selectedMomentIds.length})
+          2. 순간 고르기{' '}
+          <span className={`text-[11px] ${activeTab === 'moments' ? 'text-orange-600' : 'text-stone-400'}`}>
+            ({selectedMomentIds.length})
+          </span>
+          {activeTab === 'moments' && (
+            <motion.div
+              layoutId="tab-underline"
+              className="absolute left-2 right-2 -bottom-px h-[2px] bg-orange-600 rounded-full"
+            />
+          )}
         </button>
       </div>
+      <div className="h-px bg-stone-100 mb-7 -mt-6" />
 
       {activeTab === 'basic' ? (
         <motion.div
@@ -101,15 +113,16 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
           className="space-y-6"
           id="form-step-basic"
         >
-          <div className="text-center mb-6">
-            <span className="inline-flex p-3 rounded-2xl bg-orange-50 text-orange-600 mb-2">
+          <div className="text-center mb-2">
+            <span className="inline-flex p-3 rounded-2xl bg-orange-50 text-orange-600 mb-3 border border-orange-100">
               <Palmtree className="w-5 h-5" />
             </span>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+            <h2 className="text-[22px] font-bold text-stone-900 tracking-tight leading-snug">
               제주에서 어떤 시간을 보내실까요?
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              머릿속 가벼운 스케치를 들려주세요. 근거가 있는 것만 준비해 드립니다.
+            <p className="text-[11.5px] text-stone-500 mt-2 leading-relaxed">
+              머릿속 가벼운 스케치를 들려주세요.<br />
+              근거가 있는 것만 준비해 드립니다.
             </p>
           </div>
 
@@ -117,38 +130,37 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" /> 언제 떠나나요?
+              <label className="block text-[11px] font-semibold text-stone-500 mb-1.5 flex items-center gap-1 uppercase tracking-wide">
+                <Calendar className="w-3 h-3 text-stone-400" /> 출발일
               </label>
               <input
                 id="form-start-date-input"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-2xl border border-slate-200 bg-[#FAF9F6] text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 transition"
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 bg-[#FDFBF7] text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" /> 며칠간 머무나요?
+              <label className="block text-[11px] font-semibold text-stone-500 mb-1.5 flex items-center gap-1 uppercase tracking-wide">
+                <Calendar className="w-3 h-3 text-stone-400" /> 기간
               </label>
-              <div className="flex items-center border border-slate-200 rounded-2xl bg-[#FAF9F6] overflow-hidden">
+              <div className="flex items-center border border-stone-200 rounded-xl bg-[#FDFBF7] overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setDurationDays((d) => Math.max(1, d - 1))}
-                  className="px-3 py-2 text-slate-500 hover:bg-slate-200 transition font-bold"
+                  className="w-9 py-2.5 text-stone-500 hover:bg-stone-100 transition text-base font-medium"
                 >
-                  -
+                  −
                 </button>
-                <span className="flex-1 text-center text-sm font-semibold text-slate-800">
-                  {durationDays}일간 (
-                  {durationDays - 1 > 0 ? `${durationDays - 1}박 ${durationDays}일` : '당일치기'})
+                <span className="flex-1 text-center text-[13px] font-semibold text-stone-900">
+                  {durationDays - 1 > 0 ? `${durationDays - 1}박 ${durationDays}일` : '당일치기'}
                 </span>
                 <button
                   type="button"
                   onClick={() => setDurationDays((d) => Math.min(14, d + 1))}
-                  className="px-3 py-2 text-slate-500 hover:bg-slate-200 transition font-bold"
+                  className="w-9 py-2.5 text-stone-500 hover:bg-stone-100 transition text-base font-medium"
                 >
                   +
                 </button>
@@ -157,26 +169,33 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
-              <Users className="w-3.5 h-3.5 text-slate-400" /> 누구와 함께 하나요?
+            <label className="block text-[11px] font-semibold text-stone-500 mb-2 flex items-center gap-1 uppercase tracking-wide">
+              <Users className="w-3 h-3 text-stone-400" /> 동행자
             </label>
             <div className="grid grid-cols-2 gap-2" id="grid-companions">
-              {COMPANIONS.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  id={`companion-btn-${item.value}`}
-                  onClick={() => setCompanion(item.value)}
-                  className={`px-3 py-2.5 rounded-xl border text-xs text-left transition-all duration-200 flex items-center justify-between ${
-                    companion === item.value
-                      ? 'border-orange-500 bg-orange-50 text-orange-950 font-semibold shadow-sm shadow-orange-50'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  {companion === item.value && <Check className="w-3.5 h-3.5 text-orange-600 stroke-[3]" />}
-                </button>
-              ))}
+              {COMPANIONS.map((item) => {
+                const active = companion === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    id={`companion-btn-${item.value}`}
+                    onClick={() => setCompanion(item.value)}
+                    className={`px-3 py-2.5 rounded-xl border text-[12.5px] text-left transition-all duration-200 flex items-center justify-between ${
+                      active
+                        ? 'border-orange-500 bg-orange-50 text-orange-950 font-semibold shadow-pyj-chip'
+                        : 'border-stone-200 bg-white text-stone-600 hover:border-orange-200 hover:bg-orange-50/30'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {active && (
+                      <span className="w-4 h-4 rounded-full bg-orange-600 flex items-center justify-center shrink-0">
+                        <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -185,34 +204,37 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
               <Compass className="w-3.5 h-3.5 text-slate-400" /> 이번 여행의 가장 큰 목적은?
             </label>
             <div className="space-y-1.5" id="list-purposes">
-              {PURPOSES.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  id={`purpose-btn-${item.value}`}
-                  onClick={() => setPurpose(item.value)}
-                  className={`w-full px-4 py-3 rounded-xl border text-xs text-left transition-all duration-200 flex items-center justify-between ${
-                    purpose === item.value
-                      ? 'border-orange-500 bg-orange-50 text-orange-950 font-semibold'
-                      : 'border-slate-200 bg-white text-slate-650 hover:border-slate-300'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                      purpose === item.value ? 'bg-orange-600 border-orange-600' : 'border-slate-300 bg-white'
+              {PURPOSES.map((item) => {
+                const active = purpose === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    id={`purpose-btn-${item.value}`}
+                    onClick={() => setPurpose(item.value)}
+                    className={`w-full px-4 py-3 rounded-xl border text-[13px] text-left transition-all duration-200 flex items-center justify-between ${
+                      active
+                        ? 'border-orange-500 bg-orange-50 text-orange-950 font-semibold shadow-pyj-chip'
+                        : 'border-stone-200 bg-white text-stone-600 hover:border-orange-200 hover:bg-orange-50/30'
                     }`}
                   >
-                    {purpose === item.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                  </div>
-                </button>
-              ))}
+                    <span>{item.label}</span>
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${
+                        active ? 'bg-orange-600 border-orange-600' : 'border-stone-300 bg-white'
+                      }`}
+                    >
+                      {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {errorMsg && (
             <p
-              className="text-xs text-red-650 font-medium bg-red-50 p-2.5 rounded-xl border border-red-100"
+              className="text-[12px] text-rose-700 font-medium bg-rose-50 p-3 rounded-xl border border-rose-100"
               id="basic-error-msg"
             >
               ⚠️ {errorMsg}
@@ -223,7 +245,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
             type="button"
             id="btn-goto-moments"
             onClick={handleNextToMoments}
-            className="w-full mt-2 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm transition-all duration-200 shadow-md shadow-orange-100 flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full mt-2 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm transition-all duration-200 shadow-pyj-chip flex items-center justify-center gap-2 cursor-pointer"
           >
             기대되는 순간 고르러 가기
             <ArrowRight className="w-4 h-4" />
@@ -237,22 +259,21 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
           className="space-y-6"
           id="form-step-moments"
         >
-          <div className="text-center mb-4">
-            <span className="inline-flex p-3 rounded-2xl bg-orange-50 text-orange-600 mb-2">
-              <Sparkles className="w-5 h-5 animate-pulse" />
+          <div className="text-center mb-2">
+            <span className="inline-flex p-3 rounded-2xl bg-orange-50 text-orange-600 mb-3 border border-orange-100">
+              <Sparkles className="w-5 h-5" />
             </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              제주에서 어떤 순간을 원하시나요?
+            <h2 className="text-[22px] font-bold text-stone-900 tracking-tight leading-snug">
+              어떤 순간을 원하시나요?
             </h2>
-            <p className="text-xs text-slate-555 mt-1">
-              공공데이터로 검증된 곳만 골라 보여드립니다.{' '}
-              <br />
+            <p className="text-[11.5px] text-stone-500 mt-2 leading-relaxed">
+              공공데이터로 검증된 곳만 골라 보여드립니다.<br />
               <span className="text-orange-600 font-semibold">(다중 선택 가능)</span>
             </p>
           </div>
 
           <div
-            className="space-y-3 max-h-[360px] overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-slate-200"
+            className="space-y-2 max-h-[400px] overflow-y-auto pr-1 select-none"
             id="moments-list-viewport"
           >
             {MOMENTS.map((moment) => {
@@ -264,23 +285,25 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                   onClick={() => toggleMoment(moment.id)}
                   className={`p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex gap-3 items-start relative ${
                     isSelected
-                      ? 'border-orange-500 bg-orange-50/40 shadow-inner'
-                      : 'border-slate-250 bg-white hover:border-slate-350'
+                      ? 'border-orange-500 bg-orange-50/60 shadow-pyj-chip'
+                      : 'border-stone-200 bg-white hover:border-orange-200 hover:bg-orange-50/20'
                   }`}
                 >
-                  <span className="text-2xl mt-0.5">{moment.emoji}</span>
+                  <span className="text-2xl mt-0.5 leading-none">{moment.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm text-slate-800">{moment.title}</h3>
-                    <p className="text-xs text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
+                    <h3 className={`font-bold text-[13.5px] tracking-tight ${isSelected ? 'text-orange-950' : 'text-stone-900'}`}>
+                      {moment.title}
+                    </h3>
+                    <p className="text-[11.5px] text-stone-500 line-clamp-2 mt-0.5 leading-relaxed">
                       {moment.description}
                     </p>
                   </div>
                   <div
-                    className={`w-5 h-5 rounded-md border shrink-0 mt-1 flex items-center justify-center transition-all ${
-                      isSelected ? 'bg-orange-600 border-orange-600 text-white' : 'border-slate-300 bg-white'
+                    className={`w-5 h-5 rounded-md border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                      isSelected ? 'bg-orange-600 border-orange-600 text-white' : 'border-stone-300 bg-white'
                     }`}
                   >
-                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    {isSelected && <Check className="w-3 h-3 stroke-[4]" />}
                   </div>
                 </div>
               );
@@ -289,7 +312,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
 
           {errorMsg && (
             <p
-              className="text-xs text-red-650 font-medium bg-red-50 p-2.5 rounded-xl border border-red-100"
+              className="text-[12px] text-rose-700 font-medium bg-rose-50 p-3 rounded-xl border border-rose-100"
               id="moments-error-msg"
             >
               ⚠️ {errorMsg}
@@ -301,17 +324,17 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
               type="button"
               id="btn-back-to-basic"
               onClick={() => setActiveTab('basic')}
-              className="py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium text-xs transition duration-200 text-center cursor-pointer"
+              className="py-3 rounded-2xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 font-medium text-xs transition text-center cursor-pointer"
             >
-              이전 단계
+              이전
             </button>
             <button
               type="button"
               id="btn-generate-list"
               onClick={handleSubmitAll}
-              className="col-span-2 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm transition duration-205 shadow-md shadow-orange-100 flex items-center justify-center gap-1.5 cursor-pointer"
+              className="col-span-2 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm transition shadow-pyj-chip flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 fill-orange-100/20 text-orange-200 animate-pulse" />
+              <Sparkles className="w-4 h-4 text-orange-100" />
               근거 있는 팩 받기
             </button>
           </div>

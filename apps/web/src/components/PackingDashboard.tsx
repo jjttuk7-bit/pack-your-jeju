@@ -112,26 +112,26 @@ export default function PackingDashboard(props: Props) {
   ]);
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-6" id="packing-dashboard">
+    <div className="w-full max-w-md mx-auto space-y-5" id="packing-dashboard">
       {/* 요약 카드 */}
       <div
-        className="rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-100/50 p-5 space-y-3"
+        className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
         id="trip-summary"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">이번 제주 여행</h2>
+          <h2 className="text-[15px] font-bold text-stone-900 tracking-tight">이번 제주 여행</h2>
           <button
             onClick={onReset}
-            className="text-[10px] font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 transition"
+            className="text-[10.5px] font-semibold text-stone-500 hover:text-stone-900 inline-flex items-center gap-1 transition"
           >
             <RotateCcw className="w-3 h-3" /> 다시 세우기
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px] text-stone-700">
           <SummaryLine icon={<MapPin className="w-3.5 h-3.5" />} label={regionLabel} />
           <SummaryLine
             icon={<Calendar className="w-3.5 h-3.5" />}
-            label={`${info.startDate} · ${info.durationDays}일`}
+            label={`${info.startDate.slice(5)} · ${info.durationDays}일`}
           />
           <SummaryLine icon={<Users className="w-3.5 h-3.5" />} label={companionLabel} />
           <SummaryLine icon={<Compass className="w-3.5 h-3.5" />} label={purposeLabel} />
@@ -143,12 +143,12 @@ export default function PackingDashboard(props: Props) {
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl bg-orange-50/60 border border-orange-100 p-4 text-xs text-orange-950 leading-relaxed"
+          className="rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50/60 border border-orange-100/70 p-4 text-[12.5px] text-orange-950 leading-relaxed"
           id="intro-copy"
         >
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-650 mb-1.5">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 mb-1.5 uppercase tracking-wider">
             <Sparkles className="w-3 h-3" />
-            {packResp.intro.llm_used ? 'AI 조립 문구' : '템플릿 문구 (LLM 미사용)'}
+            {packResp.intro.llm_used ? 'AI 조립 문구' : '템플릿 문구'}
           </span>
           <p>{packResp.intro.text}</p>
         </motion.div>
@@ -156,24 +156,23 @@ export default function PackingDashboard(props: Props) {
 
       {/* 로딩 · 에러 */}
       {loading && (
-        <div className="text-center py-10 text-slate-500 text-xs" id="pack-loading">
-          <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin text-orange-500" />
+        <div className="text-center py-14 text-stone-500 text-[12px]" id="pack-loading">
+          <Loader2 className="w-5 h-5 mx-auto mb-2.5 animate-spin text-orange-500" />
           공공데이터에서 근거를 모으는 중…
         </div>
       )}
       {error && (
         <div
-          className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-xs text-rose-800 space-y-2"
+          className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-[12px] text-rose-800 space-y-2"
           id="pack-error"
         >
-          <div className="flex items-center gap-1 font-bold">
+          <div className="flex items-center gap-1.5 font-bold">
             <ShieldAlert className="w-4 h-4" />
             서버 연결 실패
           </div>
-          <div className="font-mono text-[10px] break-all">{error}</div>
-          <p className="text-[10px] leading-relaxed text-rose-700">
-            백엔드 URL을 확인해 주세요. Vercel 배포는 <code>VITE_API_BASE_URL</code> 환경변수로,
-            로컬은 <code>uvicorn apps.api.main:app --port 8000</code> 실행 필요.
+          <div className="font-mono text-[10px] break-all bg-white/70 rounded p-2">{error}</div>
+          <p className="text-[10.5px] leading-relaxed text-rose-700">
+            <code className="bg-white/70 rounded px-1">VITE_API_BASE_URL</code>이 올바른 Railway URL인지 확인해 주세요.
           </p>
         </div>
       )}
@@ -187,12 +186,14 @@ export default function PackingDashboard(props: Props) {
 
       {/* 기본 체크리스트 */}
       <div
-        className="rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-100/50 p-5 space-y-3"
+        className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
         id="basic-checklist"
       >
-        <h2 className="text-sm font-bold text-slate-800">기본 짐 체크리스트</h2>
-        <p className="text-[10px] text-slate-500">제주 여행 공통 필수 · 개인 취향으로 체크</p>
-        <div className="space-y-1.5">
+        <div>
+          <h2 className="text-[14.5px] font-bold text-stone-900 tracking-tight">기본 짐 체크리스트</h2>
+          <p className="text-[10.5px] text-stone-500 mt-0.5">제주 여행 공통 · 개인 취향으로 체크</p>
+        </div>
+        <div className="space-y-1">
           {BASIC_CHECKLIST.map((item, idx) => {
             const id = `basic-${idx}`;
             const checked = checkedItemIds.includes(id);
@@ -201,16 +202,16 @@ export default function PackingDashboard(props: Props) {
                 key={id}
                 type="button"
                 onClick={() => onToggleItem(id)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-orange-50/50 transition text-left"
               >
                 {checked ? (
-                  <CheckSquare className="w-4 h-4 text-orange-600" />
+                  <CheckSquare className="w-4 h-4 text-orange-600 shrink-0" />
                 ) : (
-                  <Square className="w-4 h-4 text-slate-300" />
+                  <Square className="w-4 h-4 text-stone-300 shrink-0" />
                 )}
                 <span
-                  className={`text-xs ${
-                    checked ? 'line-through text-slate-400' : 'text-slate-700'
+                  className={`text-[12.5px] ${
+                    checked ? 'line-through text-stone-400' : 'text-stone-700'
                   }`}
                 >
                   {item}
@@ -228,81 +229,94 @@ export default function PackingDashboard(props: Props) {
 
 function SummaryLine({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-slate-400">{icon}</span>
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="text-orange-500 shrink-0">{icon}</span>
       <span className="font-medium truncate">{label}</span>
     </div>
   );
 }
 
+const FALLBACK_MEAN: Record<string, { label: string; tint: string; emoji: string }> = {
+  coverage_gap:   { label: '공공데이터 커버리지 밖', tint: 'from-amber-50 to-orange-50/60 border-amber-100 text-amber-950',  emoji: '🟠' },
+  contradicted:   { label: '반증이 확인됩니다',       tint: 'from-rose-50 to-orange-50/60 border-rose-100 text-rose-950',     emoji: '🔴' },
+  retrieval_miss: { label: '검색 결과 없음',           tint: 'from-stone-50 to-orange-50/60 border-stone-100 text-stone-800', emoji: '⚪' },
+  out_of_scope:   { label: '제주 여행 범위 밖',       tint: 'from-stone-50 to-orange-50/60 border-stone-100 text-stone-800', emoji: '⚪' },
+};
+
 function SectionCard({ section }: { section: SectionDto }) {
   const moment = MOMENTS.find((m) => m.id === section.moment);
   const title = moment?.title ?? section.moment;
   const emoji = moment?.emoji ?? '📍';
+  const fb = section.fallback ? FALLBACK_MEAN[section.fallback.reason] : null;
 
   return (
     <div
-      className="rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-100/50 p-5 space-y-3"
+      className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
       id={`section-${section.moment}`}
     >
       <div className="flex items-center gap-2">
-        <span className="text-xl">{emoji}</span>
-        <h3 className="font-bold text-sm text-slate-800">{title}</h3>
+        <span className="text-xl leading-none">{emoji}</span>
+        <h3 className="font-bold text-[14px] text-stone-900 tracking-tight">{title}</h3>
+        {!section.fallback && section.items.length > 0 && (
+          <span className="ml-auto text-[10.5px] font-semibold text-stone-400">
+            {section.items.length}곳
+          </span>
+        )}
       </div>
 
-      {section.fallback ? (
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 text-xs text-amber-900">
-          <div className="font-bold mb-1">
-            {section.fallback.reason === 'coverage_gap' && '데이터 커버리지 밖'}
-            {section.fallback.reason === 'contradicted' && '반증 확인됨'}
-            {section.fallback.reason === 'retrieval_miss' && '검색 결과 없음'}
-            {section.fallback.reason === 'out_of_scope' && '범위 밖'}
+      {section.fallback && fb ? (
+        <div className={`rounded-2xl border bg-gradient-to-br ${fb.tint} p-4`}>
+          <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider mb-2">
+            <span>{fb.emoji}</span>
+            <span>{fb.label}</span>
           </div>
-          <p className="leading-relaxed">{section.fallback.message}</p>
+          <p className="text-[13px] leading-relaxed font-medium">
+            {section.fallback.message}
+          </p>
         </div>
       ) : section.items.length === 0 ? (
-        <p className="text-xs text-slate-400">결과가 없습니다.</p>
+        <p className="text-xs text-stone-400">결과가 없습니다.</p>
       ) : (
         <div className="space-y-2">
           {section.items.map((it) => (
             <div
               key={it.external_id}
-              className="p-3 rounded-2xl border border-slate-100 bg-slate-50/30"
+              className="p-3.5 rounded-2xl border border-stone-100 bg-[#FDFBF7] hover:border-orange-200 transition"
             >
-              <div className="flex items-start justify-between gap-2 mb-1.5">
+              <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm text-slate-800">{it.name}</div>
+                  <div className="font-bold text-[13.5px] text-stone-900 leading-snug">{it.name}</div>
                 </div>
                 <Badge kind={it.badge} note={it.note} />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 mt-1">
+              <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-stone-500">
                 {it.transit.parking && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100">
-                    <ParkingCircle className="w-3 h-3" /> 주차 {it.transit.parking_count}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
+                    <ParkingCircle className="w-3 h-3 text-stone-500" />
+                    <span className="font-medium">주차 {it.transit.parking_count}</span>
                   </span>
                 )}
                 {it.transit.bus_walkable && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100">
-                    <Bus className="w-3 h-3" /> 정류장 근접
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
+                    <Bus className="w-3 h-3 text-stone-500" />
+                    <span className="font-medium">정류장 근접</span>
                   </span>
                 )}
                 {it.freshness?.info_type && (
-                  <span className="text-slate-400">
-                    · {it.freshness.info_type}
-                  </span>
+                  <span className="text-stone-400">· {it.freshness.info_type}</span>
                 )}
               </div>
 
               {it.sources?.length > 0 && (
-                <div className="mt-1.5">
+                <div className="mt-2 pt-2 border-t border-stone-100">
                   {it.sources.map((s, i) => (
                     <a
                       key={i}
                       href={s.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[10px] text-orange-700 hover:underline"
+                      className="inline-flex items-center gap-1 text-[10.5px] font-medium text-orange-700 hover:underline"
                     >
                       <ExternalLink className="w-3 h-3" />
                       {s.name}
