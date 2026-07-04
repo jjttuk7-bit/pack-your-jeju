@@ -24,6 +24,7 @@ import type {
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
 import { requestPack } from '../api';
 import Badge from './Badge';
+import MomentIcon from './marks/MomentIcon';
 
 interface Props {
   info: TravelInfo;
@@ -246,19 +247,22 @@ const FALLBACK_MEAN: Record<string, { label: string; tint: string; emoji: string
 function SectionCard({ section }: { section: SectionDto }) {
   const moment = MOMENTS.find((m) => m.id === section.moment);
   const title = moment?.title ?? section.moment;
-  const emoji = moment?.emoji ?? '📍';
   const fb = section.fallback ? FALLBACK_MEAN[section.fallback.reason] : null;
 
   return (
     <div
-      className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
+      className="card-jeju p-5 space-y-3"
       id={`section-${section.moment}`}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-xl leading-none">{emoji}</span>
-        <h3 className="font-bold text-[14px] text-stone-900 tracking-tight">{title}</h3>
+      <div className="flex items-center gap-2.5">
+        {moment && (
+          <div className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center p-1 bg-[#FDF6EA]">
+            <MomentIcon id={moment.id as any} className="w-full h-full" />
+          </div>
+        )}
+        <h3 className="font-serif-kr font-bold text-[15px] text-basalt tracking-tight">{title}</h3>
         {!section.fallback && section.items.length > 0 && (
-          <span className="ml-auto text-[10.5px] font-semibold text-stone-400">
+          <span className="ml-auto text-[10.5px] font-bold text-basalt-2/60 uppercase tracking-wider">
             {section.items.length}곳
           </span>
         )}

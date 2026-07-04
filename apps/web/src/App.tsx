@@ -172,12 +172,12 @@ export default function App() {
         <header className="pt-2 pb-8" id="app-header">
           <div className="flex items-start gap-4 mb-2">
             <motion.div
-              initial={{ opacity: 0, scale: 0.85, rotate: -8 }}
+              initial={{ opacity: 0, scale: 0.75, rotate: -12 }}
               animate={{ opacity: 1, scale: 1, rotate: 0 }}
               transition={{ duration: 0.6, type: 'spring' }}
-              className="shrink-0 mt-1"
+              className="shrink-0 -mt-1"
             >
-              <CitrusMark className="w-14 h-14" />
+              <CitrusMark className="w-[68px] h-[68px]" />
             </motion.div>
             <div className="flex-1 min-w-0">
               <motion.p

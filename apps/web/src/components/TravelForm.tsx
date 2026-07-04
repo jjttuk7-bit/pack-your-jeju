@@ -11,6 +11,7 @@ import {
 import type { TravelInfo, MomentId, RegionId, CompanionValue, PurposeValue } from '../types';
 import { COMPANIONS, PURPOSES, MOMENTS } from '../data';
 import RegionChips from './RegionChips';
+import MomentIcon from './marks/MomentIcon';
 
 interface TravelFormProps {
   onSubmit: (info: TravelInfo, selectedMoments: MomentId[]) => void;
@@ -274,15 +275,19 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                   key={moment.id}
                   id={`moment-card-selector-${moment.id}`}
                   onClick={() => toggleMoment(moment.id)}
-                  className={`p-3.5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex gap-3 items-start relative ${
+                  className={`p-3.5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex gap-3 items-center relative ${
                     isSelected
                       ? 'border-citrus bg-citrus/8 shadow-jeju-chip'
                       : 'border-earth bg-white/70 hover:border-citrus/50 hover:bg-citrus/5'
                   }`}
                 >
-                  <span className="text-2xl mt-0.5 leading-none">{moment.emoji}</span>
+                  <div className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center p-1.5 transition ${
+                    isSelected ? 'bg-white' : 'bg-[#FDF6EA]'
+                  }`}>
+                    <MomentIcon id={moment.id} className="w-full h-full" />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className={`font-serif-kr font-bold text-[14px] tracking-tight ${isSelected ? 'text-citrus-2' : 'text-basalt'}`}>
+                    <h3 className={`font-serif-kr font-bold text-[14.5px] tracking-tight ${isSelected ? 'text-citrus-2' : 'text-basalt'}`}>
                       {moment.title}
                     </h3>
                     <p className="text-[11.5px] text-basalt-2 line-clamp-2 mt-0.5 leading-relaxed">
@@ -290,7 +295,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                     </p>
                   </div>
                   <div
-                    className={`w-5 h-5 rounded-md border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                    className={`w-5 h-5 rounded-md border-2 shrink-0 flex items-center justify-center transition-all ${
                       isSelected ? 'bg-citrus border-citrus text-white' : 'border-earth bg-white'
                     }`}
                   >
