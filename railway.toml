@@ -6,7 +6,8 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn apps.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+# startCommand는 Dockerfile CMD에 위임 (sh -c로 ${PORT} 확장 처리됨).
+# Railway startCommand는 exec 파싱이라 ${PORT:-8000}가 리터럴로 전달되는 문제 회피.
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
