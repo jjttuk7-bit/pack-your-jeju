@@ -243,11 +243,15 @@ def verify_text(text_in: str) -> list[VerifiedClaim]:
     claims = decompose_claims(text_in)
     results: list[VerifiedClaim] = []
     for c in claims:
-        query = c.place_candidate or _guess_place_name(c.text)
-        match = _match_place(query) if query else None
+        # 정직함 우선: 정확 부분 문자열 매칭을 먼저 시도한다.
+        # 얕은 조사-휴리스틱이 카테고리 명사("베이커리","카페")를 먼저 잡아
+        # 엉뚱한 place로 verified가 나오는 사고를 차단한다.
+        match = _match_from_sentence(c.text)
+        if match is None and c.place_candidate:
+            match = _match_place(c.place_candidate)
         if match is None:
-            # 휴리스틱 실패 폴백: 문장 자체와 토큰들을 순회
-            match = _match_from_sentence(c.text)
+            query = _guess_place_name(c.text)
+            match = _match_place(query) if query else None
         if match is None:
             results.append(VerifiedClaim(
                 text=c.text,
