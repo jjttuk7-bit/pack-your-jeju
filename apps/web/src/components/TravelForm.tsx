@@ -27,9 +27,11 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
   const [durationDays, setDurationDays] = useState<number>(initialInfo?.durationDays || 3);
   const [companion, setCompanion] = useState<CompanionValue>(initialInfo?.companion || 'solo');
   const [purpose, setPurpose] = useState<PurposeValue>(initialInfo?.purpose || 'healing');
+  const [specialNotes, setSpecialNotes] = useState<string>(initialInfo?.specialNotes || '');
   const [selectedMomentIds, setSelectedMomentIds] = useState<MomentId[]>(initialMoments || []);
   const [activeTab, setActiveTab] = useState<'basic' | 'moments'>('basic');
   const [errorMsg, setErrorMsg] = useState('');
+  const NOTES_MAX = 300;
 
   const toggleMoment = (id: MomentId) => {
     setSelectedMomentIds((prev) =>
@@ -58,7 +60,14 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
     }
     setErrorMsg('');
     onSubmit(
-      { region: region as RegionId, startDate, durationDays, companion, purpose },
+      {
+        region: region as RegionId,
+        startDate,
+        durationDays,
+        companion,
+        purpose,
+        specialNotes: specialNotes.trim() || undefined,
+      },
       selectedMomentIds
     );
   };
@@ -304,6 +313,28 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
                 </div>
               );
             })}
+          </div>
+
+          <div id="special-notes-field">
+            <label
+              htmlFor="special-notes-input"
+              className="block text-[10.5px] font-bold text-basalt-2 mb-1.5 flex items-center gap-1 uppercase tracking-[0.14em]"
+            >
+              <Sparkles className="w-3 h-3 text-basalt-2/60" /> 특별한 요청 (선택)
+            </label>
+            <textarea
+              id="special-notes-input"
+              value={specialNotes}
+              onChange={(e) => setSpecialNotes(e.target.value.slice(0, NOTES_MAX))}
+              placeholder="예: 부모님이 무릎이 편찮으셔서 계단 적은 곳 위주로. / 조용한 곳 위주로 부탁드려요."
+              rows={2}
+              className="w-full px-3 py-2 rounded-xl border border-earth bg-white/70 text-basalt text-[12.5px] leading-snug focus:outline-none focus:ring-2 focus:ring-citrus/25 focus:border-citrus transition placeholder:text-basalt-2/50"
+            />
+            <p className="mt-1 text-[10px] text-basalt-2/70 leading-relaxed">
+              감성 안내 문구의 톤에만 반영됩니다.{' '}
+              <span className="text-basalt-2/50">사실 검증(장소·시간·근거)은 폼 필터로만 판단합니다.</span>{' '}
+              <span className="text-basalt-2/50">({specialNotes.length}/{NOTES_MAX})</span>
+            </p>
           </div>
 
           {errorMsg && (

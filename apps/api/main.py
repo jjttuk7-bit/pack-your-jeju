@@ -63,6 +63,9 @@ class PackBody(BaseModel):
     companion: str
     purpose: str
     moments: list[str]
+    # 사용자 자유 텍스트. 사실 검증에는 영향 없음(폼이 구조화 필터를 이미 제공).
+    # assemble.py의 감성 문구 톤에만 반영 — 새 장소·수치·시간 생성 금지 원칙 유지.
+    special_notes: str | None = Field(default=None, max_length=500)
 
 
 @app.get("/health")
@@ -171,7 +174,9 @@ def pack(body: PackBody) -> dict[str, Any]:
                 # 사용자 노출된 fallback도 badge_counter에 별도 키로 남긴다
                 badge_counter[f"fallback:{section.fallback.reason}"] += 1
 
-        intro = assemble_mod.compose_intro(section_objs, req.companion)
+        intro = assemble_mod.compose_intro(
+            section_objs, req.companion, special_notes=body.special_notes,
+        )
 
     # 3) 로그 적재 (실패해도 응답에 영향 없음)
     log_id = log_pack(

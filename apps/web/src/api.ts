@@ -34,14 +34,17 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<PackResponse> {
-  return post<PackResponse>('/pack', {
+  const body: Record<string, unknown> = {
     region: info.region,
     start_date: info.startDate,
     days: info.durationDays,
     companion: info.companion,
     purpose: info.purpose,
     moments,
-  });
+  };
+  const notes = info.specialNotes?.trim();
+  if (notes) body.special_notes = notes;
+  return post<PackResponse>('/pack', body);
 }
 
 export function requestVerify(text: string): Promise<VerifyResponse> {

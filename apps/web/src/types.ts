@@ -24,6 +24,9 @@ export interface TravelInfo {
   durationDays: number;
   companion: CompanionValue;
   purpose: PurposeValue;
+  // 자유 텍스트. 사실 검증엔 영향 없음(폼이 이미 필터를 제공).
+  // 백엔드 assemble.py의 감성 문구 톤에만 반영.
+  specialNotes?: string;
 }
 
 export type MomentId =

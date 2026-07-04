@@ -84,12 +84,16 @@ _SYSTEM_PROMPT = (
     "2~3문장의 한국어 소개를 만든다. "
     "장소명·수치·시간을 새로 만들지 마라. 목록에 없는 이름을 언급하지 마라. "
     "확인되지 않은 항목이 있으면 '저희가 참조하는 공공데이터 기준으로 확인되지 않는다'는 "
-    "표현으로만 언급하고, '없다'고 단언하지 마라."
+    "표현으로만 언급하고, '없다'고 단언하지 마라. "
+    "사용자가 special_notes를 남겼다면 톤·배려 문구에만 반영하고, "
+    "이를 근거로 새 장소·시간·조건을 지어내지 마라."
 )
 
 
-def _build_user_prompt(sections: list[Section], companion: str) -> str:
-    payload = {
+def _build_user_prompt(
+    sections: list[Section], companion: str, special_notes: str | None = None,
+) -> str:
+    payload: dict = {
         "companion": companion,
         "moments": [
             {
@@ -102,18 +106,26 @@ def _build_user_prompt(sections: list[Section], companion: str) -> str:
             for s in sections
         ],
     }
+    if special_notes:
+        payload["special_notes"] = special_notes
     return json.dumps(payload, ensure_ascii=False)
 
 
-def compose_intro(sections: list[Section], companion: str) -> Intro:
-    """LLM 시도 → 실패면 템플릿 폴백. 항상 Intro를 반환한다."""
+def compose_intro(
+    sections: list[Section], companion: str, special_notes: str | None = None,
+) -> Intro:
+    """LLM 시도 → 실패면 템플릿 폴백. 항상 Intro를 반환한다.
+
+    special_notes: 사용자 자유 텍스트. LLM 프롬프트에 톤 힌트로만 전달.
+    템플릿 폴백은 그대로 (자유 텍스트를 그대로 되풀이하지 않음 — 톤 조작은 LLM 경로에서만).
+    """
     if not llm.is_available():
         return Intro(text=_template_intro(sections, companion), llm_used=False,
                      reason="OPENAI_API_KEY not set")
 
     resp = llm.complete(
         system=_SYSTEM_PROMPT,
-        user=_build_user_prompt(sections, companion),
+        user=_build_user_prompt(sections, companion, special_notes),
         max_completion_tokens=250,
         temperature=0.4,
     )
