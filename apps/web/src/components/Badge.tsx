@@ -14,13 +14,16 @@ import type { BadgeKind } from '../types';
  */
 
 // caution note 원문 → 짧은 라벨 매핑 (배지 안에 들어갈 헤드라인).
-// 매칭 실패 시 기본 "주의"로 폴백. 부분 문자열 매칭.
+// 백엔드 trust.py:_AMENITY_KO 라벨과 정합해야 한다.
+// 우선순위 순으로 위에서 아래로 첫 매칭 사용 (수정요청 이력 > amenity 결측 > 유효기간).
+// 매칭 실패 시 기본 "주의"로 폴백.
 const CAUTION_LABEL_MAP: Array<{ needle: string; label: string; footnote?: string }> = [
   { needle: '수정요청', label: '수정요청 이력', footnote: '1,686건 중 하나' },
+  { needle: '아이 동반', label: '아이 동반 정보 미확인' },
+  { needle: '접근성',   label: '접근성 정보 미확인' },
+  { needle: '주차',     label: '주차 정보 미확인' },
   { needle: '유효기간', label: '정보 노후' },
-  { needle: '아동 동반', label: 'kids 정보 미확인' },
-  { needle: '접근성', label: '접근성 미확인' },
-  { needle: '난이도', label: '난이도 미확인' },
+  { needle: '난이도',   label: '난이도 미확인' },
 ];
 
 function pickCautionLabel(note?: string | null): { label: string; footnote?: string } {
