@@ -81,9 +81,9 @@
 | **킥1 — AI가 AI를 팩트체크** | `/verify` (LLM claim 분해 → retrieval → LLM 판정) | ✅ **프로덕션 3-verdict 재현 완료** (contradicted/verified/coverage_gap). 데모 대본 확정: `data/verify_kick1_g14.json` | — |
 | **킥2 — 자가파괴** | 드롭됨 (D-15) | — | Q&A용 eval 실패 로그 캡처만 준비 |
 | **킥3 — 1,686건의 증거** | 수정요청 CSV 분석 → 오프닝 슬라이드 숫자 | ✅ **CSV 적재됨: 1,686행 → 556 place에 `has_fix_request=true` 매칭**. ⚠️ 유형 분포(폐업/이전/변경)는 미분석 | 유형별 카운트 뽑고 오프닝 슬라이드 1장. **핵심 숫자 두 개는 확정**: 1,686 (제기 건수) · 556 (실제 매칭) |
-| **킥4 — QR + 라이브 대시보드** | Vercel 프론트 QR → 발표 중 심사위원 요청이 `/admin/metrics`에 실시간 반영 | ✅ `/admin/metrics` 프로덕션 정상, ❌ **Vercel 프론트 미배포 → QR 아직 없음** | 프론트 배포, QR 생성, CORS 갱신 |
+| **킥4 — QR + 라이브 대시보드** | Vercel 프론트 QR → 발표 중 심사위원 요청이 `/admin/metrics`에 실시간 반영 | ✅ **완결**: `pack-your-jeju.vercel.app` Online, QR `docs/qr.png` 생성, 5종 배지 실 데이터 회전 중 (p50=13ms) | 슬라이드 삽입 · 발표장 Wi-Fi 사전 스캔 테스트 |
 
-**결론**: 킥1 완결. 킥3 오프닝 숫자 확정, 유형 분포만 마무리. 킥4가 유일하게 큰 미완 작업(Vercel 배포).
+**결론**: 킥1·킥4 완결. 킥3은 오프닝 숫자 확정, 유형 분포 시각화만 마무리 남음. 발표 준비의 핵심 조각은 모두 실 데이터로 살아있는 상태.
 
 ---
 
@@ -129,9 +129,10 @@
 - [x] **eval 러너 실행 + 리포트 캡처** — 12/12 GREEN, 3지표 1.00, `data/eval-reports/eval-*.md` 저장.
 - [x] **G14 tombstone 시드** — `애월오누이 제주` `tombstoned=true` (킥1 하이라이트 재현).
 
-### P1 — 시연 품질 (다음 진입 지점)
-- [ ] **Vercel 프론트 배포** — 킥4 QR의 실체. `apps/web` Root Directory, `VITE_API_BASE_URL` 세팅.
-- [ ] **Railway CORS 갱신** — Vercel 도메인 확정 후 `CORS_ALLOW_ORIGINS` 추가.
+### P1 — 시연 품질
+- [x] **Vercel 프론트 배포** — `pack-your-jeju.vercel.app` Online, pack 응답 실 렌더링 확인.
+- [x] **CORS 정합성** — `.vercel.app` regex가 이미 커버 → 별도 갱신 불필요.
+- [x] **킥4 QR 생성** — `docs/qr.png` (370×370).
 - [ ] **transit_point CSV 적재** (주차장 · 정류장) — 응답에 🚗🚌 배지 실제로 뜨게.
 - [ ] **Railway Auto Deploy 정상화** — 현재 "GitHub Repo not found" 상태. Source Disconnect/Reconnect 또는 Eject. `git push`만으로 배포 반영이 목표.
 

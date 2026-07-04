@@ -10,8 +10,10 @@
 |---|---|---|
 | API | Railway `skillful-alignment / production` / `pack-your-jeju` | Online |
 | DB | Railway Postgres (같은 프로젝트) | Online |
-| 프론트 | Vercel | 미배포 |
+| 프론트 | Vercel — `pack-your-jeju.vercel.app` | Online |
 | 도메인 (API) | `https://pack-your-jeju-production.up.railway.app` | 발급됨 |
+| 도메인 (프론트) | `https://pack-your-jeju.vercel.app` | 발급됨 |
+| QR (킥4) | `docs/qr.png` (370×370) | 생성됨 |
 
 ### 데이터
 - `raw_source`: 5,756건 (비짓제주)
@@ -64,6 +66,13 @@
 - `python -m packages.eval.run --out data/eval-reports` → 12/12 통과, 3지표 모두 1.00.
 - 리포트 파일 저장: `data/eval-reports/eval-*.json`, `data/eval-reports/eval-*.md`.
 
+### Vercel 프론트 배포
+- Root Directory: `apps/web`, Framework: Vite. `apps/web/vercel.json`이 buildCommand/outputDirectory/SPA rewrites 자동 처리.
+- 환경변수: `VITE_API_BASE_URL=https://pack-your-jeju-production.up.railway.app` (Production/Preview/Development 모두).
+- CORS: 백엔드 `main.py:40`의 `.vercel.app` regex로 자동 허용 → 별도 갱신 불필요.
+- 최근 1h 트래픽 관측(`/admin/metrics`): 5종 배지(verified/caution/coverage_gap/outdated/contradicted) 전부 실 데이터로 회전 중, p50=13ms.
+- 킥4 QR: `docs/qr.png` (370×370, `qrcode` 파이썬 라이브러리로 생성).
+
 ## 3. 알려진 이슈
 
 ### 3.1 Railway Auto Deploy 미동작 (근본 원인 미해결)
@@ -85,10 +94,9 @@
 - [x] 킥1 하이라이트(contradicted) 시연 재현 (G14 tombstone 시드)
 
 ### P1 — 시연 품질에 직접 영향
-- [ ] **Vercel 프론트 배포** — 킥4 QR의 실체. `docs/deploy.md §2` 참조.
-  - Root Directory: `apps/web`
-  - `VITE_API_BASE_URL=https://pack-your-jeju-production.up.railway.app`
-- [ ] **Railway CORS 갱신** — Vercel 도메인 확정 후 `CORS_ALLOW_ORIGINS` 환경변수 갱신.
+- [x] **Vercel 프론트 배포** — `pack-your-jeju.vercel.app` Online, pack 응답 실 렌더링 확인.
+- [x] **CORS 정합성** — `.vercel.app` regex가 이미 커버 → 별도 갱신 불필요로 확인됨.
+- [x] **킥4 QR 생성** — `docs/qr.png` 370×370.
 - [ ] **`transit_point` 적재** — 주차장/정류장 CSV. 이후 응답에서 `parking_count > 0`, `bus_walkable: true` 확인.
   - `python -m apps.pipelines.ingest_file --parking-csv <path>`
   - `python -m apps.pipelines.ingest_file --busstop-csv <path>`
