@@ -30,6 +30,13 @@ FIX_REQUEST_ID_CANDIDATES: tuple[str, ...] = (
     "콘텐츠아이디",  # 제주관광공사 실 CSV 헤더
 )
 
+# 제주특별자치도 공영주차장 CSV (제주시/서귀포시 각 1,544 / 113건, 데이터기준일 2026-04-16).
+# 헤더 실측 근거: 주차장관리번호,주차장명,...,위도,경도,장애인전용주차구역보유여부,데이터기준일자
+PARKING_NAME_CANDIDATES = ("주차장명",)
+PARKING_LAT_CANDIDATES = ("위도",)
+PARKING_LNG_CANDIDATES = ("경도",)
+PARKING_CAPACITY_CANDIDATES = ("주차구획수",)
+
 
 def _pick_first(row: dict[str, str], keys: tuple[str, ...]) -> str | None:
     for k in keys:
@@ -74,6 +81,76 @@ def ingest_fix_request_csv(csv_path: Path) -> tuple[int, int]:
             {"ids": ids},
         )
         return len(ids), result.rowcount or 0
+
+
+# ---- 주차장 CSV ----
+
+def _to_float(v: str | None) -> float | None:
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    if not s:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _to_int(v: str | None) -> int | None:
+    f = _to_float(v)
+    return int(f) if f is not None else None
+
+
+def _in_jeju_bbox(lat: float, lng: float) -> bool:
+    # DATA_PIPELINE §3 process.py 좌표 검증과 같은 bbox.
+    return 33.1 <= lat <= 33.6 and 126.1 <= lng <= 127.0
+
+
+def ingest_parking_csv(csv_paths: list[Path]) -> tuple[int, int, int]:
+    """공영주차장 CSV 여러 개 → transit_point (kind='parking') 완전 교체.
+
+    반환: (input_rows, inserted, skipped_no_coord).
+    idempotent 위해 시작 시 parking 전량 DELETE 후 INSERT — UNIQUE 제약이 없어서
+    단순 UPSERT가 불가하고, 좌표 데이터는 원본 CSV 재적재로 완전히 교체하는 것이 정직.
+    """
+    for p in csv_paths:
+        if not p.exists():
+            raise FileNotFoundError(p)
+
+    rows: list[dict] = []
+    total_in = 0
+    for p in csv_paths:
+        with _open_csv_autodetect(p) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                total_in += 1
+                lat = _to_float(_pick_first(row, PARKING_LAT_CANDIDATES))
+                lng = _to_float(_pick_first(row, PARKING_LNG_CANDIDATES))
+                if lat is None or lng is None or not _in_jeju_bbox(lat, lng):
+                    continue
+                rows.append({
+                    "kind": "parking",
+                    "name": _pick_first(row, PARKING_NAME_CANDIDATES),
+                    "lat": lat,
+                    "lng": lng,
+                    "capacity": _to_int(_pick_first(row, PARKING_CAPACITY_CANDIDATES)),
+                })
+
+    engine = db.get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM transit_point WHERE kind='parking'"))
+        if rows:
+            conn.execute(
+                text(
+                    "INSERT INTO transit_point (kind, name, lat, lng, capacity) "
+                    "VALUES (:kind, :name, :lat, :lng, :capacity)"
+                ),
+                rows,
+            )
+    inserted = len(rows)
+    skipped = total_in - inserted
+    return total_in, inserted, skipped
 
 
 # ---- dev seed (CSV 도착 전 데모 재현용) ----
@@ -164,6 +241,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="파일 기반 적재 (수정요청/위생/교통).")
     p.add_argument("--fix-request-csv", metavar="PATH",
                    help="S5 콘텐츠수정요청 CSV → has_fix_request UPDATE")
+    p.add_argument("--parking-csv", metavar="PATH", action="append", default=[],
+                   help="S3 공영주차장 CSV (제주시/서귀포시). 여러 개 지정 가능.")
     p.add_argument("--seed-dev-fix-request", action="store_true",
                    help="CSV 없을 때 애월/food 몇 곳에 플래그를 세워 데모 재현")
     p.add_argument("--seed-dev-tombstone", action="store_true",
@@ -173,9 +252,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--seed-limit", type=int, default=3)
     args = p.parse_args(argv)
 
-    if not (args.fix_request_csv or args.seed_dev_fix_request or args.seed_dev_tombstone):
+    if not (args.fix_request_csv or args.parking_csv or args.seed_dev_fix_request or args.seed_dev_tombstone):
         print(
-            "모드가 필요합니다: --fix-request-csv PATH / --seed-dev-fix-request / --seed-dev-tombstone",
+            "모드가 필요합니다: --fix-request-csv PATH / --parking-csv PATH / --seed-dev-fix-request / --seed-dev-tombstone",
             file=sys.stderr,
         )
         return 64
@@ -183,6 +262,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.fix_request_csv:
         rows, updated = ingest_fix_request_csv(Path(args.fix_request_csv))
         print(f"[fix-request] csv rows={rows}  updated_places={updated}")
+        return 0
+
+    if args.parking_csv:
+        paths = [Path(p) for p in args.parking_csv]
+        total_in, inserted, skipped = ingest_parking_csv(paths)
+        print(f"[parking] csv rows={total_in}  inserted={inserted}  skipped_no_coord={skipped}")
         return 0
 
     if args.seed_dev_fix_request:
