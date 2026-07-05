@@ -80,10 +80,10 @@
 |---|---|---|---|
 | **킥1 — AI가 AI를 팩트체크** | `/verify` (LLM claim 분해 → retrieval → LLM 판정) | ✅ **프로덕션 3-verdict 재현 완료** (contradicted/verified/coverage_gap). 데모 대본 확정: `data/verify_kick1_g14.json` | — |
 | **킥2 — 자가파괴** | 드롭됨 (D-15) | — | Q&A용 eval 실패 로그 캡처만 준비 |
-| **킥3 — 1,686건의 증거** | 수정요청 CSV 분석 → 오프닝 슬라이드 숫자 | ✅ **CSV 적재됨: 1,686행 → 556 place에 `has_fix_request=true` 매칭**. ⚠️ 유형 분포(폐업/이전/변경)는 미분석 | 유형별 카운트 뽑고 오프닝 슬라이드 1장. **핵심 숫자 두 개는 확정**: 1,686 (제기 건수) · 556 (실제 매칭) |
+| **킥3 — 1,686건의 증거** | 수정요청 CSV 분석 → 오프닝 슬라이드 숫자 | ✅ **완결**: 1,686 → 556 매칭 + 유형 분포 확정 (`scripts/kick3_stats.py`, `docs/kick3_stats.md`). 372건이 물리적 변화(폐업 20·이전 26·시간 235·주소 91). | 슬라이드에 표 삽입 |
 | **킥4 — QR + 라이브 대시보드** | Vercel 프론트 QR → 발표 중 심사위원 요청이 `/admin/metrics`에 실시간 반영 | ✅ **완결**: `pack-your-jeju.vercel.app` Online, QR `docs/qr.png` 생성, 5종 배지 실 데이터 회전 중 (p50=13ms) | 슬라이드 삽입 · 발표장 Wi-Fi 사전 스캔 테스트 |
 
-**결론**: 킥1·킥4 완결. 킥3은 오프닝 숫자 확정, 유형 분포 시각화만 마무리 남음. 발표 준비의 핵심 조각은 모두 실 데이터로 살아있는 상태.
+**결론**: 킥1·킥3·킥4 전량 완결. 발표 준비의 핵심 조각은 모두 실 데이터로 살아있는 상태.
 
 ---
 
@@ -92,10 +92,11 @@
 ### 4.1 데이터 준비
 - ✅ 주력 소스(비짓제주) 5,756건 → 4,422 place
 - ✅ 스키마 강제(`valid_until NOT NULL`, `region_normalized` 12값 매핑, `info_type` 3종)
-- ✅ **수정요청 CSV 적재 완료: 1,686행 → 556 place에 `has_fix_request=true`**
-- ✅ G14 데모 시드: `애월오누이 제주` `tombstoned=true` (골든셋 사전 정의 시나리오와 일치)
-- ⚠️ **보조 소스 2종 미적재**: transit_point(주차장·정류장), hygiene(위생등급)
-- **평가**: 80% 완성. 킥3 오프닝 숫자·G09(수정요청 caution)·G14(폐업 contradicted) 모두 활성. 남은 것은 교통 배지(🚗🚌)와 위생등급 세분화.
+- ✅ **수정요청 CSV 적재: 1,686행 → 556 place에 `has_fix_request=true`**
+- ✅ G14 데모 시드: `애월오누이 제주` `tombstoned=true`
+- ✅ **transit_point 5,828건**: parking 1,557 (공영주차장 CSV) + busstop 4,271 (TAGO 국토부 API)
+- ⚠️ 위생등급 CSV 미적재 (지엽적, 스킵 가능)
+- **평가**: 95% 완성. 🚗🚌 배지 실 데이터로 활성. 남은 지엽 조각(위생등급)은 발표 서사에 영향 미미.
 
 ### 4.2 RAG 설계
 - ✅ `/pack` 구조화 검색 + LLM 문구 조립 (assemble.py의 intro)
@@ -129,18 +130,34 @@
 - [x] **eval 러너 실행 + 리포트 캡처** — 12/12 GREEN, 3지표 1.00, `data/eval-reports/eval-*.md` 저장.
 - [x] **G14 tombstone 시드** — `애월오누이 제주` `tombstoned=true` (킥1 하이라이트 재현).
 
-### P1 — 시연 품질
-- [x] **Vercel 프론트 배포** — `pack-your-jeju.vercel.app` Online, pack 응답 실 렌더링 확인.
-- [x] **CORS 정합성** — `.vercel.app` regex가 이미 커버 → 별도 갱신 불필요.
+### P1 — 시연 품질 (전량 완료 ✅)
+- [x] **Vercel 프론트 배포** — `pack-your-jeju.vercel.app` Online.
+- [x] **CORS 정합성** — `.vercel.app` regex 커버.
 - [x] **킥4 QR 생성** — `docs/qr.png` (370×370).
-- [ ] **transit_point CSV 적재** (주차장 · 정류장) — 응답에 🚗🚌 배지 실제로 뜨게.
-- [ ] **Railway Auto Deploy 정상화** — 현재 "GitHub Repo not found" 상태. Source Disconnect/Reconnect 또는 Eject. `git push`만으로 배포 반영이 목표.
+- [x] **transit_point 적재** — parking 1,557 + busstop 4,271.
+- [x] **Railway Auto Deploy 정상화** — Settings → Source → Enable.
+- [x] **지역 다중 선택 + 요일 그룹핑** — 실제 여행 UX 반영.
+- [x] **빈 요일 세밀 진단** — (region × moment) 미확인 조합 UI 노출.
 
 ### P2 — 완성도 향상
-- [ ] **위생등급 CSV 적재** — `local_food` 배지 세분화
-- [ ] **`OPENAI_API_KEY` Railway 세팅** — `intro.llm_used: true`. 감성 문구 활성화.
+- [ ] **위생등급 CSV 적재** — `local_food` 배지 세분화 (지엽적, 스킵 가능)
+- [ ] **`OPENAI_API_KEY` Railway 세팅** — 계획 마지막에. `intro.llm_used: true` 감성 문구 활성화.
 - [x] **킥3 유형별 카운트** — `scripts/kick3_stats.py` + `docs/kick3_stats.md`. 372건이 물리적 변화(폐업 20·이전 26·운영시간 235·주소 91), 톱3=591건(35%).
-- [ ] **`/admin/metrics` 프론트 뷰** — JSON을 간단한 표로 렌더. 클로징 인상 배가.
+- [ ] **`/admin/metrics` 프론트 뷰** — JSON을 간단한 표로 렌더 (스트레치).
+
+### P3 — 발표 준비
+- [ ] **`docs/slides_script.md`** — 3막 통합 스크립트 (오프닝 킥3 · 본편 데모 · 클로징 킥4)
+- [ ] **리허설 × 2회** — 10분 안에 완주 확인
+- [ ] **전 구간 스크린 녹화** — 발표장 네트워크 불안 대비
+
+### 원 스코프 확장 — "실제 여행 UX" 반영 (2026-07-05)
+사용자 발견: 원 스코프 D-10("지역 하나만 선택")이 실제 제주 여행 방식과 불일치. 대부분 여행자는 며칠간 여러 지역을 순회한다.
+
+**대응 (CLAUDE.md 원칙 준수하며 확장)**:
+- 12지역 chip 다중 선택 (`RegionChips` 개편). 여전히 정형 값이라 D-10의 정규화 오류 차단 원칙 유지.
+- `dispatch_itinerary` 규칙 A/B: 지역별 요일 그룹핑 (규칙 기반, LLM 없음).
+- 원 로드맵 "다음 단계" 슬라이드에 있던 **여행 일정 조립**을 최소 스코프로 실현.
+- 절대 규칙 1(환각 금지) · D-09(경로 추천 아님) 위배 없음: **조합**은 하되 **동선 최적화**는 하지 않음.
 
 ### P3 — Q&A 방어 및 발표 준비
 - [ ] **"이게 RAG인가" 답변 완성** — `/verify` 파이프라인 다이어그램 1장. "벡터 없이도 RAG는 성립한다" 논리.

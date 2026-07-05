@@ -20,7 +20,7 @@
 - `place`: 4,422건 (정제 후)
 - `place.has_fix_request=true`: 556건 (수정요청 CSV 1,686행 중 매칭)
 - `place.tombstoned=true`: 1건 (`애월오누이 제주` — G14 데모 시드)
-- `transit_point`: 0건 (미적재)
+- `transit_point`: **5,828건** — parking 1,557 (2026-04-16) + busstop 4,271 (TAGO 국토부)
 - `query_log`: 자동 적재 중
 
 ### 엔드포인트 검증 (2026-07-05 마지막 검증)
@@ -72,6 +72,23 @@
 - CORS: 백엔드 `main.py:40`의 `.vercel.app` regex로 자동 허용 → 별도 갱신 불필요.
 - 최근 1h 트래픽 관측(`/admin/metrics`): 5종 배지(verified/caution/coverage_gap/outdated/contradicted) 전부 실 데이터로 회전 중, p50=13ms.
 - 킥4 QR: `docs/qr.png` (370×370, `qrcode` 파이썬 라이브러리로 생성).
+- Railway Auto Deploy 정상화: Settings → Source → Branch → `Enable`. 이후 `git push`만으로 자동 배포.
+
+### 지역 다중 선택 + 요일 그룹핑 (2026-07-05)
+- 원 스코프 D-10 "지역 하나만 선택"의 UX 한계를 발견: 실제 제주 여행은 여러 지역 순회.
+- `PackRequest.regions: tuple[str,...]` (backward compat: `region` 단일도 허용).
+- `MomentFilter.regions`, `search_strict/relaxed`가 지역 합집합 검색.
+- `assemble.dispatch_itinerary` 규칙:
+  - 규칙 A (다중 지역): 지역별 요일 그룹핑. 지역 수 > days면 `_REGION_CLUSTER`(east/west/south)로 인접 지역 묶어 배정. 지역 내 items는 요일간 순환.
+  - 규칙 B (단일 지역): 순간별 순환 (하루 다양성).
+- 응답 확장: `itinerary: [{day, date, items, regions, unavailable_moments}]`.
+- 프론트: `RegionChips` 다중 선택, `PackingDashboard` 뷰 스위처(순간별 · 요일별), `ItineraryDayCard` 지역 뱃지 + `UnavailableNote`.
+
+### 빈 요일 세밀 진단 (2026-07-05)
+- `_compute_unavailable`: (요일 regions × selected_moments) 중 items가 없는 조합 나열.
+- 프론트 문구: "{지역}에서는 {순간}이(가) 저희가 참조하는 공공데이터 기준으로 확인되지 않았습니다".
+- items 있는 요일도 부분 미확인 노출.
+- CLAUDE.md 절대 규칙 3(coverage_gap 인식론 규칙) UI 마감.
 
 ## 3. 알려진 이슈
 
@@ -93,18 +110,18 @@
 - [x] 골든셋 러너 실행 → 게이트 GREEN
 - [x] 킥1 하이라이트(contradicted) 시연 재현 (G14 tombstone 시드)
 
-### P1 — 시연 품질에 직접 영향
-- [x] **Vercel 프론트 배포** — `pack-your-jeju.vercel.app` Online, pack 응답 실 렌더링 확인.
-- [x] **CORS 정합성** — `.vercel.app` regex가 이미 커버 → 별도 갱신 불필요로 확인됨.
+### P1 — 시연 품질에 직접 영향 (전량 완료 ✅)
+- [x] **Vercel 프론트 배포** — `pack-your-jeju.vercel.app` Online.
+- [x] **CORS 정합성** — `.vercel.app` regex가 이미 커버.
 - [x] **킥4 QR 생성** — `docs/qr.png` 370×370.
-- [ ] **`transit_point` 적재** — 주차장/정류장 CSV. 이후 응답에서 `parking_count > 0`, `bus_walkable: true` 확인.
-  - `python -m apps.pipelines.ingest_file --parking-csv <path>`
-  - `python -m apps.pipelines.ingest_file --busstop-csv <path>`
-- [ ] **Railway Auto Deploy 정상화** — Settings → Source Disconnect/Reconnect 재시도 또는 Upstream **Eject**. 목표: `git push`만으로 반영.
+- [x] **`transit_point` 적재** — parking 1,557 (공영주차장 CSV) + busstop 4,271 (TAGO 국토부 API).
+- [x] **Railway Auto Deploy 정상화** — Settings → Source → Enable. `git push`만으로 반영.
+- [x] **지역 다중 선택 + 요일 그룹핑** — 실제 제주 여행 UX 반영.
+- [x] **빈 요일 세밀 진단** — 정직 UI 마감.
 
 ### P2 — 배지·문구 완성도
-- [ ] **위생등급 CSV** — `--hygiene-csv <path>`. `place.hygiene_grade` 채워짐.
-- [ ] **`OPENAI_API_KEY` 세팅** — Railway `pack-your-jeju` 서비스 Variables에 추가. 이후 `intro.text` 감성 문구, `llm_used: true`.
+- [ ] **위생등급 CSV** — `--hygiene-csv <path>`. `place.hygiene_grade` 채워짐. (지엽적, 스킵 가능)
+- [ ] **`OPENAI_API_KEY` 세팅** — 발표 전 사용자 준비 예정. Railway Variables에 추가하면 `intro.llm_used: true`.
 - [x] **킥3 유형별 카운트** — `scripts/kick3_stats.py` + `docs/kick3_stats.md`. 372건이 물리적 변화(폐업 20·이전 26·시간 235·주소 91), 톱3=591건(35%).
 
 ### P3 — 발표 리허설·백업
@@ -128,6 +145,11 @@ python -c "from apps.api import db; print(db.ping())"   # True 나오면 OK
 python -m apps.pipelines.ingest_visitjeju --fetch-all                   # 5-10분
 python -m apps.pipelines.process                                        # 30초 이내
 python -m apps.pipelines.ingest_file --fix-request-csv "제주관광공사_비짓제주(VISIT JEJU)_콘텐츠수정요청_20250806 (1).CSV"
+
+# 3-b) 주차장 · 정류장 (교통 배지)
+python -m apps.pipelines.ingest_file --parking-csv data/parking/jeju_city_parking.csv --parking-csv data/parking/seogwipo_parking.csv
+$env:TAGO_BUS_API_KEY = "<data.go.kr TAGO 인증키>"
+python -m apps.pipelines.ingest_tago_busstop                            # ~5초, 4,271건
 
 # 4) 데모용 tombstone 시드 (G14 재현 — 골든셋과 일치)
 #    아래 SQL을 psql 또는 Railway SQL Console에서 1회 실행:
