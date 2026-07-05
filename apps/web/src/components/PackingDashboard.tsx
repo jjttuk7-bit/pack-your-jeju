@@ -15,6 +15,8 @@ import {
   CheckSquare,
   Square,
   ChevronDown,
+  Download,
+  BookOpenCheck,
 } from 'lucide-react';
 import type {
   TravelInfo,
@@ -26,7 +28,7 @@ import type {
   PackItemDto,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
-import { requestPack } from '../api';
+import { requestPack, downloadPackPdf } from '../api';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 import PlaceDetail from './PlaceDetail';
@@ -73,6 +75,30 @@ export default function PackingDashboard(props: Props) {
   const [error, setError] = useState<string | null>(null);
   // 뷰 스위처: 순간별(기본) vs 요일별. 응답의 itinerary가 있어야 요일별 활성.
   const [viewMode, setViewMode] = useState<'moments' | 'itinerary'>('moments');
+  // PDF 저장 상태
+  const [pdfLoading, setPdfLoading] = useState<boolean>(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const handleDownloadPdf = async () => {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    setPdfError(null);
+    try {
+      const { filename, blob } = await downloadPackPdf(info, selectedMomentIds);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setPdfError(e?.message || String(e));
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const regionLabel = useMemo(
     () => info.regions
@@ -146,6 +172,40 @@ export default function PackingDashboard(props: Props) {
           <SummaryLine icon={<Users className="w-3.5 h-3.5" />} label={companionLabel} />
           <SummaryLine icon={<Compass className="w-3.5 h-3.5" />} label={purposeLabel} />
         </div>
+
+        {/* 이 여행을 저장 — 감성 톤 여행 저널 PDF 다운로드. 사실은 서버가 조립하고
+            프론트는 파일만 받아 저장한다. LLM 없이도 항상 동작. */}
+        {packResp && !loading && !error && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={pdfLoading}
+              className="w-full rounded-2xl px-4 py-3 bg-citrus text-white font-serif-kr font-bold text-[13.5px] hover:bg-citrus-2 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-jeju-chip"
+            >
+              {pdfLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  여행 저널 만드는 중…
+                </>
+              ) : (
+                <>
+                  <BookOpenCheck className="w-4 h-4" />
+                  이 여행을 저널로 저장
+                  <Download className="w-3.5 h-3.5 opacity-80" />
+                </>
+              )}
+            </button>
+            <p className="mt-1.5 text-[10.5px] text-stone-500 text-center leading-snug">
+              공공데이터 근거로 확인된 곳만 담긴 PDF입니다. 없는 것은 정직하게 비웠습니다.
+            </p>
+            {pdfError && (
+              <p className="mt-1.5 text-[10.5px] text-rose-700 text-center">
+                {pdfError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Intro 문구 (LLM 조립 or 템플릿 폴백) */}

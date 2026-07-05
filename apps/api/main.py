@@ -18,6 +18,7 @@ import os
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import text
 
@@ -26,6 +27,7 @@ from apps.api.engine import agent as agent_mod
 from apps.api.engine import assemble as assemble_mod
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import haruban as haruban_mod
+from apps.api.engine import packpdf as packpdf_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
@@ -207,6 +209,65 @@ def pack(body: PackBody) -> dict[str, Any]:
         "packing_additions": [],
         "log_id": log_id,
     }
+
+
+@app.post("/pack/pdf")
+def pack_pdf(body: PackBody) -> Response:
+    """폼 입력으로 팩을 다시 조립한 뒤 감성 톤 여행 저널 PDF를 반환.
+
+    사실 조립 로직은 /pack과 동일하게 filters → judge_section → assemble를 그대로 재사용.
+    LLM 문구 생성 여부와 무관하게 PDF 자체는 결정론적으로 만들어진다.
+
+    응답: Content-Type application/pdf, filename은 지역·기간 기반으로 자동 조립.
+    폰트 미탐지 (Windows/Linux 모두 없음) 시 503.
+    """
+    try:
+        req = filters_mod.PackRequest.from_dict(body.model_dump())
+        f = filters_mod.build_filters(req)
+    except (ValidationError, ValueError, filters_mod.UnknownRegion,
+            filters_mod.UnknownMoment, filters_mod.UnknownCompanion,
+            filters_mod.UnknownPurpose) as e:
+        raise HTTPException(status_code=400, detail={"error": type(e).__name__, "message": str(e)})
+
+    section_objs: list[trust_mod.Section] = []
+    sections: list[dict] = []
+    for mf in f.per_moment:
+        s = trust_mod.judge_section(mf)
+        section_objs.append(s)
+        sections.append(_serialize_section(s))
+
+    intro = assemble_mod.compose_intro(
+        section_objs, req.companion, special_notes=body.special_notes,
+    )
+    itinerary = assemble_mod.dispatch_itinerary(
+        section_objs, req.days, req.start_date,
+        selected_regions=req.regions,
+        selected_moments=req.moments,
+    )
+
+    pack_dict = {
+        "intro": {"text": intro.text, "llm_used": intro.llm_used},
+        "sections": sections,
+        "itinerary": itinerary,
+    }
+
+    try:
+        pdf_bytes = packpdf_mod.build_pack_pdf(pack_dict, body.model_dump())
+    except RuntimeError as e:
+        # 한글 폰트를 어느 후보 경로에서도 못 찾은 경우 — 배포 환경 이슈로 503.
+        raise HTTPException(status_code=503, detail={"error": "font_unavailable", "message": str(e)})
+
+    # 파일명 조립 — regions와 start_date로 사용자에게 의미 있게.
+    regions_slug = "-".join(sorted(req.regions))[:60] or "jeju"
+    filename = f"pack-your-jeju_{regions_slug}_{req.start_date.isoformat()}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
 
 
 class HarubangMessage(BaseModel):

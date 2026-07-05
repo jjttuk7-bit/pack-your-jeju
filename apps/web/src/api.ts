@@ -50,6 +50,42 @@ export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<Pack
   return post<PackResponse>('/pack', body);
 }
 
+// 여행 저널 PDF 다운로드 — 서버가 조립한 pdf를 그대로 받아 브라우저 다운로드.
+export async function downloadPackPdf(
+  info: TravelInfo,
+  moments: MomentId[],
+): Promise<{ filename: string; blob: Blob }> {
+  const body: Record<string, unknown> = {
+    regions: info.regions,
+    start_date: info.startDate,
+    days: info.durationDays,
+    companion: info.companion,
+    purpose: info.purpose,
+    moments,
+  };
+  const notes = info.specialNotes?.trim();
+  if (notes) body.special_notes = notes;
+
+  const res = await fetch(`${API_BASE_URL}/pack/pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json())?.detail?.message ?? ''; } catch {}
+    throw new Error(`/pack/pdf ${res.status} ${detail || res.statusText}`);
+  }
+
+  // 서버가 넘긴 Content-Disposition에서 filename 추출. 없으면 fallback.
+  let filename = `pack-your-jeju_${info.startDate}.pdf`;
+  const cd = res.headers.get('Content-Disposition') || '';
+  const m = /filename="?([^";]+)"?/.exec(cd);
+  if (m) filename = m[1];
+
+  return { filename, blob: await res.blob() };
+}
+
 export function requestVerify(text: string): Promise<VerifyResponse> {
   return post<VerifyResponse>('/verify', { text });
 }

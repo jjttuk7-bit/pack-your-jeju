@@ -9,6 +9,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# 한글 폰트 (reportlab PDF 생성에 사용). fonts-noto-cjk는 여행 저널 PDF의
+# 표지·본문·강조에 안정적으로 사용 가능한 한글 지원 폰트를 제공한다.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
 # 의존성만 먼저 설치 (레이어 캐시 활용)
 COPY pyproject.toml ./
 RUN pip install --upgrade pip && pip install .
