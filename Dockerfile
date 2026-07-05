@@ -14,7 +14,7 @@ WORKDIR /app
 #  - fonts-noto-cjk: TTC 파일로 배포되나 reportlab이 postscript outlines를 못 다뤄
 #    실패 사례가 있음. 백업으로만 둔다.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-nanum fonts-nanum-coding \
+    && apt-get install -y --no-install-recommends fonts-nanum \
     && rm -rf /var/lib/apt/lists/*
 
 # 의존성만 먼저 설치 (레이어 캐시 활용)
