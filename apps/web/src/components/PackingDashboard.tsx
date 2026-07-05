@@ -291,16 +291,34 @@ function ItineraryDayCard({ day }: { day: ItineraryDayDto }) {
   const dateFmt = new Date(day.date + 'T00:00:00').toLocaleDateString('ko-KR', {
     month: 'short', day: 'numeric', weekday: 'short',
   });
+  const regionLabels = (day.regions ?? [])
+    .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
+    .filter(Boolean);
   return (
     <div className="card-jeju p-5 space-y-3" id={`itinerary-day-${day.day}`}>
-      <div className="flex items-baseline gap-2.5 border-b border-earth/50 pb-2.5">
-        <span className="font-serif-kr font-bold text-[18px] text-basalt tracking-tight">
-          Day {day.day}
-        </span>
-        <span className="text-[11.5px] text-basalt-2/70 font-medium">{dateFmt}</span>
-        <span className="ml-auto text-[10.5px] font-bold text-basalt-2/60 uppercase tracking-wider">
-          {day.items.length}곳
-        </span>
+      <div className="border-b border-earth/50 pb-2.5">
+        <div className="flex items-baseline gap-2.5">
+          <span className="font-serif-kr font-bold text-[18px] text-basalt tracking-tight">
+            Day {day.day}
+          </span>
+          <span className="text-[11.5px] text-basalt-2/70 font-medium">{dateFmt}</span>
+          <span className="ml-auto text-[10.5px] font-bold text-basalt-2/60 uppercase tracking-wider">
+            {day.items.length}곳
+          </span>
+        </div>
+        {regionLabels.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <MapPin className="w-3 h-3 text-citrus-2/70 shrink-0" />
+            {regionLabels.map((label) => (
+              <span
+                key={label}
+                className="px-1.5 py-0.5 rounded-md bg-citrus/10 text-citrus-2 text-[10.5px] font-semibold"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {day.items.length === 0 ? (
