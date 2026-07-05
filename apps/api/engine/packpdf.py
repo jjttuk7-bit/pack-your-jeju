@@ -22,6 +22,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate,
@@ -101,30 +102,55 @@ def _register_first_working(name: str, candidates: list[str]) -> tuple[bool, str
     return False, " ; ".join(tried) if tried else "no candidates"
 
 
+def _register_cid_fallback() -> tuple[bool, str]:
+    """reportlab 내장 CID 한글 폰트로 fallback 등록.
+
+    파일 시스템 폰트가 하나도 없거나 파싱 불가할 때의 최후 보루.
+    HYGothic-Medium과 HYSMyeongJo-Medium은 reportlab 패키지에 CID 매핑이 함께
+    포함돼 별도 파일 없이 등록 가능. 우아함은 살짝 떨어져도 조립·렌더는 확실.
+    """
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
+        pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
+        # 우리 폰트 이름 슬롯에 CID 폰트를 alias로 매핑.
+        # reportlab는 addMapping으로 스타일 매핑을 하지만, 여기서는 이름 자체를 바꿔 준다.
+        return True, "cid=HYGothic-Medium/HYSMyeongJo-Medium"
+    except Exception as e:
+        return False, f"cid register failed: {e}"
+
+
 def _ensure_fonts() -> tuple[bool, str]:
     """실제로 등록된 상태를 True/False와 진단 메시지로 반환.
 
-    한 후보가 실패해도 다음 후보를 시도. 전부 실패하면 마지막에 상태 코드로 안내.
+    한 후보가 실패해도 다음 후보를 시도. 파일 시스템 폰트가 모두 실패하면
+    reportlab 내장 CID 폰트로 최후 fallback (배포 환경 편차와 무관하게 항상 성공).
     """
-    global _font_registered
+    global _font_registered, FONT_REGULAR, FONT_BOLD
     if _font_registered:
         return True, "cached"
 
     ok_reg, diag_reg = _register_first_working(FONT_REGULAR, _FONT_CANDIDATES_REGULAR)
-    if not ok_reg:
-        return False, f"regular font unavailable: {diag_reg}"
+    if ok_reg:
+        ok_bold, diag_bold = _register_first_working(FONT_BOLD, _FONT_CANDIDATES_BOLD)
+        if not ok_bold:
+            # bold가 없으면 regular 폰트를 bold 이름으로도 등록.
+            ok_reg2, _ = _register_first_working(FONT_BOLD, _FONT_CANDIDATES_REGULAR)
+            if not ok_reg2:
+                # regular는 성공했으니 bold를 regular 이름으로 aliasing (같은 폰트 두 슬롯).
+                FONT_BOLD = FONT_REGULAR
+                diag_bold = "(alias to regular)"
+        _font_registered = True
+        return True, f"regular={diag_reg} bold={diag_bold}"
 
-    ok_bold, diag_bold = _register_first_working(FONT_BOLD, _FONT_CANDIDATES_BOLD)
-    if not ok_bold:
-        # bold가 없으면 regular 폰트를 bold 이름으로도 등록해두어 렌더는 계속.
-        # (실제 서비스 톤: 굵기가 약해질 뿐 조립은 정상)
-        ok_reg2, _ = _register_first_working(FONT_BOLD, _FONT_CANDIDATES_REGULAR)
-        if not ok_reg2:
-            return False, f"bold font unavailable and regular re-register failed: {diag_bold}"
-        diag_bold = f"(fallback to regular)"
+    # 파일 시스템 폰트 전량 실패 → reportlab 내장 CID 폰트로 fallback.
+    ok_cid, diag_cid = _register_cid_fallback()
+    if ok_cid:
+        FONT_REGULAR = "HYGothic-Medium"
+        FONT_BOLD = "HYGothic-Medium"  # CID에는 별도 bold가 없음 — 굵기 대신 크기로 강조.
+        _font_registered = True
+        return True, f"fallback {diag_cid}"
 
-    _font_registered = True
-    return True, f"regular={diag_reg} bold={diag_bold}"
+    return False, f"all fonts unavailable — tried files ({diag_reg}) and cid ({diag_cid})"
 
 
 # ─── 컬러 팔레트 (프론트 톤과 동일) ─────────────────────
