@@ -321,15 +321,65 @@ function ItineraryDayCard({ day }: { day: ItineraryDayDto }) {
         )}
       </div>
 
-      {day.items.length === 0 ? (
-        <p className="text-[11.5px] text-stone-400">이 날짜는 아직 비어 있습니다.</p>
-      ) : (
+      {day.items.length > 0 && (
         <div className="space-y-2">
           {day.items.map((it) => (
             <ItineraryItemRow key={`${it.external_id}-${day.day}`} it={it} />
           ))}
         </div>
       )}
+
+      <UnavailableNote unavailable={day.unavailable_moments ?? []} hasItems={day.items.length > 0} />
+    </div>
+  );
+}
+
+// (region × moment) 조합 중 items로 채워지지 않은 것들을 정직 문구로 노출.
+// TRUST_ENGINE.md §2 인식론 규칙: "coverage_gap일 때 절대 '없다'로 단언하지 않는다."
+function UnavailableNote({
+  unavailable,
+  hasItems,
+}: {
+  unavailable: { region: string; moment: string }[];
+  hasItems: boolean;
+}) {
+  if (unavailable.length === 0) return null;
+
+  // 지역별로 미확인 순간들을 그룹핑 → "성산에서는 조용한 카페가..." 형태로 조립.
+  const byRegion = new Map<string, string[]>();
+  for (const u of unavailable) {
+    const arr = byRegion.get(u.region) ?? [];
+    arr.push(u.moment);
+    byRegion.set(u.region, arr);
+  }
+
+  const lines: string[] = [];
+  byRegion.forEach((moments, region) => {
+    const regionLabel = REGIONS.find((r) => r.value === region)?.label ?? region;
+    const momentLabels = moments
+      .map((m) => MOMENTS.find((x) => x.id === m)?.title ?? m)
+      .join(' · ');
+    lines.push(
+      `${regionLabel}에서는 ${momentLabels}이(가) 저희가 참조하는 공공데이터 기준으로 확인되지 않았습니다.`,
+    );
+  });
+
+  return (
+    <div
+      className={`rounded-2xl border p-3 text-[11.5px] leading-relaxed ${
+        hasItems
+          ? 'border-amber-100 bg-amber-50/60 text-amber-900'
+          : 'border-stone-100 bg-[#FDF6EA] text-stone-700'
+      }`}
+    >
+      <div className="flex items-start gap-1.5">
+        <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-700/80" />
+        <div className="space-y-0.5">
+          {lines.map((l, i) => (
+            <p key={i}>{l}</p>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

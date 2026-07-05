@@ -183,6 +183,7 @@ def pack(body: PackBody) -> dict[str, Any]:
         itinerary = assemble_mod.dispatch_itinerary(
             section_objs, req.days, req.start_date,
             selected_regions=req.regions,
+            selected_moments=req.moments,
         )
 
     # 3) 로그 적재 (실패해도 응답에 영향 없음)

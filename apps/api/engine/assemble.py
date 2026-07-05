@@ -136,11 +136,35 @@ def _item_to_dict(moment: str, it) -> dict:
     }
 
 
+def _compute_unavailable(
+    day_regions: list[str],
+    day_items: list[dict],
+    selected_moments: tuple[str, ...],
+) -> list[dict]:
+    """이 요일의 (region × 사용자 선택 순간) 조합 중 items로 채워지지 않은 것들을 나열.
+
+    정직함 원칙 (CLAUDE.md 절대 규칙 3): 빈 요일에 이유를 사실 그대로 노출한다.
+    """
+    if not day_regions or not selected_moments:
+        return []
+    present: set[tuple[str, str]] = {
+        (str(it.get("region_normalized") or ""), str(it.get("moment") or ""))
+        for it in day_items
+    }
+    out: list[dict] = []
+    for r in day_regions:
+        for m in selected_moments:
+            if (r, m) not in present:
+                out.append({"region": r, "moment": m})
+    return out
+
+
 def dispatch_itinerary(
     sections: list[Section],
     days: int,
     start_date: date,
     selected_regions: tuple[str, ...] = (),
+    selected_moments: tuple[str, ...] = (),
 ) -> list[dict]:
     """검증된 items를 요일별로 배치 (규칙 기반, LLM 없음).
 
@@ -168,6 +192,7 @@ def dispatch_itinerary(
                 "date": (start_date + timedelta(days=i)).isoformat(),
                 "items": [],
                 "regions": [],
+                "unavailable_moments": [],
             }
             for i in range(days)
         ]
@@ -182,6 +207,11 @@ def dispatch_itinerary(
         for s in sections:
             for idx, it in enumerate(s.items):
                 result[idx % days]["items"].append(_item_to_dict(s.moment, it))
+        # 각 요일마다 (region × moment) 중 빈 조합 진단
+        for day in result:
+            day["unavailable_moments"] = _compute_unavailable(
+                day["regions"], day["items"], selected_moments,
+            )
         return result
 
     # 규칙 A: 여러 지역 — 지역별로 요일 배정
@@ -271,6 +301,12 @@ def dispatch_itinerary(
                 orphans.append(_item_to_dict(s.moment, it))
     if orphans:
         result[-1]["items"].extend(orphans)
+
+    # 규칙 A 결과에도 요일별 (region × moment) 빈 조합 진단
+    for day in result:
+        day["unavailable_moments"] = _compute_unavailable(
+            day["regions"], day["items"], selected_moments,
+        )
 
     return result
 
