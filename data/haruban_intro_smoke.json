@@ -1,0 +1,153 @@
+{
+  "available": true,
+  "greeting": "구좌에서 연인과 힐링 여행이시라구요? 저희 공공데이터로 확인된 6곳을 먼저 보여드릴게요.",
+  "coverage": {
+    "verified": 11,
+    "caution": 4,
+    "total": 15,
+    "gap_combos": 0
+  },
+  "gaps": [],
+  "llm_used": false,
+  "reason": "openai call failed: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************3NgA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+  "highlights": [
+    {
+      "external_id": "CNTS_300000000012663",
+      "name": "카페달보름",
+      "region": "gujwa",
+      "region_label": "구좌",
+      "moment": "quiet_cafe",
+      "moment_label": "조용한 카페",
+      "address": "제주특별자치도 제주시 구좌읍 대수길 24",
+      "badge": "verified",
+      "note": null,
+      "sources": [
+        {
+          "name": "비짓제주",
+          "url": "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_300000000012663"
+        }
+      ],
+      "transit": {
+        "parking": true,
+        "parking_count": 1,
+        "bus_walkable": false
+      },
+      "reason": null
+    },
+    {
+      "external_id": "CNTS_300000000013861",
+      "name": "수퍼플라워 제주",
+      "region": "gujwa",
+      "region_label": "구좌",
+      "moment": "sunset",
+      "moment_label": "노을 감상",
+      "address": "제주특별자치도 제주시 구좌읍 동복로 85 (동복리) 지하 1층",
+      "badge": "verified",
+      "note": null,
+      "sources": [
+        {
+          "name": "비짓제주",
+          "url": "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_300000000013861"
+        }
+      ],
+      "transit": {
+        "parking": true,
+        "parking_count": 2,
+        "bus_walkable": true
+      },
+      "reason": null
+    },
+    {
+      "external_id": "CNTS_300000000013966",
+      "name": "미자뷔페",
+      "region": "gujwa",
+      "region_label": "구좌",
+      "moment": "local_food",
+      "moment_label": "현지 맛집",
+      "address": "제주특별자치도 제주시 구좌읍 세평항로 24",
+      "badge": "verified",
+      "note": null,
+      "sources": [
+        {
+          "name": "비짓제주",
+          "url": "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_300000000013966"
+        }
+      ],
+      "transit": {
+        "parking": true,
+        "parking_count": 31,
+        "bus_walkable": true
+      },
+      "reason": null
+    },
+    {
+      "external_id": "CNTS_300000000013970",
+      "name": "세화카페텐더럽",
+      "region": "gujwa",
+      "region_label": "구좌",
+      "moment": "quiet_cafe",
+      "moment_label": "조용한 카페",
+      "address": "제주특별자치도 제주시 구좌읍 해맞이해안로 1426 2층",
+      "badge": "verified",
+      "note": null,
+      "sources": [
+        {
+          "name": "비짓제주",
+          "url": "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_300000000013970"
+        }
+      ],
+      "transit": {
+        "parking": true,
+        "parking_count": 31,
+        "bus_walkable": true
+      },
+      "reason": null
+    },
+    {
+      "external_id": "CNTS_000000000001158",
+      "name": "메이즈랜드",
+      "region": "gujwa",
+      "region_label": "구좌",
+      "moment": "sunset",
+      "moment_label": "노을 감상",
+      "address": "제주특별자치도 제주시 구좌읍 비자림로 2134-47",
+      "badge": "caution",
+      "note": "이용자 정보 수정요청 이력",
+      "sources": [
+        {
+          "name": "비짓제주",
+          "url": "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_000000000001158"
+        }
+      ],
+      "transit": {
+        "parking": true,
+        "parking_count": 1,
+        "bus_walkable": true
+      },
+      "reason": null
+    },
+    {
+      "external_id": "CNTS_300000000012660",
+      "name": "인터포레스트",
+      "region": "gujwa",
+      "region_label": "구좌",
+      "moment": "local_food",
+      "moment_label": "현지 맛집",
+      "address": "제주특별자치도 제주시 구좌읍 비자림로 1655",
+      "badge": "verified",
+      "note": null,
+      "sources": [
+        {
+          "name": "비짓제주",
+          "url": "https://www.visitjeju.net/kr/detail/view?contentsid=CNTS_300000000012660"
+        }
+      ],
+      "transit": {
+        "parking": false,
+        "parking_count": 0,
+        "bus_walkable": true
+      },
+      "reason": null
+    }
+  ]
+}

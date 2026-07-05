@@ -46,7 +46,10 @@ app = FastAPI(title="Pack Your Jeju API", lifespan=lifespan)
 # CORS — 프론트(Vercel)에서 크로스오리진 호출 허용.
 # CORS_ALLOW_ORIGINS 환경변수에 콤마 구분으로 세팅 (예: "https://pack-your-jeju.vercel.app,http://localhost:3000")
 # 미설정 시 로컬 개발용 기본값만 허용.
-_default_origins = "http://localhost:3000,http://localhost:5173"
+_default_origins = (
+    "http://localhost:3000,http://localhost:5173,"
+    "http://127.0.0.1:3000,http://127.0.0.1:5173"
+)
 _origins = [o.strip() for o in os.environ.get("CORS_ALLOW_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -233,6 +236,29 @@ def agent_chat(body: HarubangChatBody) -> dict[str, Any]:
         "form_suggestion": turn.form_suggestion,
         "tool_trace": turn.tool_trace,
         "reason": turn.reason,
+    }
+
+
+class HarubangIntroBody(BaseModel):
+    form_state: dict = Field(default_factory=dict)
+
+
+@app.post("/agent/intro")
+def agent_intro(body: HarubangIntroBody) -> dict[str, Any]:
+    """폼에서 지역+순간 임계 도달 시 하루방이 스스로 인사하는 라이트 경로.
+
+    사실은 결정론적 DB 조회로 확정하고, LLM은 greeting + 각 하이라이트 reason 한 줄만.
+    LLM 미가용 시 템플릿 greeting + reason 생략 (배지·주소는 정상 노출).
+    """
+    intro = haruban_mod.build_intro(body.form_state)
+    return {
+        "available": intro.available,
+        "greeting": intro.greeting,
+        "highlights": intro.highlights,
+        "coverage": intro.coverage,
+        "gaps": intro.gaps,
+        "llm_used": intro.llm_used,
+        "reason": intro.reason,
     }
 
 

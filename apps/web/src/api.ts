@@ -13,9 +13,12 @@ import type {
   VerifyResponse,
 } from './types';
 
+// 로컬 dev 기본값은 127.0.0.1로 고정 (Windows에서 localhost는 IPv6로 해석되어
+// uvicorn 기본 IPv4 바인딩과 어긋나는 사례가 있어 발생하는 Failed to fetch를 회피).
+// 배포 환경은 VITE_API_BASE_URL이 주입되므로 이 기본값이 쓰이지 않는다.
 export const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
-  'http://localhost:8000';
+  'http://127.0.0.1:8000';
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -102,6 +105,52 @@ export function requestHarubanChat(
 ): Promise<HarubanChatResponse> {
   return post<HarubanChatResponse>('/agent/chat', {
     messages,
+    form_state: formState,
+  });
+}
+
+// 하루방 인사 (임계 도달 시 자동 팝업).
+// 폼 상태만 넘기면 결정론적 DB 조회로 하이라이트를 뽑고, LLM은 greeting + reason만.
+export interface HarubanIntroHighlight {
+  external_id: string;
+  name: string;
+  region: string;
+  region_label: string;
+  moment: string;
+  moment_label: string;
+  address: string | null;
+  badge: 'verified' | 'caution' | 'contradicted' | string;
+  note: string | null;
+  sources: Array<{ name: string; url: string }>;
+  transit: { parking: boolean; parking_count: number; bus_walkable: boolean };
+  reason: string | null;
+}
+export interface HarubanIntroGap {
+  region: string;
+  region_label: string;
+  moment: string;
+  moment_label: string;
+  note: string;
+}
+export interface HarubanIntroCoverage {
+  verified: number;
+  caution: number;
+  total: number;
+  gap_combos: number;
+}
+export interface HarubanIntroResponse {
+  available: boolean;
+  greeting: string;
+  highlights: HarubanIntroHighlight[];
+  coverage: HarubanIntroCoverage;
+  gaps: HarubanIntroGap[];
+  llm_used: boolean;
+  reason: string;
+}
+export function requestHarubanIntro(
+  formState: Record<string, unknown>,
+): Promise<HarubanIntroResponse> {
+  return post<HarubanIntroResponse>('/agent/intro', {
     form_state: formState,
   });
 }

@@ -23,7 +23,54 @@ from apps.api import db
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import llm
 from apps.api.engine import search as search_mod
+from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
+
+
+# ─── 한글 라벨 (하이라이트 문구 조립용) ───
+
+REGION_LABEL_KO: dict[str, str] = {
+    "jeju_city": "제주시",
+    "seogwipo":  "서귀포",
+    "aewol":     "애월",
+    "hallim":    "한림",
+    "seongsan":  "성산",
+    "jocheon":   "조천",
+    "gujwa":     "구좌",
+    "andeok":    "안덕",
+    "daejeong":  "대정",
+    "pyoseon":   "표선",
+    "namwon":    "남원",
+    "udo":       "우도",
+}
+
+COMPANION_LABEL_KO: dict[str, str] = {
+    "solo":    "혼자",
+    "couple":  "연인과",
+    "friend":  "친구와",
+    "family":  "가족과",
+    "kids":    "아이와",
+    "parents": "부모님과",
+}
+
+MOMENT_LABEL_KO: dict[str, str] = {
+    "oreum":        "오름 산책",
+    "beach_walk":   "바다 산책",
+    "sunset":       "노을 감상",
+    "local_market": "로컬 시장",
+    "local_food":   "현지 맛집",
+    "quiet_cafe":   "조용한 카페",
+    "gotjawal":     "곶자왈 숲길",
+    "citrus":       "감귤 체험",
+}
+
+PURPOSE_LABEL_KO: dict[str, str] = {
+    "healing":     "힐링",
+    "sightseeing": "관광",
+    "food":        "먹부림",
+    "activity":    "액티비티",
+    "hocance":     "호캉스",
+}
 
 
 # ─── 하루방 도구 정의 ───
@@ -386,3 +433,342 @@ def _chat_turn_raw(
         tool_trace=trace,
         reason=f"max iterations ({max_iterations}) reached",
     )
+
+
+# ─── 하루방 인사 (임계 도달 시 자동 팝업) ───────────────────────────
+#
+# 목적: 사용자가 폼에서 지역+순간을 하나 이상 채우면 하루방이 스스로 인사하며
+#       "이 조합에서 저희 데이터로 확인된 곳" 하이라이트 카드를 첫 봇 메시지로 준다.
+#
+# 흐름 (결정적):
+#   1) 폼 → PackRequest → build_filters
+#   2) 각 moment별 search_strict → badge_item
+#   3) 하이라이트 후보 선정 (규칙 기반: verified 우선, region×moment 다양성)
+#   4) coverage_matrix에서 items=0인 조합 → gaps 나열
+#   5) LLM 있으면 greeting + 각 하이라이트 reason(한 줄) 조립
+#      없으면 템플릿 폴백
+#
+# 사실은 절대 LLM이 만들지 않는다: 이름·주소·배지는 DB 조회값 그대로.
+# LLM은 greeting 문구와 "왜 이 곳인지" 한 줄만 채운다.
+
+
+@dataclass(frozen=True)
+class HarubanIntro:
+    available: bool
+    greeting: str = ""
+    highlights: list[dict] = field(default_factory=list)   # place 카드
+    coverage: dict = field(default_factory=dict)           # verified/caution/gap 카운트
+    gaps: list[dict] = field(default_factory=list)         # (region × moment) items=0 조합
+    llm_used: bool = False
+    reason: str = ""
+
+
+def build_intro(form_state: dict, *, max_highlights: int = 6) -> HarubanIntro:
+    """폼 상태 → 하이라이트 카드 + 인사 문구.
+
+    LLM은 greeting과 각 place의 reason 한 줄만. 이름/주소/배지는 DB 조회값 그대로.
+    LLM 미가용 시 템플릿 greeting + reason 생략 (배지·주소는 정상 노출).
+    """
+    # 1) 폼 검증. 임계 미달(regions/moments 비어 있음) 등은 available=False.
+    try:
+        req = filters_mod.PackRequest.from_dict(form_state)
+    except (ValueError, KeyError) as e:
+        return HarubanIntro(available=False, reason=f"form invalid: {type(e).__name__}: {e}")
+
+    if not req.moments:
+        return HarubanIntro(available=False, reason="no moments selected")
+
+    try:
+        bundle = filters_mod.build_filters(req)
+    except (
+        filters_mod.UnknownRegion, filters_mod.UnknownMoment,
+        filters_mod.UnknownCompanion, filters_mod.UnknownPurpose,
+        ValueError,
+    ) as e:
+        return HarubanIntro(available=False, reason=f"filters invalid: {type(e).__name__}: {e}")
+
+    # 2) 각 moment의 items 수집 (badge 판정 포함)
+    now = datetime.now(timezone.utc)
+    per_moment: dict[str, list[trust_mod.BadgedItem]] = {}
+    # 검색 limit은 하이라이트 6 + 여유. moment별 6이면 4*6=24 hit, 감당 가능.
+    per_moment_hits: dict[str, list] = {}
+    for mf in bundle.per_moment:
+        hits = search_mod.search_strict(mf, limit=max_highlights)
+        per_moment_hits[mf.moment] = hits
+        per_moment[mf.moment] = [trust_mod.badge_item(h, mf, now=now) for h in hits]
+
+    # 3) 하이라이트 선정 (verified 우선, (region, moment) 다양성)
+    highlights = _pick_highlights(per_moment, per_moment_hits, req, max_count=max_highlights)
+
+    # 4) coverage 매트릭스 & gaps
+    coverage_matrix = _compute_coverage_matrix(per_moment, req)
+    gaps = _compute_gaps(coverage_matrix, req)
+    coverage = _compute_coverage_summary(per_moment, gaps)
+
+    # 5) LLM 조립 (greeting + reasons)
+    greeting = ""
+    reasons_by_id: dict[str, str] = {}
+    llm_used = False
+    llm_reason = ""
+
+    if llm.is_available():
+        greeting, reasons_by_id, llm_used, llm_reason = _llm_compose(req, highlights, gaps)
+
+    if not llm_used or not greeting:
+        greeting = _template_greeting(req, highlights, gaps, coverage)
+
+    # 6) reason 병합 (LLM이 준 것만)
+    for h in highlights:
+        r = reasons_by_id.get(h["external_id"])
+        if r:
+            h["reason"] = r
+
+    return HarubanIntro(
+        available=True,
+        greeting=greeting,
+        highlights=highlights,
+        coverage=coverage,
+        gaps=gaps,
+        llm_used=llm_used,
+        reason=llm_reason,
+    )
+
+
+def _pick_highlights(
+    per_moment: dict[str, list[trust_mod.BadgedItem]],
+    per_moment_hits: dict[str, list],
+    req: filters_mod.PackRequest,
+    *,
+    max_count: int,
+) -> list[dict]:
+    """규칙 기반 하이라이트 선정.
+
+    규칙:
+      - (region × moment) 조합에서 하나씩 뽑아 다양성 확보 (라운드 로빈)
+      - 각 조합 안에서는 verified > caution 순
+      - contradicted / tombstoned는 이미 search_strict에서 배제됨
+      - 결과가 max_count 미달이면 나머지 슬롯은 남은 verified/caution로 채움
+    """
+    # (region, moment) → 배지 순 정렬된 후보 리스트
+    buckets: dict[tuple[str, str], list[dict]] = {}
+    for moment, items in per_moment.items():
+        hits = per_moment_hits.get(moment, [])
+        for i, it in enumerate(items):
+            region = it.region_normalized or (hits[i].region_normalized if i < len(hits) else "")
+            hit = hits[i] if i < len(hits) else None
+            entry = {
+                "external_id": it.external_id,
+                "name": it.name,
+                "region": region,
+                "region_label": REGION_LABEL_KO.get(region, region),
+                "moment": moment,
+                "moment_label": MOMENT_LABEL_KO.get(moment, moment),
+                "address": (hit.address if hit else None),
+                "badge": it.badge,
+                "note": it.note,
+                "sources": it.sources,
+                "transit": it.transit,
+                "reason": None,   # LLM이 채움. 없으면 None.
+            }
+            buckets.setdefault((region, moment), []).append(entry)
+
+    for key in buckets:
+        buckets[key].sort(key=lambda e: (0 if e["badge"] == "verified" else 1))
+
+    # 라운드 로빈: 선택된 (region, moment) 조합을 반복 순회하며 하나씩 뽑음.
+    combos = [
+        (r, m)
+        for r in req.regions
+        for m in req.moments
+        if (r, m) in buckets and buckets[(r, m)]
+    ]
+    chosen: list[dict] = []
+    while combos and len(chosen) < max_count:
+        next_round: list[tuple[str, str]] = []
+        for key in combos:
+            if buckets[key]:
+                chosen.append(buckets[key].pop(0))
+                if len(chosen) >= max_count:
+                    break
+                if buckets[key]:
+                    next_round.append(key)
+        combos = next_round
+
+    return chosen
+
+
+def _compute_coverage_matrix(
+    per_moment: dict[str, list[trust_mod.BadgedItem]],
+    req: filters_mod.PackRequest,
+) -> dict[tuple[str, str], int]:
+    """선택된 (region × moment) 조합별 verified+caution 카운트."""
+    matrix: dict[tuple[str, str], int] = {}
+    for r in req.regions:
+        for m in req.moments:
+            items = per_moment.get(m, [])
+            n = sum(1 for it in items if (it.region_normalized or "") == r)
+            matrix[(r, m)] = n
+    return matrix
+
+
+def _compute_gaps(
+    matrix: dict[tuple[str, str], int],
+    req: filters_mod.PackRequest,
+) -> list[dict]:
+    """items=0인 조합을 정직 문구와 함께 나열."""
+    gaps: list[dict] = []
+    for (r, m), n in matrix.items():
+        if n == 0:
+            gaps.append({
+                "region": r,
+                "region_label": REGION_LABEL_KO.get(r, r),
+                "moment": m,
+                "moment_label": MOMENT_LABEL_KO.get(m, m),
+                "note": (
+                    f"{REGION_LABEL_KO.get(r, r)}에서 {MOMENT_LABEL_KO.get(m, m)}은(는) "
+                    "저희가 참조하는 공공데이터 기준으로 확인되지 않았습니다."
+                ),
+            })
+    return gaps
+
+
+def _compute_coverage_summary(
+    per_moment: dict[str, list[trust_mod.BadgedItem]],
+    gaps: list[dict],
+) -> dict:
+    verified = 0
+    caution = 0
+    for items in per_moment.values():
+        for it in items:
+            if it.badge == "verified":
+                verified += 1
+            elif it.badge == "caution":
+                caution += 1
+    total = verified + caution
+    return {
+        "verified": verified,
+        "caution": caution,
+        "total": total,
+        "gap_combos": len(gaps),
+    }
+
+
+def _template_greeting(
+    req: filters_mod.PackRequest,
+    highlights: list[dict],
+    gaps: list[dict],
+    coverage: dict,
+) -> str:
+    """LLM 없어도 항상 나오는 안전 문구.
+
+    형식: "{동행자}와 {지역} {목적}이시라구요? 저희 데이터로 확인된 곳 N곳 보여드릴게요."
+    조합에 빈 것이 있으면 두 번째 문장으로 정직하게 덧붙임.
+    """
+    companion_ko = COMPANION_LABEL_KO.get(req.companion, "")
+    purpose_ko = PURPOSE_LABEL_KO.get(req.purpose, "")
+    regions_ko = ", ".join(REGION_LABEL_KO.get(r, r) for r in req.regions)
+
+    head = ""
+    if companion_ko and purpose_ko:
+        head = f"{regions_ko}에서 {companion_ko} {purpose_ko} 여행이시라구요? "
+    elif regions_ko:
+        head = f"{regions_ko} 여행이시라구요? "
+
+    if highlights:
+        body = f"저희 공공데이터로 확인된 {len(highlights)}곳을 먼저 보여드릴게요."
+    else:
+        body = "이 조합에서 저희 데이터로 확인된 곳이 아직 없어요."
+
+    tail = ""
+    if gaps:
+        tail = f" (확인되지 않은 조합 {len(gaps)}개는 아래에 정직하게 알려드려요.)"
+
+    return (head + body + tail).strip()
+
+
+def _llm_compose(
+    req: filters_mod.PackRequest,
+    highlights: list[dict],
+    gaps: list[dict],
+) -> tuple[str, dict[str, str], bool, str]:
+    """LLM에 greeting + reason 한 줄씩 요청.
+
+    반환: (greeting_text, reasons_by_external_id, llm_used, reason)
+    실패/키 없음 시 (있는 그대로 반환) — 호출부가 폴백.
+    """
+    # LLM 호출 시 사실 그대로 지어내지 않도록: 후보 리스트를 JSON으로 넘기고
+    # 오직 이 external_id 목록에 한해 reason을 매기라고 지시.
+    payload = {
+        "user": {
+            "regions": [REGION_LABEL_KO.get(r, r) for r in req.regions],
+            "companion": COMPANION_LABEL_KO.get(req.companion, req.companion),
+            "purpose": PURPOSE_LABEL_KO.get(req.purpose, req.purpose),
+            "moments": [MOMENT_LABEL_KO.get(m, m) for m in req.moments],
+        },
+        "candidates": [
+            {
+                "external_id": h["external_id"],
+                "name": h["name"],
+                "region": h["region_label"],
+                "moment": h["moment_label"],
+                "badge": h["badge"],
+                "note": h["note"],
+            }
+            for h in highlights
+        ],
+        "gaps": [
+            {"region": g["region_label"], "moment": g["moment_label"]}
+            for g in gaps
+        ],
+    }
+
+    system = (
+        "너는 '하루방'이다. 제주 여행 정직 에이전트 캐릭터.\n"
+        "말투: 부드러운 존댓말, 짧고 따뜻하게, 이모지 없이.\n\n"
+        "역할: 사용자가 폼에서 지역·순간을 방금 골랐다. "
+        "저희 데이터로 확인된 후보들과 확인되지 않은 조합이 아래 JSON에 있다. "
+        "이걸 바탕으로 (1) 짧은 인사 한두 문장과 (2) 각 후보의 '이 곳을 왜 보여드리는지' 한 줄을 만들어라.\n\n"
+        "절대 규칙:\n"
+        "- candidates에 없는 장소·주소·운영시간·수치를 지어내지 마라.\n"
+        "- '가장 좋은 곳' 같은 단정 대신 '저희 데이터로 확인된 곳' 톤을 유지하라.\n"
+        "- 확인되지 않은 조합(gaps)은 인사에서 정직하게 언급하되 '없다'고 단언하지 마라.\n"
+        "- reasons는 반드시 candidates의 external_id를 key로 써라. 다른 id를 지어내지 마라.\n\n"
+        "출력 형식은 아래 JSON 스키마 그대로:\n"
+        '{\n'
+        '  "greeting": "한 두 문장",\n'
+        '  "reasons": { "<external_id>": "한 줄 이유", ... }\n'
+        '}'
+    )
+
+    user = "다음 JSON에 근거해서만 답하라:\n" + json.dumps(payload, ensure_ascii=False, indent=2)
+
+    resp = llm.complete(system=system, user=user, max_completion_tokens=700, temperature=0.3)
+    if not resp.available:
+        return "", {}, False, resp.reason
+
+    text_out = resp.text.strip()
+    # 코드펜스 제거 (LLM이 ```json ...``` 감쌀 때)
+    if text_out.startswith("```"):
+        text_out = text_out.strip("`")
+        # ```json\n{...}\n``` 형태
+        if text_out.startswith("json"):
+            text_out = text_out[4:]
+        text_out = text_out.strip()
+
+    try:
+        parsed = json.loads(text_out)
+    except json.JSONDecodeError as e:
+        return "", {}, False, f"json decode failed: {e}"
+
+    greeting = str(parsed.get("greeting") or "").strip()
+    reasons_raw = parsed.get("reasons") or {}
+
+    # candidates에 없는 id는 조용히 버림 (사실 생성 방지 게이트).
+    valid_ids = {h["external_id"] for h in highlights}
+    reasons: dict[str, str] = {}
+    if isinstance(reasons_raw, dict):
+        for k, v in reasons_raw.items():
+            if k in valid_ids and isinstance(v, str) and v.strip():
+                reasons[k] = v.strip()
+
+    return greeting, reasons, True, ""
