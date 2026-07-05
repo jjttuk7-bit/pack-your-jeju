@@ -50,3 +50,24 @@ export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<Pack
 export function requestVerify(text: string): Promise<VerifyResponse> {
   return post<VerifyResponse>('/verify', { text });
 }
+
+// 자연어 상담 레이어 (정직 에이전트 Phase A).
+// 응답의 available=false면 프론트는 폼 fallback으로 안내한다.
+export interface ParsedRequestDto {
+  regions: string[];
+  start_date: string;
+  days: number;
+  companion: string;
+  purpose: string;
+  moments: string[];
+  special_notes: string;
+  reasoning: string;
+}
+export interface AgentParseResponse {
+  available: boolean;
+  reason: string;
+  parsed: ParsedRequestDto | null;
+}
+export function requestAgentParse(text: string): Promise<AgentParseResponse> {
+  return post<AgentParseResponse>('/agent/parse', { text });
+}

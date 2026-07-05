@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import text
 
 from apps.api import bootstrap, db
+from apps.api.engine import agent as agent_mod
 from apps.api.engine import assemble as assemble_mod
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import trust as trust_mod
@@ -201,6 +202,30 @@ def pack(body: PackBody) -> dict[str, Any]:
         "itinerary": itinerary,
         "packing_additions": [],
         "log_id": log_id,
+    }
+
+
+class AgentParseBody(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/agent/parse")
+def agent_parse(body: AgentParseBody) -> dict[str, Any]:
+    """자연어 → PackRequest 필드 파싱. 사용자 확인 후 실제 /pack 호출로 이어짐.
+
+    LLM 미가용 시 available=False로 응답 → 프론트는 폼 fallback으로 안내.
+    """
+    result = agent_mod.parse_pack_request(body.text)
+    if not result.available or result.parsed is None:
+        return {
+            "available": False,
+            "reason": result.reason,
+            "parsed": None,
+        }
+    return {
+        "available": True,
+        "reason": "",
+        "parsed": result.parsed.to_dict(),
     }
 
 

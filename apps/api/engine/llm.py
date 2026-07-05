@@ -81,3 +81,72 @@ def complete(
     choice: Any = resp.choices[0] if resp.choices else None
     text = (choice.message.content if choice and choice.message else "") or ""
     return LLMResponse(available=True, text=text.strip())
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """function calling 응답 하나. name + arguments(JSON string 원본)."""
+    name: str
+    arguments: str
+
+
+@dataclass(frozen=True)
+class ToolCallResponse:
+    """function calling 호출 결과. available=False면 호출부가 폴백 경로로 진행한다."""
+    available: bool
+    tool_calls: tuple[ToolCall, ...] = ()
+    text: str = ""                  # tool_calls와 병존 가능한 자연어 문구
+    reason: str = ""
+
+
+def complete_with_tools(
+    *,
+    system: str,
+    user: str,
+    tools: list[dict],
+    max_completion_tokens: int = 500,
+    temperature: float = 0.2,
+) -> ToolCallResponse:
+    """gpt-5.3-mini function calling 호출.
+
+    tools는 OpenAI 표준 형식: [{"type": "function", "function": {"name","description","parameters"}}]
+    호출부가 tool_calls를 확인 후 실제 도구를 실행하고 결과를 다시 넘겨받는 흐름은
+    호출부(예: agent.py) 책임 (여러 턴 필요 시 turn 관리).
+    """
+    key = _api_key()
+    if key is None:
+        return ToolCallResponse(available=False, reason="OPENAI_API_KEY not set")
+
+    try:
+        from openai import OpenAI
+    except Exception as e:  # pragma: no cover
+        return ToolCallResponse(available=False, reason=f"openai import failed: {e}")
+
+    client = OpenAI(api_key=key)
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": system + "\n\n" + NO_HALLUCINATION_CLAUSE},
+                {"role": "user", "content": user},
+            ],
+            tools=tools,
+            tool_choice="auto",
+            max_completion_tokens=max_completion_tokens,
+            temperature=temperature,
+        )
+    except Exception as e:
+        return ToolCallResponse(available=False, reason=f"openai call failed: {e}")
+
+    choice: Any = resp.choices[0] if resp.choices else None
+    msg = choice.message if choice else None
+    text = (msg.content if msg else "") or ""
+    tool_calls_raw = getattr(msg, "tool_calls", None) or []
+    tool_calls = tuple(
+        ToolCall(
+            name=getattr(tc.function, "name", "") if hasattr(tc, "function") else "",
+            arguments=getattr(tc.function, "arguments", "") if hasattr(tc, "function") else "",
+        )
+        for tc in tool_calls_raw
+    )
+    return ToolCallResponse(available=True, tool_calls=tool_calls, text=text.strip())
