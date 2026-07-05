@@ -124,6 +124,11 @@ export interface HarubanIntroHighlight {
   sources: Array<{ name: string; url: string }>;
   transit: { parking: boolean; parking_count: number; bus_walkable: boolean };
   reason: string | null;
+  // 상세 확장 UI용 (선택 필드)
+  category?: string;
+  amenities?: Record<string, unknown> | null;
+  hygiene_grade?: string | null;
+  freshness?: { info_type: string; valid_until: string | null };
 }
 export interface HarubanIntroGap {
   region: string;

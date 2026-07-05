@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Loader2,
   MapPin,
@@ -14,6 +14,7 @@ import {
   Sparkles,
   CheckSquare,
   Square,
+  ChevronDown,
 } from 'lucide-react';
 import type {
   TravelInfo,
@@ -22,11 +23,13 @@ import type {
   SectionDto,
   ItineraryDayDto,
   ItineraryItemDto,
+  PackItemDto,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
 import { requestPack } from '../api';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
+import PlaceDetail from './PlaceDetail';
 
 interface Props {
   info: TravelInfo;
@@ -387,55 +390,104 @@ function UnavailableNote({
 function ItineraryItemRow({ it }: { it: ItineraryItemDto }) {
   const moment = MOMENTS.find((m) => m.id === it.moment);
   const momentTitle = moment?.title ?? String(it.moment);
+  const momentHeader = (
+    <div className="flex items-center gap-1.5 text-[10px] text-orange-700/80 font-semibold uppercase tracking-wider mb-0.5">
+      {moment && <MomentIcon id={moment.id as any} className="w-3.5 h-3.5" />}
+      <span>{momentTitle}</span>
+    </div>
+  );
+  return <PackItemCard it={it} header={momentHeader} />;
+}
+
+// 팩 아이템 하나 = 클릭 시 확장. 헤더(장소명·배지·요약 뱃지)만 접혀 있고, 열면 PlaceDetail 노출.
+// 요일별 뷰와 순간별 뷰가 공유. 순간 라벨은 부모(요일별 뷰)에서 header prop으로 주입.
+function PackItemCard({
+  it,
+  header,
+}: {
+  it: PackItemDto;
+  header?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="p-3.5 rounded-2xl border border-stone-100 bg-[#FDFBF7] hover:border-orange-200 transition">
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 text-[10px] text-orange-700/80 font-semibold uppercase tracking-wider mb-0.5">
-            {moment && (
-              <MomentIcon id={moment.id as any} className="w-3.5 h-3.5" />
-            )}
-            <span>{momentTitle}</span>
+    <div
+      className={`rounded-2xl border bg-[#FDFBF7] transition ${
+        open ? 'border-orange-200 shadow-sm' : 'border-stone-100 hover:border-orange-200'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full text-left p-3.5 focus:outline-none focus:ring-2 focus:ring-citrus/30 rounded-2xl"
+      >
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex-1 min-w-0">
+            {header}
+            <div className="font-bold text-[13.5px] text-stone-900 leading-snug">
+              {it.name}
+            </div>
           </div>
-          <div className="font-bold text-[13.5px] text-stone-900 leading-snug">{it.name}</div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge kind={it.badge} note={it.note} />
+            <ChevronDown
+              className={`w-4 h-4 text-basalt-2/60 transition-transform ${
+                open ? 'rotate-180' : ''
+              }`}
+            />
+          </div>
         </div>
-        <Badge kind={it.badge} note={it.note} />
-      </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-stone-500">
-        {it.transit.parking && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
-            <ParkingCircle className="w-3 h-3 text-stone-500" />
-            <span className="font-medium">주차 {it.transit.parking_count}</span>
-          </span>
-        )}
-        {it.transit.bus_walkable && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
-            <Bus className="w-3 h-3 text-stone-500" />
-            <span className="font-medium">정류장 근접</span>
-          </span>
-        )}
-        {it.freshness?.info_type && (
-          <span className="text-stone-400">· {it.freshness.info_type}</span>
-        )}
-      </div>
-
-      {it.sources?.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-stone-100">
-          {it.sources.map((s, i) => (
-            <a
-              key={i}
-              href={s.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[10.5px] font-medium text-orange-700 hover:underline"
-            >
-              <ExternalLink className="w-3 h-3" />
-              {s.name}
-            </a>
-          ))}
+        <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-stone-500">
+          {it.transit.parking && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
+              <ParkingCircle className="w-3 h-3 text-stone-500" />
+              <span className="font-medium">주차 {it.transit.parking_count}</span>
+            </span>
+          )}
+          {it.transit.bus_walkable && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
+              <Bus className="w-3 h-3 text-stone-500" />
+              <span className="font-medium">정류장 근접</span>
+            </span>
+          )}
+          {it.freshness?.info_type && (
+            <span className="text-stone-400">· {it.freshness.info_type}</span>
+          )}
+          {!open && (
+            <span className="ml-auto text-[10px] text-citrus-2/80 font-semibold">
+              자세히 보기 →
+            </span>
+          )}
         </div>
-      )}
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="detail"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3.5 pb-3.5 pt-1 border-t border-stone-100">
+              <PlaceDetail
+                externalId={it.external_id}
+                address={it.address}
+                category={it.category}
+                amenities={it.amenities}
+                freshness={it.freshness}
+                transit={it.transit}
+                hygieneGrade={it.hygiene_grade}
+                note={it.note}
+                sources={it.sources}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -479,52 +531,7 @@ function SectionCard({ section }: { section: SectionDto }) {
       ) : (
         <div className="space-y-2">
           {section.items.map((it) => (
-            <div
-              key={it.external_id}
-              className="p-3.5 rounded-2xl border border-stone-100 bg-[#FDFBF7] hover:border-orange-200 transition"
-            >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-[13.5px] text-stone-900 leading-snug">{it.name}</div>
-                </div>
-                <Badge kind={it.badge} note={it.note} />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-stone-500">
-                {it.transit.parking && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
-                    <ParkingCircle className="w-3 h-3 text-stone-500" />
-                    <span className="font-medium">주차 {it.transit.parking_count}</span>
-                  </span>
-                )}
-                {it.transit.bus_walkable && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
-                    <Bus className="w-3 h-3 text-stone-500" />
-                    <span className="font-medium">정류장 근접</span>
-                  </span>
-                )}
-                {it.freshness?.info_type && (
-                  <span className="text-stone-400">· {it.freshness.info_type}</span>
-                )}
-              </div>
-
-              {it.sources?.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-stone-100">
-                  {it.sources.map((s, i) => (
-                    <a
-                      key={i}
-                      href={s.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[10.5px] font-medium text-orange-700 hover:underline"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      {s.name}
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
+            <PackItemCard key={it.external_id} it={it} />
           ))}
         </div>
       )}

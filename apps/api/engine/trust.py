@@ -13,7 +13,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -42,6 +42,11 @@ class BadgedItem:
     transit: dict
     note: str | None = None                  # 완화 검색 결과 등 부가 설명
     region_normalized: str = ""              # 지역별 요일 그룹핑에 사용 (assemble.dispatch_itinerary)
+    # 상세 확장 UI에서 노출 — 근거 있는 값만. 결측은 None으로 두어 프론트가 '미확인' 표기.
+    address: str | None = None
+    category: str = ""
+    amenities: dict = field(default_factory=dict)
+    hygiene_grade: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +144,10 @@ def badge_item(
         transit=transit,
         note=display_note,
         region_normalized=hit.region_normalized or "",
+        address=hit.address,
+        category=hit.category,
+        amenities=hit.amenities if isinstance(hit.amenities, dict) else {},
+        hygiene_grade=hit.hygiene_grade,
     )
 
 

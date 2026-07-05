@@ -568,6 +568,11 @@ def _pick_highlights(
                 "note": it.note,
                 "sources": it.sources,
                 "transit": it.transit,
+                # 상세 확장용 (근거 있는 값만; 결측은 그대로 넘겨 프론트가 '미확인' 표기)
+                "category": it.category,
+                "amenities": it.amenities,
+                "hygiene_grade": it.hygiene_grade,
+                "freshness": it.freshness,
                 "reason": None,   # LLM이 채움. 없으면 None.
             }
             buckets.setdefault((region, moment), []).append(entry)

@@ -88,6 +88,12 @@ export interface PackItemDto {
   freshness: { info_type: string; valid_until: string | null };
   transit: { parking: boolean; parking_count: number; bus_walkable: boolean };
   note: string | null;
+  // 상세 확장 UI용 (선택 필드; 결측이면 프론트에서 '미확인' 표기)
+  address?: string | null;
+  category?: string;
+  amenities?: Record<string, unknown> | null;
+  hygiene_grade?: string | null;
+  region?: string;
 }
 
 export type FallbackReason = 'out_of_scope' | 'contradicted' | 'retrieval_miss' | 'coverage_gap';

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Loader2, Check, RefreshCcw, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { X, Send, Loader2, Check, RefreshCcw, ShieldCheck, AlertTriangle, ChevronDown } from 'lucide-react';
 import HarubangMark from './marks/HarubangMark';
 import type { TravelInfo, MomentId, RegionId, CompanionValue, PurposeValue } from '../types';
 import {
@@ -10,6 +10,7 @@ import {
   type HarubanFormSuggestion,
   type HarubanIntroResponse,
 } from '../api';
+import PlaceDetail from './PlaceDetail';
 
 interface HarubanChatProps {
   info: TravelInfo;
@@ -510,6 +511,7 @@ function HighlightCard({
   alreadyInForm: boolean;
   onPick: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const isVerified = highlight.badge === 'verified';
   const isCaution = highlight.badge === 'caution';
   const badgeStyle = isVerified
@@ -520,46 +522,92 @@ function HighlightCard({
   const BadgeIcon = isCaution ? AlertTriangle : ShieldCheck;
   const badgeLabel = isVerified ? '확인됨' : isCaution ? '주의' : highlight.badge;
 
-  const sourceUrl = highlight.sources?.[0]?.url;
-
   return (
-    <div className="rounded-xl border border-earth/70 bg-white p-3 space-y-1.5 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] text-basalt-2/70 mb-0.5">
-            {highlight.region_label} · {highlight.moment_label}
+    <div
+      className={`rounded-xl border bg-white shadow-sm transition ${
+        open ? 'border-citrus/40' : 'border-earth/70'
+      }`}
+    >
+      {/* 헤더 — 클릭 시 확장 */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full text-left p-3 space-y-1.5 focus:outline-none focus:ring-2 focus:ring-citrus/30 rounded-xl"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] text-basalt-2/70 mb-0.5">
+              {highlight.region_label} · {highlight.moment_label}
+            </div>
+            <div className="font-serif-kr font-bold text-[13.5px] text-basalt leading-snug break-keep">
+              {highlight.name}
+            </div>
           </div>
-          <div className="font-serif-kr font-bold text-[13.5px] text-basalt leading-snug break-keep">
-            {highlight.name}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${badgeStyle}`}
+            >
+              <BadgeIcon className="w-2.5 h-2.5" />
+              {badgeLabel}
+            </div>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-basalt-2/60 transition-transform ${
+                open ? 'rotate-180' : ''
+              }`}
+            />
           </div>
         </div>
-        <div
-          className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${badgeStyle}`}
-        >
-          <BadgeIcon className="w-2.5 h-2.5" />
-          {badgeLabel}
-        </div>
-      </div>
 
-      {highlight.address && (
-        <div className="text-[11px] text-basalt-2 leading-snug break-keep">
-          {highlight.address}
-        </div>
-      )}
+        {highlight.address && (
+          <div className="text-[11px] text-basalt-2 leading-snug break-keep">
+            {highlight.address}
+          </div>
+        )}
 
-      {highlight.reason && (
-        <div className="text-[11px] text-basalt leading-relaxed border-l-2 border-citrus/40 pl-2 mt-1">
-          {highlight.reason}
-        </div>
-      )}
+        {highlight.reason && (
+          <div className="text-[11px] text-basalt leading-relaxed border-l-2 border-citrus/40 pl-2 mt-1">
+            {highlight.reason}
+          </div>
+        )}
 
-      {highlight.note && (
-        <div className="text-[10.5px] text-amber-800 leading-snug">
-          · {highlight.note}
-        </div>
-      )}
+        {!open && (
+          <div className="text-[10px] text-citrus-2/80 font-semibold pt-0.5">
+            자세히 보기 →
+          </div>
+        )}
+      </button>
 
-      <div className="flex items-center gap-2 pt-1">
+      {/* 확장 상세 — 근거 있는 값만. */}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="detail"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 pt-1 border-t border-earth/50">
+              <PlaceDetail
+                externalId={highlight.external_id}
+                address={highlight.address}
+                category={highlight.category}
+                amenities={highlight.amenities}
+                freshness={highlight.freshness}
+                transit={highlight.transit}
+                hygieneGrade={highlight.hygiene_grade}
+                note={highlight.note}
+                sources={highlight.sources}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 액션 라인 — 항상 노출 */}
+      <div className="flex items-center gap-2 px-3 pb-3">
         {alreadyInForm ? (
           <span className="text-[11px] px-2 py-1 rounded-md bg-mint/10 text-mint border border-mint/40 inline-flex items-center gap-1">
             <Check className="w-3 h-3" />
@@ -574,16 +622,6 @@ function HighlightCard({
             <Check className="w-3 h-3" />
             이 조건 폼에 반영
           </button>
-        )}
-        {sourceUrl && (
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10.5px] text-basalt-2/70 underline underline-offset-2 hover:text-basalt-2"
-          >
-            근거 (비짓제주)
-          </a>
         )}
       </div>
     </div>
