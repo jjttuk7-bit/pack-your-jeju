@@ -42,18 +42,20 @@ from reportlab.platypus import (
 # 둘 다에서 동작하도록 후보 경로를 순차 탐색해 가장 먼저 발견된 것을 등록한다.
 
 _FONT_CANDIDATES_REGULAR: list[str] = [
-    # 프로덕션(Debian slim + fonts-noto-cjk)
+    # 프로덕션(Debian + fonts-nanum) — 순수 TTF, reportlab 완벽 호환.
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    # Noto CJK — TTC라 reportlab이 실패할 수 있으나 서브폰트 인덱스 지정 시 부분 성공.
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Regular.otf",
-    # 나눔고딕(존재 시)
-    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
     # 로컬 Windows
     r"C:\Windows\Fonts\malgun.ttf",
 ]
 _FONT_CANDIDATES_BOLD: list[str] = [
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Bold.otf",
-    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
     r"C:\Windows\Fonts\malgunbd.ttf",
 ]
 
@@ -63,36 +65,66 @@ FONT_BOLD = "PYJ-KR-Bold"
 _font_registered = False
 
 
-def _pick_font(candidates: list[str]) -> str | None:
+def _try_register(name: str, path: str) -> tuple[bool, str]:
+    """단일 폰트 등록 시도. TTC는 subfontIndex를 시도해 postscript outlines 이슈 우회.
+
+    성공하면 (True, path), 실패하면 (False, 이유).
+    """
+    try:
+        pdfmetrics.registerFont(TTFont(name, path))
+        return True, path
+    except Exception as e1:
+        # TTC 컬렉션이면 서브폰트 0을 지정해 재시도.
+        if path.lower().endswith(".ttc"):
+            try:
+                pdfmetrics.registerFont(TTFont(name, path, subfontIndex=0))
+                return True, f"{path}#0"
+            except Exception as e2:
+                return False, f"{path}: {e1} | subfont0: {e2}"
+        return False, f"{path}: {e1}"
+
+
+def _register_first_working(name: str, candidates: list[str]) -> tuple[bool, str]:
+    """후보 리스트를 순회하며 파일 존재 + registerFont 성공하는 첫 항목을 채택.
+
+    한 후보 실패해도 다음 후보로 넘어간다. 전부 실패하면 실패 사유를 모두 반환.
+    """
+    tried: list[str] = []
     for p in candidates:
-        if os.path.exists(p):
-            return p
-    return None
+        if not os.path.exists(p):
+            tried.append(f"{p} (not found)")
+            continue
+        ok, diag = _try_register(name, p)
+        if ok:
+            return True, diag
+        tried.append(diag)
+    return False, " ; ".join(tried) if tried else "no candidates"
 
 
 def _ensure_fonts() -> tuple[bool, str]:
     """실제로 등록된 상태를 True/False와 진단 메시지로 반환.
 
-    폰트 파일이 없으면 등록 실패 → 호출부는 500 대신 상태 코드로 안내.
+    한 후보가 실패해도 다음 후보를 시도. 전부 실패하면 마지막에 상태 코드로 안내.
     """
     global _font_registered
     if _font_registered:
         return True, "cached"
 
-    reg = _pick_font(_FONT_CANDIDATES_REGULAR)
-    if reg is None:
-        return False, "no Korean font found (tried Noto CJK, Nanum, malgun)"
+    ok_reg, diag_reg = _register_first_working(FONT_REGULAR, _FONT_CANDIDATES_REGULAR)
+    if not ok_reg:
+        return False, f"regular font unavailable: {diag_reg}"
 
-    bold = _pick_font(_FONT_CANDIDATES_BOLD) or reg
-
-    try:
-        pdfmetrics.registerFont(TTFont(FONT_REGULAR, reg))
-        pdfmetrics.registerFont(TTFont(FONT_BOLD, bold))
-    except Exception as e:
-        return False, f"reportlab registerFont failed: {e}"
+    ok_bold, diag_bold = _register_first_working(FONT_BOLD, _FONT_CANDIDATES_BOLD)
+    if not ok_bold:
+        # bold가 없으면 regular 폰트를 bold 이름으로도 등록해두어 렌더는 계속.
+        # (실제 서비스 톤: 굵기가 약해질 뿐 조립은 정상)
+        ok_reg2, _ = _register_first_working(FONT_BOLD, _FONT_CANDIDATES_REGULAR)
+        if not ok_reg2:
+            return False, f"bold font unavailable and regular re-register failed: {diag_bold}"
+        diag_bold = f"(fallback to regular)"
 
     _font_registered = True
-    return True, f"regular={reg} bold={bold}"
+    return True, f"regular={diag_reg} bold={diag_bold}"
 
 
 # ─── 컬러 팔레트 (프론트 톤과 동일) ─────────────────────
