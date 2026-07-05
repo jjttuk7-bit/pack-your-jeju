@@ -96,10 +96,21 @@ export interface SectionDto {
   fallback: { reason: FallbackReason; message: string; stats: any } | null;
 }
 
+export interface ItineraryItemDto extends PackItemDto {
+  moment: MomentId | string;
+}
+
+export interface ItineraryDayDto {
+  day: number;                     // 1-indexed
+  date: string;                    // yyyy-mm-dd
+  items: ItineraryItemDto[];
+}
+
 export interface PackResponse {
   pack_id: string;
   intro: { text: string; llm_used: boolean };
   sections: SectionDto[];
+  itinerary?: ItineraryDayDto[];   // 규칙 기반 요일별 재배치 (LLM 없음)
   packing_additions: { item: string; reason: string; badge: BadgeKind; source?: string }[];
   log_id: string | null;
 }

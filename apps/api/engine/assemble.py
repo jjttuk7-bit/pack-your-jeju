@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 from apps.api.engine import llm
 from apps.api.engine.trust import Section
@@ -109,6 +110,52 @@ def _build_user_prompt(
     if special_notes:
         payload["special_notes"] = special_notes
     return json.dumps(payload, ensure_ascii=False)
+
+
+def dispatch_itinerary(
+    sections: list[Section], days: int, start_date: date,
+) -> list[dict]:
+    """검증된 items를 요일별로 균등 배치 (규칙 기반, LLM 없음).
+
+    원칙 (CLAUDE.md 절대 규칙 1):
+      - LLM 사용 금지. items를 지어내지 않고 기존 검증된 것들만 재배치.
+      - 각 item은 원래 moment 정보를 유지 → UI에서 "어느 순간에서 왔는지" 표시.
+
+    배치 규칙:
+      - moment별로 items를 순환 배치 (같은 moment는 서로 다른 요일에 분산).
+      - items가 days보다 적으면 앞쪽 요일만 채움 (나머지 요일은 빈 items).
+      - 예: 3일 여행 × [oreum:2, cafe:3] →
+          Day1: [oreum#1, cafe#1]  Day2: [oreum#2, cafe#2]  Day3: [cafe#3]
+
+    입력:
+      sections: trust.judge_section 결과. items에 접근.
+      days: 여행 일수 (>= 1).
+      start_date: 여행 시작일. 요일별 date 계산에 사용.
+    반환:
+      [{"day": 1, "date": "YYYY-MM-DD", "items": [{...item + moment}, ...]}, ...]
+    """
+    result: list[dict] = [
+        {
+            "day": i + 1,
+            "date": (start_date + timedelta(days=i)).isoformat(),
+            "items": [],
+        }
+        for i in range(days)
+    ]
+    for s in sections:
+        for idx, it in enumerate(s.items):
+            day_idx = idx % days
+            result[day_idx]["items"].append({
+                "moment": s.moment,
+                "name": it.name,
+                "badge": it.badge,
+                "external_id": it.external_id,
+                "sources": it.sources,
+                "freshness": it.freshness,
+                "transit": it.transit,
+                "note": it.note,
+            })
+    return result
 
 
 def compose_intro(

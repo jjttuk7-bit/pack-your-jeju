@@ -20,6 +20,8 @@ import type {
   MomentId,
   PackResponse,
   SectionDto,
+  ItineraryDayDto,
+  ItineraryItemDto,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
 import { requestPack } from '../api';
@@ -66,6 +68,8 @@ export default function PackingDashboard(props: Props) {
   const [packResp, setPackResp] = useState<PackResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  // 뷰 스위처: 순간별(기본) vs 요일별. 응답의 itinerary가 있어야 요일별 활성.
+  const [viewMode, setViewMode] = useState<'moments' | 'itinerary'>('moments');
 
   const regionLabel = useMemo(
     () => REGIONS.find((r) => r.value === info.region)?.label ?? info.region,
@@ -178,11 +182,47 @@ export default function PackingDashboard(props: Props) {
         </div>
       )}
 
-      {/* 순간별 섹션 (백엔드 응답) */}
-      {packResp?.sections?.map((section) => (
+      {/* 뷰 스위처: 순간별 vs 요일별 */}
+      {packResp && !loading && !error && (packResp.itinerary?.length ?? 0) > 0 && (
+        <div
+          className="flex items-center gap-1 p-1 rounded-2xl bg-[#FDF6EA] border border-earth"
+          id="view-mode-tabs"
+        >
+          <button
+            type="button"
+            onClick={() => setViewMode('moments')}
+            className={`flex-1 py-2 rounded-xl text-[12px] font-semibold transition ${
+              viewMode === 'moments'
+                ? 'bg-white text-basalt shadow-jeju-chip'
+                : 'text-basalt-2/70 hover:text-basalt'
+            }`}
+          >
+            순간별로
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('itinerary')}
+            className={`flex-1 py-2 rounded-xl text-[12px] font-semibold transition ${
+              viewMode === 'itinerary'
+                ? 'bg-white text-basalt shadow-jeju-chip'
+                : 'text-basalt-2/70 hover:text-basalt'
+            }`}
+          >
+            요일별로 (Day 1–{info.durationDays})
+          </button>
+        </div>
+      )}
+
+      {/* 순간별 뷰 */}
+      {viewMode === 'moments' && packResp?.sections?.map((section) => (
         <React.Fragment key={section.moment}>
           <SectionCard section={section} />
         </React.Fragment>
+      ))}
+
+      {/* 요일별 뷰 (검증된 items를 규칙 기반 재배치) */}
+      {viewMode === 'itinerary' && packResp?.itinerary?.map((day) => (
+        <ItineraryDayCard key={day.day} day={day} />
       ))}
 
       {/* 기본 체크리스트 */}
@@ -243,6 +283,92 @@ const FALLBACK_MEAN: Record<string, { label: string; tint: string; emoji: string
   retrieval_miss: { label: '검색 결과 없음',           tint: 'from-stone-50 to-orange-50/60 border-stone-100 text-stone-800', emoji: '⚪' },
   out_of_scope:   { label: '제주 여행 범위 밖',       tint: 'from-stone-50 to-orange-50/60 border-stone-100 text-stone-800', emoji: '⚪' },
 };
+
+function ItineraryDayCard({ day }: { day: ItineraryDayDto }) {
+  // 여행 날짜를 사람에게 읽기 좋은 형태로 표시. 데이터 지어내지 않는 표준 포맷.
+  const dateFmt = new Date(day.date + 'T00:00:00').toLocaleDateString('ko-KR', {
+    month: 'short', day: 'numeric', weekday: 'short',
+  });
+  return (
+    <div className="card-jeju p-5 space-y-3" id={`itinerary-day-${day.day}`}>
+      <div className="flex items-baseline gap-2.5 border-b border-earth/50 pb-2.5">
+        <span className="font-serif-kr font-bold text-[18px] text-basalt tracking-tight">
+          Day {day.day}
+        </span>
+        <span className="text-[11.5px] text-basalt-2/70 font-medium">{dateFmt}</span>
+        <span className="ml-auto text-[10.5px] font-bold text-basalt-2/60 uppercase tracking-wider">
+          {day.items.length}곳
+        </span>
+      </div>
+
+      {day.items.length === 0 ? (
+        <p className="text-[11.5px] text-stone-400">이 날짜는 아직 비어 있습니다.</p>
+      ) : (
+        <div className="space-y-2">
+          {day.items.map((it) => (
+            <ItineraryItemRow key={`${it.external_id}-${day.day}`} it={it} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItineraryItemRow({ it }: { it: ItineraryItemDto }) {
+  const moment = MOMENTS.find((m) => m.id === it.moment);
+  const momentTitle = moment?.title ?? String(it.moment);
+  return (
+    <div className="p-3.5 rounded-2xl border border-stone-100 bg-[#FDFBF7] hover:border-orange-200 transition">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 text-[10px] text-orange-700/80 font-semibold uppercase tracking-wider mb-0.5">
+            {moment && (
+              <MomentIcon id={moment.id as any} className="w-3.5 h-3.5" />
+            )}
+            <span>{momentTitle}</span>
+          </div>
+          <div className="font-bold text-[13.5px] text-stone-900 leading-snug">{it.name}</div>
+        </div>
+        <Badge kind={it.badge} note={it.note} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-stone-500">
+        {it.transit.parking && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
+            <ParkingCircle className="w-3 h-3 text-stone-500" />
+            <span className="font-medium">주차 {it.transit.parking_count}</span>
+          </span>
+        )}
+        {it.transit.bus_walkable && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-stone-200">
+            <Bus className="w-3 h-3 text-stone-500" />
+            <span className="font-medium">정류장 근접</span>
+          </span>
+        )}
+        {it.freshness?.info_type && (
+          <span className="text-stone-400">· {it.freshness.info_type}</span>
+        )}
+      </div>
+
+      {it.sources?.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-stone-100">
+          {it.sources.map((s, i) => (
+            <a
+              key={i}
+              href={s.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[10.5px] font-medium text-orange-700 hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {s.name}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SectionCard({ section }: { section: SectionDto }) {
   const moment = MOMENTS.find((m) => m.id === section.moment);

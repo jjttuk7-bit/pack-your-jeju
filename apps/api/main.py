@@ -177,6 +177,9 @@ def pack(body: PackBody) -> dict[str, Any]:
         intro = assemble_mod.compose_intro(
             section_objs, req.companion, special_notes=body.special_notes,
         )
+        itinerary = assemble_mod.dispatch_itinerary(
+            section_objs, req.days, req.start_date,
+        )
 
     # 3) 로그 적재 (실패해도 응답에 영향 없음)
     log_id = log_pack(
@@ -190,6 +193,7 @@ def pack(body: PackBody) -> dict[str, Any]:
         "pack_id": str(uuid.uuid4()),
         "intro": {"text": intro.text, "llm_used": intro.llm_used},
         "sections": sections,
+        "itinerary": itinerary,
         "packing_additions": [],
         "log_id": log_id,
     }
