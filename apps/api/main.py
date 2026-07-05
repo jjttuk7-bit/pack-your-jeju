@@ -25,6 +25,7 @@ from apps.api import bootstrap, db
 from apps.api.engine import agent as agent_mod
 from apps.api.engine import assemble as assemble_mod
 from apps.api.engine import filters as filters_mod
+from apps.api.engine import haruban as haruban_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
@@ -202,6 +203,36 @@ def pack(body: PackBody) -> dict[str, Any]:
         "itinerary": itinerary,
         "packing_additions": [],
         "log_id": log_id,
+    }
+
+
+class HarubangMessage(BaseModel):
+    role: str
+    content: str = ""
+    tool_calls: list[dict] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
+
+
+class HarubangChatBody(BaseModel):
+    messages: list[HarubangMessage] = Field(min_length=1, max_length=30)
+    form_state: dict = Field(default_factory=dict)
+
+
+@app.post("/agent/chat")
+def agent_chat(body: HarubangChatBody) -> dict[str, Any]:
+    """하루방 대화 한 턴. LLM function calling으로 도구 호출까지 자동 실행.
+
+    LLM 미가용 시 available=False → 프론트가 안내.
+    """
+    messages_in = [m.model_dump(exclude_none=True) for m in body.messages]
+    turn = haruban_mod.chat_turn(messages_in, body.form_state)
+    return {
+        "available": turn.available,
+        "reply_text": turn.reply_text,
+        "form_suggestion": turn.form_suggestion,
+        "tool_trace": turn.tool_trace,
+        "reason": turn.reason,
     }
 
 

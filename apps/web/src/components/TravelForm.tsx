@@ -7,13 +7,9 @@ import {
   Sparkles,
   Check,
   ArrowRight,
-  MessageCircle,
-  Loader2,
-  ShieldAlert,
 } from 'lucide-react';
 import type { TravelInfo, MomentId, RegionId, CompanionValue, PurposeValue } from '../types';
 import { COMPANIONS, PURPOSES, MOMENTS } from '../data';
-import { requestAgentParse } from '../api';
 import RegionChips from './RegionChips';
 import MomentIcon from './marks/MomentIcon';
 
@@ -36,50 +32,6 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
   const [activeTab, setActiveTab] = useState<'basic' | 'moments'>('basic');
   const [errorMsg, setErrorMsg] = useState('');
   const NOTES_MAX = 300;
-
-  // 자연어 상담 레이어 (Phase A)
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatText, setChatText] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatReasoning, setChatReasoning] = useState<string | null>(null);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const CHAT_MAX = 500;
-
-  const handleAgentParse = async () => {
-    const t = chatText.trim();
-    if (!t) {
-      setChatError('여행 계획을 자유롭게 적어 주세요.');
-      return;
-    }
-    setChatLoading(true);
-    setChatError(null);
-    setChatReasoning(null);
-    try {
-      const resp = await requestAgentParse(t);
-      if (!resp.available || !resp.parsed) {
-        setChatError(
-          resp.reason?.includes('OPENAI_API_KEY')
-            ? '자연어 이해는 아직 준비 중이에요. 아래 폼으로 진행해 주세요.'
-            : '자연어 이해에 실패했어요. 아래 폼으로 진행해 주세요.',
-        );
-        return;
-      }
-      const p = resp.parsed;
-      // 파싱된 값이 있으면 폼 상태에 반영. 빈 값은 기존 값 유지 (덮어쓰지 않음).
-      if (p.regions.length > 0) setRegions(p.regions as RegionId[]);
-      if (p.start_date) setStartDate(p.start_date);
-      if (p.days > 0) setDurationDays(p.days);
-      if (p.companion) setCompanion(p.companion as CompanionValue);
-      if (p.purpose) setPurpose(p.purpose as PurposeValue);
-      if (p.moments.length > 0) setSelectedMomentIds(p.moments as MomentId[]);
-      if (p.special_notes) setSpecialNotes(p.special_notes.slice(0, NOTES_MAX));
-      setChatReasoning(p.reasoning);
-    } catch (e: any) {
-      setChatError(e?.message || String(e));
-    } finally {
-      setChatLoading(false);
-    }
-  };
 
   const toggleMoment = (id: MomentId) => {
     setSelectedMomentIds((prev) =>
@@ -122,78 +74,6 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
 
   return (
     <div className="w-full max-w-md mx-auto card-jeju p-6 sm:p-8" id="travel-form">
-      {/* 자연어 상담 (Phase A). 폼을 대체하지 않고 위에 얹혀 폼을 채우는 방식. */}
-      <div className="mb-6 rounded-2xl border-2 border-dashed border-citrus/40 bg-citrus/5 overflow-hidden" id="agent-parse-card">
-        <button
-          type="button"
-          onClick={() => setChatOpen((v) => !v)}
-          className="w-full px-4 py-3 flex items-center gap-2 text-left"
-        >
-          <MessageCircle className="w-4 h-4 text-citrus-2 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-serif-kr font-bold text-basalt">
-              자연어로 얘기하기
-            </div>
-            <div className="text-[10.5px] text-basalt-2/80 leading-relaxed">
-              여행 계획을 편하게 말해주시면 폼을 자동으로 채워드려요.
-              <span className="text-basalt-2/60"> 사실 정보는 지어내지 않아요.</span>
-            </div>
-          </div>
-          <ArrowRight
-            className={`w-3.5 h-3.5 text-basalt-2/60 shrink-0 transition-transform ${chatOpen ? 'rotate-90' : ''}`}
-          />
-        </button>
-
-        {chatOpen && (
-          <div className="px-4 pb-4 space-y-2 border-t border-citrus/30 pt-3">
-            <textarea
-              id="agent-parse-input"
-              value={chatText}
-              onChange={(e) => setChatText(e.target.value.slice(0, CHAT_MAX))}
-              placeholder="예: 부모님이랑 3일 힐링 여행. 애월·성산·서귀포. 오름이랑 조용한 카페 좋아하셔."
-              rows={3}
-              className="w-full px-3 py-2 rounded-xl border border-earth bg-white/80 text-basalt text-[12.5px] leading-snug focus:outline-none focus:ring-2 focus:ring-citrus/25 focus:border-citrus transition placeholder:text-basalt-2/50"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-basalt-2/60">{chatText.length}/{CHAT_MAX}</span>
-              <button
-                type="button"
-                id="btn-agent-parse"
-                onClick={handleAgentParse}
-                disabled={chatLoading || chatText.trim().length === 0}
-                className="ml-auto px-3.5 py-2 rounded-xl bg-citrus hover:bg-citrus-2 text-white text-[12px] font-serif-kr font-bold disabled:opacity-40 disabled:cursor-not-allowed shadow-jeju-chip transition flex items-center gap-1.5"
-              >
-                {chatLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                이해하고 채우기
-              </button>
-            </div>
-
-            {chatReasoning && (
-              <div className="rounded-xl bg-white/80 border border-citrus/30 px-3 py-2.5 text-[11.5px] leading-relaxed">
-                <div className="text-[10px] font-bold text-citrus-2 uppercase tracking-wider mb-1">
-                  저는 이렇게 이해했어요
-                </div>
-                <p className="text-basalt-2">{chatReasoning}</p>
-                <p className="text-[10px] text-basalt-2/70 mt-2">
-                  아래 폼에 반영했어요. 확인하고 수정한 뒤 팩을 만들어 주세요.
-                </p>
-              </div>
-            )}
-
-            {chatError && (
-              <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2 text-[11.5px] text-amber-900 flex items-start gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <p>{chatError}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       <div className="relative flex items-center mb-8 pb-3" id="form-tab-nav">
         <button
           onClick={() => setActiveTab('basic')}

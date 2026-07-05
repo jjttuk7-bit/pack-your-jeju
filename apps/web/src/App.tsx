@@ -5,6 +5,7 @@ import { TravelInfo, MomentId, SavedTravel } from './types';
 import TravelForm from './components/TravelForm';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
+import HarubanChat from './components/HarubanChat';
 import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import StoneWallPattern from './components/marks/StoneWallPattern';
@@ -75,6 +76,18 @@ export default function App() {
 
   const goToVerify = () => setState(prev => ({ ...prev, step: 'verify' }));
   const goToDashboard = () => setState(prev => ({ ...prev, step: 'dashboard' }));
+
+  // 하루방 폼 반영 제안 승인 시. 빈 값은 기존 값을 덮어쓰지 않는다.
+  const handleHarubanApply = (
+    infoPatch: Partial<TravelInfo>,
+    selectedMoments: MomentId[] | null,
+  ) => {
+    setState(prev => ({
+      ...prev,
+      info: { ...prev.info, ...infoPatch },
+      selectedMomentIds: selectedMoments ?? prev.selectedMomentIds,
+    }));
+  };
 
   const handleToggleItem = (itemId: string) => {
     setState(prev => {
@@ -377,6 +390,15 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* 하루방 챗 위젯 — 우측 하단 상주. verify 페이지에서는 숨김 (검증 시연 화면 방해 방지). */}
+      {state.step !== 'verify' && (
+        <HarubanChat
+          info={state.info}
+          selectedMomentIds={state.selectedMomentIds}
+          onApplySuggestion={handleHarubanApply}
+        />
+      )}
 
     </div>
   );

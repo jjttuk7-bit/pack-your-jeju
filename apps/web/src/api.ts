@@ -71,3 +71,37 @@ export interface AgentParseResponse {
 export function requestAgentParse(text: string): Promise<AgentParseResponse> {
   return post<AgentParseResponse>('/agent/parse', { text });
 }
+
+// 하루방 챗 (Phase C — 대화형 + 도구 사용 에이전트).
+export interface HarubanChatMessage {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  tool_calls?: any[];
+  tool_call_id?: string;
+  name?: string;
+}
+export interface HarubanFormSuggestion {
+  regions?: string[];
+  companion?: string;
+  purpose?: string;
+  moments?: string[];
+  days?: number;
+  start_date?: string;
+  reason: string;
+}
+export interface HarubanChatResponse {
+  available: boolean;
+  reply_text: string;
+  form_suggestion: HarubanFormSuggestion | null;
+  tool_trace: any[];
+  reason: string;
+}
+export function requestHarubanChat(
+  messages: HarubanChatMessage[],
+  formState: Record<string, unknown>,
+): Promise<HarubanChatResponse> {
+  return post<HarubanChatResponse>('/agent/chat', {
+    messages,
+    form_state: formState,
+  });
+}
