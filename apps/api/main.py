@@ -57,7 +57,10 @@ app.add_middleware(
 
 
 class PackBody(BaseModel):
-    region: str
+    # 다중 지역 선택 지원. `region`(단일) 필드도 backward compat로 허용.
+    # 최소 하나는 필요 (from_dict에서 정규화 후 검증).
+    regions: list[str] | None = None
+    region: str | None = None
     start_date: str
     days: int = Field(ge=1, le=14)
     companion: str
@@ -179,6 +182,7 @@ def pack(body: PackBody) -> dict[str, Any]:
         )
         itinerary = assemble_mod.dispatch_itinerary(
             section_objs, req.days, req.start_date,
+            selected_regions=req.regions,
         )
 
     # 3) 로그 적재 (실패해도 응답에 영향 없음)

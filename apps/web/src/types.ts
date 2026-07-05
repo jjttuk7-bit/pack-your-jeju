@@ -19,7 +19,9 @@ export type CompanionValue = 'solo' | 'couple' | 'friend' | 'family' | 'kids' | 
 export type PurposeValue = 'healing' | 'sightseeing' | 'food' | 'activity' | 'hocance';
 
 export interface TravelInfo {
-  region: RegionId;             // 12지역 칩 하나 선택. destination 자유입력·해외 토글 삭제됨.
+  // 12지역 칩 다중 선택. 실제 제주 여행 UX 반영 (한 지역만 다니지 않음).
+  // 백엔드 dispatch_itinerary가 선택된 지역들을 요일별로 그룹핑한다.
+  regions: RegionId[];
   startDate: string;            // yyyy-mm-dd
   durationDays: number;
   companion: CompanionValue;
@@ -104,6 +106,7 @@ export interface ItineraryDayDto {
   day: number;                     // 1-indexed
   date: string;                    // yyyy-mm-dd
   items: ItineraryItemDto[];
+  regions: string[];               // 이 요일에 방문할 지역들 (다중 지역 선택 시)
 }
 
 export interface PackResponse {

@@ -60,18 +60,35 @@ COMPANION_REQUIRED_AMENITIES: dict[Companion, tuple[str, ...]] = {
 
 @dataclass(frozen=True)
 class PackRequest:
-    """PRD.md §4 /pack 요청 스키마."""
-    region: Region
+    """PRD.md §4 /pack 요청 스키마.
+
+    regions는 1개 이상. 여러 지역 선택 시 dispatch_itinerary가 요일별로 그룹핑한다.
+    backward compat: `region` 단일 문자열도 허용 (regions=[region]으로 정규화).
+    """
+    regions: tuple[Region, ...]
     start_date: date
     days: int
     companion: Companion
     purpose: Purpose
     moments: tuple[CardId, ...]
 
+    @property
+    def region(self) -> Region:
+        """대표 지역 (첫 번째). 하위 호환 필드."""
+        return self.regions[0] if self.regions else ""
+
     @classmethod
     def from_dict(cls, data: dict) -> "PackRequest":
+        # backward compat: `region: str` 단일 필드도 허용
+        raw = data.get("regions")
+        if raw is None:
+            single = data.get("region")
+            raw = [single] if single else []
+        regions = tuple(str(r) for r in raw if r)
+        if not regions:
+            raise ValueError("regions or region required")
         return cls(
-            region=data["region"],
+            regions=regions,
             start_date=date.fromisoformat(data["start_date"]),
             days=int(data["days"]),
             companion=data["companion"],
@@ -82,20 +99,28 @@ class PackRequest:
 
 @dataclass(frozen=True)
 class MomentFilter:
-    """moment 하나당 만들어지는 검색 필터."""
+    """moment 하나당 만들어지는 검색 필터.
+
+    regions는 검색 대상 지역들 (1개 이상). search_strict는 이 목록 전체를,
+    search_relaxed는 각 region을 상위 시권으로 확장한 합집합을 사용한다.
+    """
     moment: CardId
     primary_category: Category           # 카드 매핑 카테고리 (강한 신호)
     supporting_categories: tuple[Category, ...]  # purpose 완화 시그널 (약한 신호)
-    region: Region
+    regions: tuple[Region, ...]
     trip_start: date
     trip_end: date                       # inclusive
     required_amenities: tuple[str, ...]  # 결측 시 caution 하향용
+
+    @property
+    def region(self) -> Region:
+        return self.regions[0] if self.regions else ""
 
 
 @dataclass(frozen=True)
 class Filters:
     """/pack 전체 요청에 대한 필터 집합."""
-    region: Region
+    regions: tuple[Region, ...]
     trip_start: date
     trip_end: date
     companion: Companion
@@ -120,8 +145,9 @@ class UnknownPurpose(ValueError):
 
 
 def build_filters(req: PackRequest) -> Filters:
-    if req.region not in REGIONS:
-        raise UnknownRegion(req.region)
+    for r in req.regions:
+        if r not in REGIONS:
+            raise UnknownRegion(r)
     if req.companion not in COMPANION_REQUIRED_AMENITIES:
         raise UnknownCompanion(req.companion)
     if req.purpose not in PURPOSE_TO_CATEGORIES:
@@ -145,14 +171,14 @@ def build_filters(req: PackRequest) -> Filters:
             moment=card_id,
             primary_category=primary,
             supporting_categories=supporting,
-            region=req.region,
+            regions=req.regions,
             trip_start=req.start_date,
             trip_end=trip_end,
             required_amenities=required,
         ))
 
     return Filters(
-        region=req.region,
+        regions=req.regions,
         trip_start=req.start_date,
         trip_end=trip_end,
         companion=req.companion,

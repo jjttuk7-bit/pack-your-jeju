@@ -143,12 +143,15 @@ def _row_to_hit(r) -> PlaceHit:
 # ---- 퍼블릭 검색 함수 ----
 
 def search_strict(mf: MomentFilter, *, limit: int = DEFAULT_LIMIT) -> list[PlaceHit]:
-    """정확 매칭: region 정확 + primary_category만."""
+    """정확 매칭: 선택된 regions 정확 + primary_category만.
+
+    사용자가 여러 지역을 선택했으면 그 지역들의 합집합을 검색한다.
+    """
     now = datetime.now(timezone.utc)
     with db.get_engine().connect() as conn:
         return _run_query(
             conn,
-            regions=(mf.region,),
+            regions=mf.regions,
             categories=(mf.primary_category,),
             now=now,
             limit=limit,
@@ -156,19 +159,20 @@ def search_strict(mf: MomentFilter, *, limit: int = DEFAULT_LIMIT) -> list[Place
 
 
 def search_relaxed(mf: MomentFilter, *, limit: int = DEFAULT_LIMIT) -> list[PlaceHit]:
-    """완화 매칭: 상위 지역 그룹으로 **지역만** 확대. 카테고리는 primary 유지.
+    """완화 매칭: 각 region을 상위 시권으로 확대한 합집합. 카테고리는 primary 유지.
 
     TRUST_ENGINE.md §2 규칙: "완화 재시도 1회 (지역 확대: 읍면동 → 시 단위)".
-    카테고리 확대는 신뢰를 훼손한다 (예: 감귤 요청에 해변 매칭 방지).
-    supporting_categories는 결과 부스팅/추후 재사용용으로 filters.py에 남겨둔다.
     """
     now = datetime.now(timezone.utc)
-    regions = REGION_GROUP.get(mf.region, (mf.region,))
+    expanded: set[str] = set()
+    for r in mf.regions:
+        for g in REGION_GROUP.get(r, (r,)):
+            expanded.add(g)
     categories = (mf.primary_category,)
     with db.get_engine().connect() as conn:
         return _run_query(
             conn,
-            regions=regions,
+            regions=tuple(sorted(expanded)),
             categories=categories,
             now=now,
             limit=limit,

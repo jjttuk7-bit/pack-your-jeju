@@ -72,8 +72,10 @@ export default function PackingDashboard(props: Props) {
   const [viewMode, setViewMode] = useState<'moments' | 'itinerary'>('moments');
 
   const regionLabel = useMemo(
-    () => REGIONS.find((r) => r.value === info.region)?.label ?? info.region,
-    [info.region]
+    () => info.regions
+      .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
+      .join(' · '),
+    [info.regions]
   );
   const companionLabel = useMemo(
     () => COMPANIONS.find((c) => c.value === info.companion)?.label ?? info.companion,
@@ -108,7 +110,7 @@ export default function PackingDashboard(props: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    info.region,
+    JSON.stringify(info.regions),
     info.startDate,
     info.durationDays,
     info.companion,

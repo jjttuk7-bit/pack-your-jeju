@@ -35,7 +35,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<PackResponse> {
   const body: Record<string, unknown> = {
-    region: info.region,
+    regions: info.regions,
     start_date: info.startDate,
     days: info.durationDays,
     companion: info.companion,

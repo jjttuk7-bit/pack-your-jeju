@@ -20,7 +20,7 @@ interface TravelFormProps {
 }
 
 export default function TravelForm({ onSubmit, initialInfo, initialMoments }: TravelFormProps) {
-  const [region, setRegion] = useState<RegionId | ''>(initialInfo?.region || '');
+  const [regions, setRegions] = useState<RegionId[]>(initialInfo?.regions || []);
   const [startDate, setStartDate] = useState(
     initialInfo?.startDate || new Date().toISOString().split('T')[0]
   );
@@ -40,8 +40,8 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
   };
 
   const handleNextToMoments = () => {
-    if (!region) {
-      setErrorMsg('제주 안에서 어디로 가실지 지역을 하나 골라 주세요.');
+    if (regions.length === 0) {
+      setErrorMsg('제주 안에서 가실 지역을 하나 이상 골라 주세요.');
       return;
     }
     setErrorMsg('');
@@ -49,7 +49,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
   };
 
   const handleSubmitAll = () => {
-    if (!region) {
+    if (regions.length === 0) {
       setErrorMsg('지역을 다시 확인해 주세요.');
       setActiveTab('basic');
       return;
@@ -61,7 +61,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
     setErrorMsg('');
     onSubmit(
       {
-        region: region as RegionId,
+        regions,
         startDate,
         durationDays,
         companion,
@@ -129,7 +129,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
             </p>
           </div>
 
-          <RegionChips value={region} onChange={setRegion} />
+          <RegionChips value={regions} onChange={setRegions} />
 
           <div className="grid grid-cols-2 gap-3">
             <div>

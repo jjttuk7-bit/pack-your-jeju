@@ -112,49 +112,166 @@ def _build_user_prompt(
     return json.dumps(payload, ensure_ascii=False)
 
 
+# 12지역 → 대표 시권 (지역별 요일 그룹핑에 사용).
+# 인접 지역은 같은 요일 클러스터로 묶여 동선이 자연스러워진다.
+_REGION_CLUSTER: dict[str, str] = {
+    "jeju_city": "west", "aewol": "west", "hallim": "west",
+    "seogwipo":  "south", "andeok": "south", "daejeong": "south",
+    "namwon":    "south", "pyoseon": "south",
+    "seongsan":  "east", "gujwa": "east", "jocheon": "east", "udo": "east",
+}
+
+
+def _item_to_dict(moment: str, it) -> dict:
+    return {
+        "moment": moment,
+        "name": it.name,
+        "badge": it.badge,
+        "external_id": it.external_id,
+        "sources": it.sources,
+        "freshness": it.freshness,
+        "transit": it.transit,
+        "note": it.note,
+        "region_normalized": getattr(it, "region_normalized", ""),
+    }
+
+
 def dispatch_itinerary(
-    sections: list[Section], days: int, start_date: date,
+    sections: list[Section],
+    days: int,
+    start_date: date,
+    selected_regions: tuple[str, ...] = (),
 ) -> list[dict]:
-    """검증된 items를 요일별로 균등 배치 (규칙 기반, LLM 없음).
+    """검증된 items를 요일별로 배치 (규칙 기반, LLM 없음).
 
     원칙 (CLAUDE.md 절대 규칙 1):
       - LLM 사용 금지. items를 지어내지 않고 기존 검증된 것들만 재배치.
       - 각 item은 원래 moment 정보를 유지 → UI에서 "어느 순간에서 왔는지" 표시.
 
-    배치 규칙:
-      - moment별로 items를 순환 배치 (같은 moment는 서로 다른 요일에 분산).
-      - items가 days보다 적으면 앞쪽 요일만 채움 (나머지 요일은 빈 items).
-      - 예: 3일 여행 × [oreum:2, cafe:3] →
-          Day1: [oreum#1, cafe#1]  Day2: [oreum#2, cafe#2]  Day3: [cafe#3]
+    배치 규칙 (지역 선택 개수에 따라):
+      A) 여러 지역 선택 → 지역별 그룹핑
+         선택 지역 수 <= days: 지역 하나당 최소 하루씩 배정
+         선택 지역 수 > days:  인접 지역(_REGION_CLUSTER)끼리 같은 날에 합침
+      B) 지역 하나만 선택 (또는 selected_regions 미지정) → 순간별 순환 배치
+         같은 moment는 서로 다른 요일에 분산 (하루당 다양한 순간)
 
     입력:
-      sections: trust.judge_section 결과. items에 접근.
+      sections: trust.judge_section 결과.
       days: 여행 일수 (>= 1).
-      start_date: 여행 시작일. 요일별 date 계산에 사용.
-    반환:
-      [{"day": 1, "date": "YYYY-MM-DD", "items": [{...item + moment}, ...]}, ...]
+      start_date: 여행 시작일.
+      selected_regions: 사용자가 폼에서 선택한 지역들 (순서 유지). 하나면 B 규칙.
     """
-    result: list[dict] = [
-        {
-            "day": i + 1,
-            "date": (start_date + timedelta(days=i)).isoformat(),
-            "items": [],
-        }
-        for i in range(days)
-    ]
+    def _empty_days() -> list[dict]:
+        return [
+            {
+                "day": i + 1,
+                "date": (start_date + timedelta(days=i)).isoformat(),
+                "items": [],
+                "regions": [],
+            }
+            for i in range(days)
+        ]
+
+    # 규칙 B: 지역 하나 또는 미지정 — 순간별 순환
+    unique_regions = tuple(dict.fromkeys(selected_regions))  # 순서 유지 uniq
+    if len(unique_regions) <= 1:
+        result = _empty_days()
+        if unique_regions:
+            for day in result:
+                day["regions"] = list(unique_regions)
+        for s in sections:
+            for idx, it in enumerate(s.items):
+                result[idx % days]["items"].append(_item_to_dict(s.moment, it))
+        return result
+
+    # 규칙 A: 여러 지역 — 지역별로 요일 배정
+    # 1) 지역 → 클러스터 별로 묶기 (인접 지역 합치기)
+    #    days보다 지역 수가 많으면 클러스터 단위로 배정
+    cluster_of = lambda r: _REGION_CLUSTER.get(r, r)
+    n_regions = len(unique_regions)
+
+    if n_regions <= days:
+        # 지역 하나당 최소 하루. 남는 요일은 첫 지역 반복 or 균등 채움.
+        # 균등 채움: days를 n_regions로 나눠 각 지역에 몫만큼 배정, 나머지는 앞쪽 지역에.
+        base = days // n_regions
+        extra = days - base * n_regions
+        day_to_region: list[str] = []
+        for i, r in enumerate(unique_regions):
+            n = base + (1 if i < extra else 0)
+            day_to_region.extend([r] * n)
+    else:
+        # 지역 수 > days: 클러스터별로 요일 배정 → 클러스터 안의 지역들을 같은 날에 몰기.
+        # 클러스터도 days보다 많으면 초과분은 마지막 날에 합쳐 넣는다.
+        cluster_seq: list[str] = []
+        seen: set[str] = set()
+        for r in unique_regions:
+            c = cluster_of(r)
+            if c not in seen:
+                cluster_seq.append(c)
+                seen.add(c)
+        n_clusters = len(cluster_seq)
+        if n_clusters <= days:
+            base = days // n_clusters
+            extra = days - base * n_clusters
+            day_to_cluster: list[str] = []
+            for i, c in enumerate(cluster_seq):
+                n = base + (1 if i < extra else 0)
+                day_to_cluster.extend([c] * n)
+            day_to_region = day_to_cluster  # 실제로는 cluster id로 배정
+        else:
+            # 클러스터도 days보다 많음: 앞 (days-1)개는 하루씩, 마지막 날에 나머지 몰아넣기
+            day_to_region = list(cluster_seq[:days])
+            day_to_region[-1] = "|".join(cluster_seq[days - 1:])
+
+    result = _empty_days()
+
+    # 2) 각 요일에 노출할 지역 라벨(들) 세팅
+    day_match_regions: list[list[str]] = []
+    for day_idx, tag in enumerate(day_to_region):
+        if n_regions <= days:
+            match_regions = [tag]
+        else:
+            match_regions = (
+                [r for r in unique_regions if cluster_of(r) == tag]
+                if "|" not in tag
+                else [r for r in unique_regions if cluster_of(r) in tag.split("|")]
+            )
+        result[day_idx]["regions"] = match_regions
+        day_match_regions.append(match_regions)
+
+    # 3) 지역별 items 수집 (같은 items가 여러 요일에 중복되지 않도록 지역별 pool 구성)
+    region_pool: dict[str, list[dict]] = {r: [] for r in unique_regions}
     for s in sections:
-        for idx, it in enumerate(s.items):
-            day_idx = idx % days
-            result[day_idx]["items"].append({
-                "moment": s.moment,
-                "name": it.name,
-                "badge": it.badge,
-                "external_id": it.external_id,
-                "sources": it.sources,
-                "freshness": it.freshness,
-                "transit": it.transit,
-                "note": it.note,
-            })
+        for it in s.items:
+            r = getattr(it, "region_normalized", "") or ""
+            if r in region_pool:
+                region_pool[r].append(_item_to_dict(s.moment, it))
+
+    # 4) 각 지역에 할당된 요일 리스트를 만들고, 그 요일들에 items를 순환 배치
+    region_day_indices: dict[str, list[int]] = {r: [] for r in unique_regions}
+    for day_idx, matches in enumerate(day_match_regions):
+        for r in matches:
+            if r in region_day_indices:
+                region_day_indices[r].append(day_idx)
+
+    for r, items in region_pool.items():
+        target_days = region_day_indices.get(r, [])
+        if not target_days:
+            continue
+        for i, item in enumerate(items):
+            di = target_days[i % len(target_days)]
+            result[di]["items"].append(item)
+
+    # 5) 매칭 실패 items (원 응답에는 있는데 지역 매칭 안 된 것) 마지막 요일에 흡수 (정직: 유실 방지)
+    placed_ids: set[str] = {i["external_id"] for day in result for i in day["items"]}
+    orphans: list[dict] = []
+    for s in sections:
+        for it in s.items:
+            if it.external_id not in placed_ids:
+                orphans.append(_item_to_dict(s.moment, it))
+    if orphans:
+        result[-1]["items"].extend(orphans)
+
     return result
 
 

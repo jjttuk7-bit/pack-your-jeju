@@ -40,7 +40,8 @@ class BadgedItem:
     sources: list[dict]
     freshness: dict
     transit: dict
-    note: str | None = None  # 완화 검색 결과 등 부가 설명
+    note: str | None = None                  # 완화 검색 결과 등 부가 설명
+    region_normalized: str = ""              # 지역별 요일 그룹핑에 사용 (assemble.dispatch_itinerary)
 
 
 @dataclass(frozen=True)
@@ -137,6 +138,7 @@ def badge_item(
         freshness=freshness,
         transit=transit,
         note=display_note,
+        region_normalized=hit.region_normalized or "",
     )
 
 

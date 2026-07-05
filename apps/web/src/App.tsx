@@ -13,7 +13,7 @@ const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 
 const defaultState: SavedTravel = {
   info: {
-    region: 'jeju_city',
+    regions: [],
     startDate: new Date().toISOString().split('T')[0],
     durationDays: 3,
     companion: 'solo',
@@ -28,12 +28,24 @@ const defaultState: SavedTravel = {
   customMemories: []
 };
 
+// legacy 상태(단일 region)에서 다중 regions로 마이그레이션.
+// 이전 앱 사용자의 localStorage에는 info.region이 문자열로 저장돼 있을 수 있다.
+function migrateSavedTravel(saved: any): SavedTravel {
+  if (!saved || typeof saved !== 'object') return defaultState;
+  const info = saved.info ?? {};
+  if (!Array.isArray(info.regions)) {
+    info.regions = info.region ? [info.region] : [];
+    delete info.region;
+  }
+  return { ...defaultState, ...saved, info: { ...defaultState.info, ...info } };
+}
+
 export default function App() {
   const [state, setState] = useState<SavedTravel>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        return migrateSavedTravel(JSON.parse(saved));
       }
     } catch (e) {
       console.error('Failed to load state from localStorage:', e);
@@ -262,7 +274,7 @@ export default function App() {
               >
                 <TravelForm
                   onSubmit={handleFormSubmit}
-                  initialInfo={state.info.region ? state.info : undefined}
+                  initialInfo={state.info.regions?.length ? state.info : undefined}
                   initialMoments={state.selectedMomentIds}
                 />
               </motion.div>
