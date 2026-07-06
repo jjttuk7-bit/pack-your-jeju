@@ -21,6 +21,9 @@ import {
   MapPinned,
   Copy,
   Check,
+  Plus,
+  Trash2,
+  ClipboardCheck,
 } from 'lucide-react';
 import type {
   TravelInfo,
@@ -30,9 +33,12 @@ import type {
   ItineraryDayDto,
   ItineraryItemDto,
   PackItemDto,
+  TravelPlanItem,
+  VisitCheck,
+  VisitCheckStatus,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
-import { requestPack, downloadPackPdf } from '../api';
+import { requestPack } from '../api';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 import PlaceDetail from './PlaceDetail';
@@ -45,6 +51,8 @@ interface Props {
   customBasicItems: string[];
   customMomentItems: Record<MomentId, string[]>;
   customMemories: string[];
+  selectedPlanItems: TravelPlanItem[];
+  visitChecks: Record<string, VisitCheck>;
   onToggleItem: (itemId: string) => void;
   onToggleMemory: (memoryId: string) => void;
   onAddCustomBasic: (itemName: string) => void;
@@ -53,6 +61,10 @@ interface Props {
   onRemoveCustomMomentItem: (momentId: MomentId, itemName: string) => void;
   onAddCustomMemory: (memoryText: string) => void;
   onRemoveCustomMemory: (memoryText: string) => void;
+  onTogglePlanItem: (item: TravelPlanItem) => void;
+  onAddCustomPlanItem: (item: TravelPlanItem) => void;
+  onRemovePlanItem: (itemId: string) => void;
+  onSetVisitCheck: (itemId: string, status: VisitCheckStatus) => void;
   onReset: () => void;
 }
 
@@ -71,8 +83,31 @@ const BASIC_CHECKLIST: string[] = [
   '방수 지퍼백 (해수욕장·감귤 체험 대비)',
 ];
 
+const PLAN_PACKING_ITEMS: Record<string, string[]> = {
+  beach_walk: ['모래 털기 쉬운 샌들', '작은 수건', '선글라스'],
+  oreum: ['미끄럽지 않은 운동화', '500ml 이상 물', '가벼운 바람막이'],
+  gotjawal: ['긴 바지 또는 레깅스', '벌레 기피제', '작은 손전등'],
+  sunset: ['해 질 무렵 걸칠 겉옷', '보조배터리', '사진용 거치대'],
+  local_market: ['접이식 장바구니', '현금 또는 지역화폐', '물티슈'],
+  local_food: ['소화제', '입가심용 물', '예약 확인 메모'],
+  quiet_cafe: ['읽을 책이나 이어폰', '충전 케이블', '노트 앱 메모'],
+  citrus: ['얼룩이 덜 보이는 옷', '손 세정 티슈', '사진 저장 공간'],
+};
+
 export default function PackingDashboard(props: Props) {
-  const { info, selectedMomentIds, checkedItemIds, onToggleItem, onReset } = props;
+  const {
+    info,
+    selectedMomentIds,
+    checkedItemIds,
+    selectedPlanItems,
+    visitChecks,
+    onToggleItem,
+    onTogglePlanItem,
+    onAddCustomPlanItem,
+    onRemovePlanItem,
+    onSetVisitCheck,
+    onReset,
+  } = props;
 
   const [packResp, setPackResp] = useState<PackResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -85,12 +120,13 @@ export default function PackingDashboard(props: Props) {
   const [shareCopied, setShareCopied] = useState<boolean>(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPlan = async () => {
     if (pdfLoading) return;
     setPdfLoading(true);
     setPdfError(null);
     try {
-      const { filename, blob } = await downloadPackPdf(info, selectedMomentIds);
+      const filename = `pack-your-jeju-plan_${info.startDate}.txt`;
+      const blob = new Blob([shareText], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -121,9 +157,17 @@ export default function PackingDashboard(props: Props) {
     [info.purpose]
   );
   const packItems = useMemo(() => collectPackItems(packResp), [packResp]);
+  const selectedPlanIds = useMemo(
+    () => new Set(selectedPlanItems.map((item) => item.id)),
+    [selectedPlanItems],
+  );
+  const planPackingItems = useMemo(
+    () => buildPlanPackingItems(selectedPlanItems),
+    [selectedPlanItems],
+  );
   const shareText = useMemo(
-    () => packResp ? buildShareText(info, selectedMomentIds, packResp) : '',
-    [info, selectedMomentIds, packResp]
+    () => packResp ? buildShareText(info, selectedMomentIds, packResp, selectedPlanItems, visitChecks) : '',
+    [info, selectedMomentIds, packResp, selectedPlanItems, visitChecks]
   );
 
   const handleCopyShare = async () => {
@@ -204,7 +248,7 @@ export default function PackingDashboard(props: Props) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={handleDownloadPdf}
+                onClick={handleDownloadPlan}
                 disabled={pdfLoading}
                 className="rounded-2xl px-3 py-3 bg-citrus text-white font-serif-kr font-bold text-[13px] hover:bg-citrus-2 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5 shadow-jeju-chip"
               >
@@ -216,7 +260,7 @@ export default function PackingDashboard(props: Props) {
                 ) : (
                   <>
                     <BookOpenCheck className="w-4 h-4" />
-                    여행플랜 저장
+                    내 플랜 저장
                     <Download className="w-3.5 h-3.5 opacity-80" />
                   </>
                 )}
@@ -241,7 +285,7 @@ export default function PackingDashboard(props: Props) {
               </button>
             </div>
             <p className="mt-1.5 text-[10.5px] text-stone-500 text-center leading-snug">
-              공공데이터 근거로 확인된 곳을 담고, 근거가 부족한 항목은 별도로 안내합니다.
+              플랜에 담은 장소와 직접 추가한 메모만 저장·공유합니다.
             </p>
             {pdfError && (
               <p className="mt-1.5 text-[10.5px] text-rose-700 text-center">
@@ -277,6 +321,16 @@ export default function PackingDashboard(props: Props) {
         <TripMapCard
           items={packItems}
           regions={info.regions}
+        />
+      )}
+
+      {packResp && !loading && !error && (
+        <PlanBuilderCard
+          planItems={selectedPlanItems}
+          visitChecks={visitChecks}
+          onAddCustomPlanItem={onAddCustomPlanItem}
+          onRemovePlanItem={onRemovePlanItem}
+          onSetVisitCheck={onSetVisitCheck}
         />
       )}
 
@@ -337,14 +391,60 @@ export default function PackingDashboard(props: Props) {
       {/* 순간별 뷰 */}
       {viewMode === 'moments' && packResp?.sections?.map((section) => (
         <React.Fragment key={section.moment}>
-          <SectionCard section={section} />
+          <SectionCard
+            section={section}
+            selectedPlanIds={selectedPlanIds}
+            onTogglePlanItem={onTogglePlanItem}
+          />
         </React.Fragment>
       ))}
 
       {/* 요일별 뷰 (검증된 items를 규칙 기반 재배치) */}
       {viewMode === 'itinerary' && packResp?.itinerary?.map((day) => (
-        <ItineraryDayCard key={day.day} day={day} />
+        <ItineraryDayCard
+          key={day.day}
+          day={day}
+          selectedPlanIds={selectedPlanIds}
+          onTogglePlanItem={onTogglePlanItem}
+        />
       ))}
+
+      {planPackingItems.length > 0 && (
+        <div
+          className="rounded-[24px] border border-mint/20 bg-[#F4FBF8] shadow-pyj-card p-5 space-y-3"
+          id="plan-based-checklist"
+        >
+          <div>
+            <h2 className="text-[14.5px] font-bold text-stone-900 tracking-tight">내 플랜 맞춤 짐</h2>
+            <p className="text-[10.5px] text-stone-500 mt-0.5">
+              플랜에 담은 장소 유형을 기준으로 챙길 것을 제안합니다.
+            </p>
+          </div>
+          <div className="space-y-1">
+            {planPackingItems.map((item, idx) => {
+              const id = `plan-pack-${idx}-${item}`;
+              const checked = checkedItemIds.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onToggleItem(id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/70 transition text-left"
+                >
+                  {checked ? (
+                    <CheckSquare className="w-4 h-4 text-mint shrink-0" />
+                  ) : (
+                    <Square className="w-4 h-4 text-stone-300 shrink-0" />
+                  )}
+                  <span className={`text-[12.5px] ${checked ? 'line-through text-stone-400' : 'text-stone-700'}`}>
+                    {item}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 기본 체크리스트 */}
       <div
@@ -403,10 +503,248 @@ function collectPackItems(packResp: PackResponse | null): PackItemDto[] {
   });
 }
 
+function buildPlanPackingItems(planItems: TravelPlanItem[]): string[] {
+  const seen = new Set<string>();
+  planItems.forEach((item) => {
+    (PLAN_PACKING_ITEMS[item.moment] ?? []).forEach((packingItem) => seen.add(packingItem));
+  });
+  return Array.from(seen).slice(0, 12);
+}
+
+function toPlanItem(item: PackItemDto | ItineraryItemDto, day?: ItineraryDayDto): TravelPlanItem {
+  const maybeMoment = (item as ItineraryItemDto).moment;
+  const moment = maybeMoment ?? item.category ?? 'custom';
+  return {
+    id: `public-${item.external_id || item.name}-${moment}`,
+    name: item.name,
+    moment,
+    source: 'public_data',
+    badge: item.badge,
+    external_id: item.external_id,
+    region: item.region ?? null,
+    address: item.address ?? null,
+    note: item.note ?? null,
+    day: day?.day ?? null,
+    date: day?.date ?? null,
+  };
+}
+
+function PlanBuilderCard({
+  planItems,
+  visitChecks,
+  onAddCustomPlanItem,
+  onRemovePlanItem,
+  onSetVisitCheck,
+}: {
+  planItems: TravelPlanItem[];
+  visitChecks: Record<string, VisitCheck>;
+  onAddCustomPlanItem: (item: TravelPlanItem) => void;
+  onRemovePlanItem: (itemId: string) => void;
+  onSetVisitCheck: (itemId: string, status: VisitCheckStatus) => void;
+}) {
+  const [customName, setCustomName] = useState('');
+  const [customMemo, setCustomMemo] = useState('');
+
+  const handleAdd = () => {
+    const name = customName.trim();
+    if (!name) return;
+    onAddCustomPlanItem({
+      id: `user-${Date.now()}-${name}`,
+      name,
+      moment: 'user_added',
+      source: 'user_added',
+      note: customMemo.trim() || null,
+    });
+    setCustomName('');
+    setCustomMemo('');
+  };
+
+  return (
+    <div className="card-jeju p-5 space-y-4" id="my-plan-builder">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-citrus-2 uppercase tracking-wider mb-1.5">
+            <ClipboardCheck className="w-3 h-3" />
+            My Travel Plan
+          </span>
+          <h3 className="font-serif-kr font-bold text-[16px] text-basalt tracking-tight">
+            내 여행플랜에 담은 것
+          </h3>
+          <p className="mt-1 text-[11px] text-basalt-2 leading-relaxed">
+            후보 중 실제로 갈 곳만 담고, 다른 곳에서 찾은 정보도 검증 전 메모로 함께 보관합니다.
+          </p>
+        </div>
+        <span className="rounded-full border border-earth bg-[#FDF6EA] px-2.5 py-1 text-[10px] font-bold text-basalt-2">
+          {planItems.length}개
+        </span>
+      </div>
+
+      {planItems.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-earth bg-[#FDF6EA]/70 px-4 py-5 text-center">
+          <p className="text-[12px] font-semibold text-basalt">아직 담은 장소가 없습니다.</p>
+          <p className="mt-1 text-[10.5px] text-basalt-2 leading-relaxed">
+            아래 추천 후보에서 `플랜에 담기`를 누르면 이곳에 일정 후보가 쌓입니다.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {planItems.map((item) => (
+            <PlanItemRow
+              key={item.id}
+              item={item}
+              visitCheck={visitChecks[item.id]}
+              onRemovePlanItem={onRemovePlanItem}
+              onSetVisitCheck={onSetVisitCheck}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-earth bg-white/80 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold text-basalt">내가 찾은 장소 추가</p>
+          <span className="text-[9.5px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
+            검증 전 메모
+          </span>
+        </div>
+        <input
+          value={customName}
+          onChange={(e) => setCustomName(e.target.value)}
+          placeholder="예: 친구가 추천한 카페, 숙소 근처 식당"
+          className="w-full rounded-xl border border-earth bg-[#FDFBF7] px-3 py-2 text-[12px] text-basalt placeholder:text-basalt-2/40 focus:outline-none focus:ring-2 focus:ring-citrus/25"
+        />
+        <input
+          value={customMemo}
+          onChange={(e) => setCustomMemo(e.target.value)}
+          placeholder="출처나 메모를 적어두세요"
+          className="w-full rounded-xl border border-earth bg-[#FDFBF7] px-3 py-2 text-[12px] text-basalt placeholder:text-basalt-2/40 focus:outline-none focus:ring-2 focus:ring-citrus/25"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!customName.trim()}
+          className="w-full rounded-xl bg-basalt text-white py-2.5 text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-basalt-2 transition disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          플랜에 직접 추가
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PlanItemRow({
+  item,
+  visitCheck,
+  onRemovePlanItem,
+  onSetVisitCheck,
+}: {
+  item: TravelPlanItem;
+  visitCheck?: VisitCheck;
+  onRemovePlanItem: (itemId: string) => void;
+  onSetVisitCheck: (itemId: string, status: VisitCheckStatus) => void;
+}) {
+  const moment = MOMENTS.find((m) => m.id === item.moment);
+  const visitLabel = visitCheck ? visitStatusLabel(visitCheck.status) : '방문 후 확인 전';
+
+  return (
+    <div className="rounded-2xl border border-earth bg-[#FDFBF7] p-3 space-y-2">
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <span className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold border ${
+              item.source === 'public_data'
+                ? 'bg-mint/10 text-mint border-mint/20'
+                : 'bg-amber-50 text-amber-700 border-amber-100'
+            }`}>
+              {item.source === 'public_data' ? '공공데이터 후보' : '사용자 추가'}
+            </span>
+            {moment && (
+              <span className="text-[9.5px] font-semibold text-citrus-2 bg-citrus/10 rounded-full px-2 py-0.5">
+                {moment.title}
+              </span>
+            )}
+            {item.day && (
+              <span className="text-[9.5px] font-semibold text-basalt-2 bg-white border border-earth rounded-full px-2 py-0.5">
+                Day {item.day}
+              </span>
+            )}
+          </div>
+          <p className="font-bold text-[13px] text-basalt leading-snug">{item.name}</p>
+          {(item.address || item.note) && (
+            <p className="mt-0.5 text-[10.5px] text-basalt-2 leading-relaxed line-clamp-2">
+              {item.address || item.note}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemovePlanItem(item.id)}
+          aria-label={`${item.name} 플랜에서 제거`}
+          className="shrink-0 rounded-full p-1.5 text-basalt-2/50 hover:text-rose-600 hover:bg-rose-50 transition"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[9.5px] font-semibold text-basalt-2 mr-0.5">{visitLabel}</span>
+        <VisitButton
+          label="다녀왔어요"
+          active={visitCheck?.status === 'visited'}
+          onClick={() => onSetVisitCheck(item.id, 'visited')}
+        />
+        <VisitButton
+          label="정보 맞았어요"
+          active={visitCheck?.status === 'matched'}
+          onClick={() => onSetVisitCheck(item.id, 'matched')}
+        />
+        <VisitButton
+          label="달랐어요"
+          active={visitCheck?.status === 'changed'}
+          onClick={() => onSetVisitCheck(item.id, 'changed')}
+        />
+      </div>
+    </div>
+  );
+}
+
+function VisitButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-2 py-1 text-[9.5px] font-bold transition ${
+        active
+          ? 'border-mint bg-mint text-white'
+          : 'border-earth bg-white text-basalt-2 hover:border-mint/50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function visitStatusLabel(status: VisitCheckStatus): string {
+  if (status === 'matched') return '방문 확인 · 정보 일치';
+  if (status === 'changed') return '방문 확인 · 정보 다름';
+  return '방문 확인됨';
+}
+
 function buildShareText(
   info: TravelInfo,
   selectedMomentIds: MomentId[],
   packResp: PackResponse,
+  planItems: TravelPlanItem[],
+  visitChecks: Record<string, VisitCheck>,
 ): string {
   const regions = info.regions
     .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
@@ -417,11 +755,9 @@ function buildShareText(
   const companion = COMPANIONS.find((c) => c.value === info.companion)?.label ?? info.companion;
   const purpose = PURPOSES.find((p) => p.value === info.purpose)?.label ?? info.purpose;
   const signals = countPackSignals(packResp);
-  const itinerary = packResp.itinerary ?? [];
-  const planLines = itinerary.length > 0
-    ? itinerary.flatMap((day) => buildShareDayLines(day))
-    : collectPackItems(packResp).slice(0, 8).map((item, idx) =>
-      `${idx + 1}. ${item.name} (${shareBadgeLabel(item.badge)})`);
+  const planLines = planItems.length > 0
+    ? buildSelectedPlanLines(planItems, visitChecks)
+    : ['아직 내 여행플랜에 담은 장소가 없습니다.'];
   const gapLines = collectUnavailableCombos(packResp).slice(0, 5);
   const url = typeof window !== 'undefined' ? window.location.href : 'https://pack-your-jeju.vercel.app/';
   return [
@@ -452,6 +788,30 @@ function countPackSignals(packResp: PackResponse): { total: number; verified: nu
     caution: items.filter((item) => item.badge === 'caution').length,
     gaps: collectUnavailableCombos(packResp).length,
   };
+}
+
+function buildSelectedPlanLines(
+  planItems: TravelPlanItem[],
+  visitChecks: Record<string, VisitCheck>,
+): string[] {
+  const byDay = new Map<string, TravelPlanItem[]>();
+  planItems.forEach((item) => {
+    const key = item.day ? `Day ${item.day}${item.date ? ` (${item.date})` : ''}` : '직접 담은 항목';
+    byDay.set(key, [...(byDay.get(key) ?? []), item]);
+  });
+
+  const lines: string[] = [];
+  byDay.forEach((items, dayLabel) => {
+    lines.push(dayLabel);
+    items.forEach((item) => {
+      const moment = MOMENTS.find((m) => m.id === item.moment)?.title
+        ?? (item.source === 'user_added' ? '사용자 추가' : String(item.moment));
+      const source = item.source === 'public_data' ? shareBadgeLabel(item.badge ?? 'reference') : '검증 전 메모';
+      const visit = visitChecks[item.id] ? ` · ${visitStatusLabel(visitChecks[item.id].status)}` : '';
+      lines.push(`- ${item.name} (${moment} · ${source}${visit})`);
+    });
+  });
+  return lines;
 }
 
 function buildShareDayLines(day: ItineraryDayDto): string[] {
@@ -700,7 +1060,15 @@ const FALLBACK_MEAN: Record<string, { label: string; tint: string; emoji: string
   out_of_scope:   { label: '제주 여행 범위 밖',       tint: 'from-stone-50 to-orange-50/60 border-stone-100 text-stone-800', emoji: '⚪' },
 };
 
-function ItineraryDayCard({ day }: { day: ItineraryDayDto }) {
+function ItineraryDayCard({
+  day,
+  selectedPlanIds,
+  onTogglePlanItem,
+}: {
+  day: ItineraryDayDto;
+  selectedPlanIds: Set<string>;
+  onTogglePlanItem: (item: TravelPlanItem) => void;
+}) {
   // 여행 날짜를 사람에게 읽기 좋은 형태로 표시. 데이터 지어내지 않는 표준 포맷.
   const dateFmt = new Date(day.date + 'T00:00:00').toLocaleDateString('ko-KR', {
     month: 'short', day: 'numeric', weekday: 'short',
@@ -738,7 +1106,13 @@ function ItineraryDayCard({ day }: { day: ItineraryDayDto }) {
       {day.items.length > 0 && (
         <div className="space-y-2">
           {day.items.map((it) => (
-            <ItineraryItemRow key={`${it.external_id}-${day.day}`} it={it} />
+            <ItineraryItemRow
+              key={`${it.external_id}-${day.day}`}
+              it={it}
+              day={day}
+              selectedPlanIds={selectedPlanIds}
+              onTogglePlanItem={onTogglePlanItem}
+            />
           ))}
         </div>
       )}
@@ -798,7 +1172,17 @@ function UnavailableNote({
   );
 }
 
-function ItineraryItemRow({ it }: { it: ItineraryItemDto }) {
+function ItineraryItemRow({
+  it,
+  day,
+  selectedPlanIds,
+  onTogglePlanItem,
+}: {
+  it: ItineraryItemDto;
+  day: ItineraryDayDto;
+  selectedPlanIds: Set<string>;
+  onTogglePlanItem: (item: TravelPlanItem) => void;
+}) {
   const moment = MOMENTS.find((m) => m.id === it.moment);
   const momentTitle = moment?.title ?? String(it.moment);
   const momentHeader = (
@@ -807,7 +1191,16 @@ function ItineraryItemRow({ it }: { it: ItineraryItemDto }) {
       <span>{momentTitle}</span>
     </div>
   );
-  return <PackItemCard it={it} header={momentHeader} />;
+  const planItem = toPlanItem(it, day);
+  return (
+    <PackItemCard
+      it={it}
+      header={momentHeader}
+      planItem={planItem}
+      inPlan={selectedPlanIds.has(planItem.id)}
+      onTogglePlanItem={onTogglePlanItem}
+    />
+  );
 }
 
 // 팩 아이템 하나 = 클릭 시 확장. 헤더(장소명·배지·요약 뱃지)만 접혀 있고, 열면 PlaceDetail 노출.
@@ -815,9 +1208,15 @@ function ItineraryItemRow({ it }: { it: ItineraryItemDto }) {
 function PackItemCard({
   it,
   header,
+  planItem,
+  inPlan = false,
+  onTogglePlanItem,
 }: {
   it: PackItemDto;
   header?: React.ReactNode;
+  planItem?: TravelPlanItem;
+  inPlan?: boolean;
+  onTogglePlanItem?: (item: TravelPlanItem) => void;
 }) {
   const [open, setOpen] = useState(false);
   // 썸네일: 제주 ITS API로 병합된 visitjeju CDN 이미지. 결측 시 렌더 안 함.
@@ -890,6 +1289,32 @@ function PackItemCard({
         </div>
       </button>
 
+      {planItem && onTogglePlanItem && (
+        <div className="px-3.5 pb-3.5 -mt-1">
+          <button
+            type="button"
+            onClick={() => onTogglePlanItem(planItem)}
+            className={`w-full rounded-xl border px-3 py-2 text-[11.5px] font-bold inline-flex items-center justify-center gap-1.5 transition ${
+              inPlan
+                ? 'border-mint bg-mint/10 text-mint hover:bg-mint/15'
+                : 'border-citrus/30 bg-white text-citrus-2 hover:bg-orange-50'
+            }`}
+          >
+            {inPlan ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                내 여행플랜에 담김
+              </>
+            ) : (
+              <>
+                <Plus className="w-3.5 h-3.5" />
+                플랜에 담기
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -920,7 +1345,15 @@ function PackItemCard({
   );
 }
 
-function SectionCard({ section }: { section: SectionDto }) {
+function SectionCard({
+  section,
+  selectedPlanIds,
+  onTogglePlanItem,
+}: {
+  section: SectionDto;
+  selectedPlanIds: Set<string>;
+  onTogglePlanItem: (item: TravelPlanItem) => void;
+}) {
   const moment = MOMENTS.find((m) => m.id === section.moment);
   const title = moment?.title ?? section.moment;
   const fb = section.fallback ? FALLBACK_MEAN[section.fallback.reason] : null;
@@ -958,9 +1391,18 @@ function SectionCard({ section }: { section: SectionDto }) {
         <p className="text-xs text-stone-400">결과가 없습니다.</p>
       ) : (
         <div className="space-y-2">
-          {section.items.map((it) => (
-            <PackItemCard key={it.external_id} it={it} />
-          ))}
+          {section.items.map((it) => {
+            const planItem = toPlanItem({ ...it, moment: section.moment } as ItineraryItemDto);
+            return (
+              <PackItemCard
+                key={it.external_id}
+                it={it}
+                planItem={planItem}
+                inPlan={selectedPlanIds.has(planItem.id)}
+                onTogglePlanItem={onTogglePlanItem}
+              />
+            );
+          })}
         </div>
       )}
     </div>

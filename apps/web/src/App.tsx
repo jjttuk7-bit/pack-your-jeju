@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, Home } from 'lucide-react';
-import { TravelInfo, MomentId, SavedTravel } from './types';
+import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheckStatus } from './types';
 import TravelForm from './components/TravelForm';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
@@ -29,7 +29,9 @@ const defaultState: SavedTravel = {
   customBasicItems: [],
   customMomentItems: {} as Record<MomentId, string[]>,
   step: 'setup',
-  customMemories: []
+  customMemories: [],
+  selectedPlanItems: [],
+  visitChecks: {},
 };
 
 // legacy 상태(단일 region)에서 다중 regions로 마이그레이션.
@@ -198,6 +200,53 @@ export default function App() {
     });
   };
 
+  const handleTogglePlanItem = (item: TravelPlanItem) => {
+    setState(prev => {
+      const current = prev.selectedPlanItems || [];
+      const exists = current.some(planItem => planItem.id === item.id);
+      return {
+        ...prev,
+        selectedPlanItems: exists
+          ? current.filter(planItem => planItem.id !== item.id)
+          : [...current, item],
+      };
+    });
+  };
+
+  const handleAddCustomPlanItem = (item: TravelPlanItem) => {
+    setState(prev => {
+      const current = prev.selectedPlanItems || [];
+      if (current.some(planItem => planItem.id === item.id)) return prev;
+      return {
+        ...prev,
+        selectedPlanItems: [...current, item],
+      };
+    });
+  };
+
+  const handleRemovePlanItem = (itemId: string) => {
+    setState(prev => ({
+      ...prev,
+      selectedPlanItems: (prev.selectedPlanItems || []).filter(item => item.id !== itemId),
+      visitChecks: Object.fromEntries(
+        Object.entries(prev.visitChecks || {}).filter(([id]) => id !== itemId),
+      ),
+    }));
+  };
+
+  const handleSetVisitCheck = (itemId: string, status: VisitCheckStatus) => {
+    setState(prev => ({
+      ...prev,
+      visitChecks: {
+        ...(prev.visitChecks || {}),
+        [itemId]: {
+          status,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    }));
+  };
+
   const handleRemoveCustomMemory = (memoryText: string) => {
     setState(prev => {
       const current = prev.customMemories || [];
@@ -360,6 +409,8 @@ export default function App() {
                   customBasicItems={state.customBasicItems}
                   customMomentItems={state.customMomentItems}
                   customMemories={state.customMemories || []}
+                  selectedPlanItems={state.selectedPlanItems || []}
+                  visitChecks={state.visitChecks || {}}
                   onToggleItem={handleToggleItem}
                   onToggleMemory={handleToggleMemory}
                   onAddCustomBasic={handleAddCustomBasic}
@@ -368,6 +419,10 @@ export default function App() {
                   onRemoveCustomMomentItem={handleRemoveCustomMomentItem}
                   onAddCustomMemory={handleAddCustomMemory}
                   onRemoveCustomMemory={handleRemoveCustomMemory}
+                  onTogglePlanItem={handleTogglePlanItem}
+                  onAddCustomPlanItem={handleAddCustomPlanItem}
+                  onRemovePlanItem={handleRemovePlanItem}
+                  onSetVisitCheck={handleSetVisitCheck}
                   onReset={handleReset}
                 />
               </motion.div>

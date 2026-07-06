@@ -62,6 +62,28 @@ export interface MemoryTask {
   description: string;
 }
 
+export interface TravelPlanItem {
+  id: string;
+  name: string;
+  moment: MomentId | string;
+  source: 'public_data' | 'user_added';
+  badge?: BadgeKind;
+  external_id?: string;
+  region?: string | null;
+  address?: string | null;
+  note?: string | null;
+  day?: number | null;
+  date?: string | null;
+}
+
+export type VisitCheckStatus = 'visited' | 'matched' | 'changed';
+
+export interface VisitCheck {
+  status: VisitCheckStatus;
+  memo?: string;
+  updatedAt: string;
+}
+
 // 앱 상태(로컬 스토리지 지속). step에 verify 뷰 추가.
 export interface SavedTravel {
   info: TravelInfo;
@@ -72,6 +94,8 @@ export interface SavedTravel {
   customMomentItems: Record<MomentId, string[]>;
   step: 'setup' | 'dashboard' | 'verify';
   customMemories?: string[];
+  selectedPlanItems?: TravelPlanItem[];
+  visitChecks?: Record<string, VisitCheck>;
 }
 
 // ─────────────────────────────────────────────────────
