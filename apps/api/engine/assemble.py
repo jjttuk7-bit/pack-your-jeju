@@ -87,7 +87,9 @@ _SYSTEM_PROMPT = (
     "확인되지 않은 항목이 있으면 '저희가 참조하는 공공데이터 기준으로 확인되지 않는다'는 "
     "표현으로만 언급하고, '없다'고 단언하지 마라. "
     "사용자가 special_notes를 남겼다면 톤·배려 문구에만 반영하고, "
-    "이를 근거로 새 장소·시간·조건을 지어내지 마라."
+    "이를 근거로 새 장소·시간·조건을 지어내지 마라.\n\n"
+    "출력 형식: JSON이나 코드블록 없이 순수 한국어 문장 그대로만 출력하라. "
+    "따옴표·중괄호·키 이름 없이 사용자에게 그대로 보여줄 문구만 반환하라."
 )
 
 
@@ -333,4 +335,35 @@ def compose_intro(
         return Intro(text=_template_intro(sections, companion), llm_used=False,
                      reason=resp.reason or "empty response")
 
-    return Intro(text=resp.text, llm_used=True)
+    # 방어적 파싱: llm.py의 공통 NO_HALLUCINATION_CLAUSE에 'JSON 외 출력 금지'가
+    # 포함돼 모델이 {"introduction": "..."} 같은 JSON으로 응답할 수 있다.
+    # 사용자 화면에는 순수 문자열만 노출한다.
+    cleaned = _unwrap_intro_text(resp.text)
+    return Intro(text=cleaned, llm_used=True)
+
+
+def _unwrap_intro_text(raw: str) -> str:
+    """LLM 응답에서 사용자 노출용 순수 문장만 추출."""
+    text = raw.strip()
+    # 코드펜스 제거
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    # JSON이면 introduction/text/message 순으로 필드 시도, 안 되면 값들의 첫 문자열.
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                for key in ("introduction", "text", "message", "intro", "content"):
+                    v = obj.get(key)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+                # 최후: dict의 첫 문자열 값
+                for v in obj.values():
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+        except json.JSONDecodeError:
+            pass
+    return text
