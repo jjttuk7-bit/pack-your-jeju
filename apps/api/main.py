@@ -232,7 +232,7 @@ def pack(body: PackBody) -> dict[str, Any]:
 
 @app.post("/pack/pdf")
 def pack_pdf(body: PackBody) -> Response:
-    """폼 입력으로 팩을 다시 조립한 뒤 감성 톤 여행 저널 PDF를 반환.
+    """폼 입력으로 팩을 다시 조립한 뒤 신뢰 기반 여행플랜 PDF를 반환.
 
     사실 조립 로직은 /pack과 동일하게 filters → judge_section → assemble를 그대로 재사용.
     LLM 문구 생성 여부와 무관하게 PDF 자체는 결정론적으로 만들어진다.
@@ -278,7 +278,7 @@ def pack_pdf(body: PackBody) -> Response:
 
     # 파일명 조립 — regions와 start_date로 사용자에게 의미 있게.
     regions_slug = "-".join(sorted(req.regions))[:60] or "jeju"
-    filename = f"pack-your-jeju_{regions_slug}_{req.start_date.isoformat()}.pdf"
+    filename = f"pack-your-jeju-plan_{regions_slug}_{req.start_date.isoformat()}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

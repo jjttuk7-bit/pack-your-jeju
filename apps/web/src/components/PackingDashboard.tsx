@@ -197,7 +197,7 @@ export default function PackingDashboard(props: Props) {
           <SummaryLine icon={<Compass className="w-3.5 h-3.5" />} label={purposeLabel} />
         </div>
 
-        {/* 이 여행을 저장 — 감성 톤 여행 저널 PDF 다운로드. 사실은 서버가 조립하고
+        {/* 이 여행을 저장 — 근거 기반 여행플랜 PDF 다운로드. 사실은 서버가 조립하고
             프론트는 파일만 받아 저장한다. LLM 없이도 항상 동작. */}
         {packResp && !loading && !error && (
           <div className="pt-1">
@@ -211,12 +211,12 @@ export default function PackingDashboard(props: Props) {
                 {pdfLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    저널 생성 중
+                    플랜 생성 중
                   </>
                 ) : (
                   <>
                     <BookOpenCheck className="w-4 h-4" />
-                    저널 저장
+                    여행플랜 저장
                     <Download className="w-3.5 h-3.5 opacity-80" />
                   </>
                 )}
@@ -234,7 +234,7 @@ export default function PackingDashboard(props: Props) {
                 ) : (
                   <>
                     <Share2 className="w-4 h-4 text-citrus-2" />
-                    결과 공유
+                    플랜 공유
                     <Copy className="w-3.5 h-3.5 text-basalt-2/70" />
                   </>
                 )}

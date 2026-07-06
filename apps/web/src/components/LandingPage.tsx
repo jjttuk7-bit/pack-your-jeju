@@ -244,7 +244,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   <FeatureCard
                     icon={<FileText className="h-5 w-5" />}
                     title="플랜 파일"
-                    body="확정된 여행팩은 PDF 저널로 저장하고, 근거 링크와 비어 있는 조합까지 함께 기록합니다."
+                    body="확정된 여행팩은 PDF 여행플랜으로 저장하고, 근거 링크와 데이터가 부족한 조합까지 함께 정리합니다."
                   />
                   <FeatureCard
                     icon={<Search className="h-5 w-5" />}
@@ -299,7 +299,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     ['1', '지역 선택', '지역별 근거 현황과 약한 순간을 먼저 확인합니다.'],
                     ['2', '하루방 에이전트', '매 턴 DB 후보를 다시 조회해 자연어로 조립합니다.'],
                     ['3', '여행팩 생성', '근거 배지와 접근성 신호를 포함해 일정으로 묶습니다.'],
-                    ['4', 'PDF 저장', '현재 확정 버전을 여행 저널로 아카이브합니다.'],
+                    ['4', '여행플랜 저장', '현재 확정 버전을 따라가기 쉬운 PDF 플랜으로 정리합니다.'],
                     ['5', '방문 기록', '체크인 데이터가 다음 추천의 신뢰 신호가 됩니다.'],
                   ].map(([step, title, body]) => (
                     <div key={step} className="rounded-2xl border border-orange-100/70 bg-white p-4 shadow-sm">
@@ -325,7 +325,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     이제 실제 여행팩을 만들어 볼 차례입니다.
                   </h2>
                   <p className="mt-3 max-w-2xl text-[14px] leading-7 text-basalt-2">
-                    진입하면 지역 정밀 설정, 하루방 에이전트 추천, 근거 기반 장소 카드, PDF 여행 저널까지
+                    진입하면 지역 정밀 설정, 하루방 에이전트 추천, 근거 기반 장소 카드, PDF 여행플랜까지
                     한 흐름으로 확인할 수 있습니다.
                   </p>
                 </div>

@@ -71,7 +71,7 @@ export function requestRegionCoveragePreview(
   );
 }
 
-// 여행 저널 PDF 다운로드 — 서버가 조립한 pdf를 그대로 받아 브라우저 다운로드.
+// 여행플랜 PDF 다운로드 — 서버가 조립한 pdf를 그대로 받아 브라우저 다운로드.
 export async function downloadPackPdf(
   info: TravelInfo,
   moments: MomentId[],
@@ -111,7 +111,7 @@ export function requestVerify(text: string): Promise<VerifyResponse> {
   return post<VerifyResponse>('/verify', { text });
 }
 
-// 자연어 상담 레이어 (정직 에이전트 Phase A).
+// 자연어 상담 레이어 (신뢰 기반 에이전트 Phase A).
 // 응답의 available=false면 프론트는 폼 fallback으로 안내한다.
 export interface ParsedRequestDto {
   regions: string[];

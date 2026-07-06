@@ -9,7 +9,7 @@ import type { BadgeKind } from '../types';
  * - contradicted ×: 반증 존재 (폐업 확인)
  * - reference 🟠: 참고 (공공데이터 검증 아님)
  *
- * 정직함 원칙(CLAUDE.md 절대 규칙 3): 사유가 있으면 반드시 보이게.
+ * 신뢰 기반 원칙(CLAUDE.md 절대 규칙 3): 사유가 있으면 반드시 보이게.
  * caution 배지는 note를 라벨에 압축 노출하고, note 원문은 아래 소자로 유지.
  */
 

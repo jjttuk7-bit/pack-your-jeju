@@ -1,9 +1,9 @@
-"""팩 결과 → 감성 톤 여행 저널 PDF.
+"""팩 결과 → 근거 기반 여행플랜 PDF.
 
 원칙 (CLAUDE.md):
   - 문구·수치·시간을 LLM으로 지어내지 않는다. 표지 문안은 폼 입력만으로 조립.
   - 각 place 카드의 이름·주소·배지·근거 URL은 100% DB 조회값.
-  - 확인되지 않은 (region × moment) 조합은 정직하게 마지막에 노출.
+  - 확인되지 않은 (region × moment) 조합은 데이터 부족 메모로 노출.
 
 폰트: 로컬 Windows(맑은 고딕) → 프로덕션 Linux(Noto CJK) 순으로 fallback.
 """
@@ -267,6 +267,16 @@ def _make_styles() -> dict[str, ParagraphStyle]:
             "sh", fontName=FONT_BOLD, fontSize=14, leading=18,
             textColor=BASALT, spaceBefore=12, spaceAfter=6,
         ),
+        "plan_note": ParagraphStyle(
+            "pn", fontName=FONT_REGULAR, fontSize=9.5, leading=14,
+            textColor=BASALT_2, backColor=IVORY,
+            borderColor=EARTH, borderWidth=0.3, borderPadding=6,
+            spaceBefore=4, spaceAfter=7,
+        ),
+        "slot_label": ParagraphStyle(
+            "sl", fontName=FONT_BOLD, fontSize=8.5, leading=11,
+            textColor=CITRUS_2, spaceBefore=3, spaceAfter=2,
+        ),
         "closing": ParagraphStyle(
             "cl", fontName=FONT_REGULAR, fontSize=11, leading=18,
             textColor=BASALT, alignment=TA_CENTER, spaceAfter=6,
@@ -341,8 +351,45 @@ def _badge_flowable(badge: str, styles: dict) -> Table:
     return t
 
 
+def _safe_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _source_label(item: dict) -> str:
+    sources = item.get("sources") or []
+    if not sources:
+        return "근거: Pack Your Jeju 데이터"
+    src = sources[0] or {}
+    return f"근거: {src.get('name') or '공공데이터'}"
+
+
+def _item_plan_tip(item: dict) -> str:
+    badge = item.get("badge") or ""
+    moment = item.get("moment") or ""
+    moment_ko = MOMENT_LABEL_KO.get(moment, moment)
+    if badge == "caution":
+        return "주의 신호가 있어 일정에 넣기 전 상세 근거를 확인해 주세요."
+    if badge == "verified":
+        return f"{moment_ko or '선택한 여행 순간'} 후보로 먼저 검토하기 좋은 장소입니다."
+    return "근거가 연결된 후보입니다. 상세 정보 확인 후 일정에 넣어 주세요."
+
+
+def _slot_label(item: dict, index: int) -> str:
+    moment = item.get("moment") or ""
+    if moment == "local_food":
+        return "점심·저녁 후보"
+    if moment in {"quiet_cafe", "local_market", "citrus"}:
+        return "오후 후보"
+    if moment in {"sunset"}:
+        return "저녁 후보"
+    if moment in {"oreum", "beach_walk", "gotjawal"}:
+        return "오전·오후 후보"
+    labels = ["오전 후보", "점심 후보", "오후 후보", "저녁 후보"]
+    return labels[min(index, len(labels) - 1)]
+
+
 def _item_card(item: dict, styles: dict) -> Table:
-    """place 하나를 한 개의 카드로 렌더 — 이름 · 배지 · 순간 · 주소 · 근거."""
+    """place 하나를 한 개의 여행플랜 카드로 렌더 — 이름 · 배지 · 순간 · 주소 · 근거."""
     moment = item.get("moment") or ""
     moment_ko = MOMENT_LABEL_KO.get(moment, moment)
     region = item.get("region") or ""
@@ -358,7 +405,7 @@ def _item_card(item: dict, styles: dict) -> Table:
     left_lines = [Paragraph(meta, styles["moment_pill"])] if meta else []
     left_lines.append(Paragraph(item.get("name", ""), styles["item_title"]))
     if item.get("address"):
-        left_lines.append(Paragraph(item["address"], styles["item_meta"]))
+        left_lines.append(Paragraph(f"주소: {item['address']}", styles["item_meta"]))
     if item.get("note"):
         left_lines.append(Paragraph(f"※ {item['note']}", styles["item_meta"]))
     if item.get("sources"):
@@ -369,6 +416,9 @@ def _item_card(item: dict, styles: dict) -> Table:
                 styles["item_meta"],
             )
         )
+    else:
+        left_lines.append(Paragraph(_source_label(item), styles["item_meta"]))
+    left_lines.append(Paragraph(f"플랜 메모: {_item_plan_tip(item)}", styles["item_body"]))
 
     left_cell = Table(
         [[p] for p in left_lines],
@@ -400,7 +450,7 @@ def _item_card(item: dict, styles: dict) -> Table:
 
 
 def _day_block(day: dict, styles: dict) -> list:
-    """Day 하나 = 헤더 + 카드 리스트 + (선택) 미확인 조합 노트."""
+    """Day 하나 = 헤더 + 흐름형 카드 리스트 + (선택) 데이터 부족 노트."""
     day_no = day.get("day", 0)
     date_iso = day.get("date", "")
     date_ko = _fmt_date_ko(date_iso)
@@ -408,13 +458,21 @@ def _day_block(day: dict, styles: dict) -> list:
     region_ko = " · ".join(REGION_LABEL_KO.get(r, r) for r in regions)
 
     story: list = []
-    story.append(Paragraph(f"Day {day_no}", styles["day_head"]))
+    story.append(Paragraph(f"Day {day_no} 여행 흐름", styles["day_head"]))
     subtitle_parts = [date_ko]
     if region_ko:
         subtitle_parts.append(region_ko)
     story.append(Paragraph(" · ".join(subtitle_parts), styles["day_sub"]))
 
-    for it in day.get("items", []):
+    items = day.get("items", []) or []
+    if items:
+        story.append(Paragraph(
+            "아래 순서는 선택한 지역과 순간을 기준으로 묶은 후보 흐름입니다. 실제 이동 전에는 지도에서 거리와 운영 여부를 확인해 주세요.",
+            styles["plan_note"],
+        ))
+
+    for idx, it in enumerate(items):
+        story.append(Paragraph(_slot_label(it, idx), styles["slot_label"]))
         story.append(_item_card(it, styles))
         story.append(Spacer(1, 3 * mm))
 
@@ -427,7 +485,9 @@ def _day_block(day: dict, styles: dict) -> list:
         for r, ms in by_region.items():
             reg_ko = REGION_LABEL_KO.get(r, r)
             ms_ko = " · ".join(MOMENT_LABEL_KO.get(m, m) for m in ms)
-            lines.append(f"{reg_ko}에서는 {ms_ko}이(가) 저희 공공데이터로 확인되지 않았습니다.")
+            lines.append(
+                f"{reg_ko} · {ms_ko}: 저희가 참조하는 공공데이터 기준으로 근거가 부족합니다."
+            )
         note_style = ParagraphStyle(
             "un", fontName=FONT_REGULAR, fontSize=9, leading=13,
             textColor=AMBER_TEXT, backColor=AMBER_BG,
@@ -447,7 +507,7 @@ def _draw_footer(canvas, doc):
     canvas.saveState()
     canvas.setFont(FONT_REGULAR, 8)
     canvas.setFillColor(BASALT_2)
-    canvas.drawString(20 * mm, 12 * mm, "Pack Your Jeju — 근거 있는 여행 저널")
+    canvas.drawString(20 * mm, 12 * mm, "Pack Your Jeju — 신뢰 기반 여행플랜")
     canvas.drawRightString(A4[0] - 20 * mm, 12 * mm, f"{doc.page}")
     canvas.setStrokeColor(EARTH)
     canvas.setLineWidth(0.4)
@@ -470,19 +530,12 @@ def _cover_story(req: dict, pack: dict, styles: dict) -> list:
     story: list = []
     story.append(Spacer(1, 55 * mm))
     story.append(Paragraph("PACK YOUR JEJU", styles["cover_kicker"]))
-    story.append(Paragraph("이 여행을,<br/>정직하게 담았습니다.", styles["cover_title"]))
+    story.append(Paragraph("제주 여행플랜", styles["cover_title"]))
     story.append(Spacer(1, 4 * mm))
 
     hero = _hero_line(req)
     if hero:
         story.append(Paragraph(hero, styles["cover_subtitle"]))
-
-    intro_text = ""
-    if isinstance(pack.get("intro"), dict):
-        intro_text = pack["intro"].get("text") or ""
-    if intro_text:
-        story.append(Spacer(1, 4 * mm))
-        story.append(Paragraph(intro_text, styles["cover_hero"]))
 
     # 커버리지 스냅샷
     counts = _pack_counts(pack)
@@ -499,10 +552,10 @@ def _cover_story(req: dict, pack: dict, styles: dict) -> list:
             chip,
         ))
 
-    story.append(Spacer(1, 30 * mm))
+    story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
-        "저희는 지어내지 않았습니다. 근거로 담고, 없는 것은 정직하게 비웠습니다.",
-        styles["small"],
+        "폼 선택과 하루방 에이전트의 근거 기반 후보를 바탕으로 만든 플랜입니다. 장소명·주소·주의 신호는 조회된 데이터만 사용합니다.",
+        styles["cover_hero"],
     ))
 
     story.append(PageBreak())
@@ -522,25 +575,67 @@ def _pack_counts(pack: dict) -> dict[str, int]:
     return {"verified": verified, "caution": caution, "total": verified + caution}
 
 
-# ─── 미확인 조합 요약 (마지막 페이지) ─────────
+# ─── 플랜 요약과 데이터 부족 메모 ─────────
 
-def _honesty_page(pack: dict, styles: dict) -> list:
+def _plan_summary_page(req: dict, pack: dict, styles: dict) -> list:
     story: list = []
-    story.append(Paragraph("정직하게, 확인되지 않은 것들", styles["section_head"]))
-    story.append(Paragraph(
-        "저희 데이터에서 확인되지 않은 조합입니다. 없다는 뜻이 아니라, "
-        "저희가 참조하는 공공데이터 기준으로 확인되지 않았다는 뜻입니다.",
-        styles["item_body"],
-    ))
+    story.append(Paragraph("여행플랜 요약", styles["section_head"]))
+    rows = []
+    regions = req.get("regions") or ([req.get("region")] if req.get("region") else [])
+    moments = req.get("moments") or []
+    rows.append(["지역", " · ".join(REGION_LABEL_KO.get(r, r) for r in regions if r) or "-"])
+    rows.append(["기간", f"{req.get('start_date', '-')}부터 {req.get('days') or '-'}일"])
+    rows.append(["동행", COMPANION_LABEL_KO.get(req.get("companion", ""), req.get("companion", "-"))])
+    rows.append(["목적", PURPOSE_LABEL_KO.get(req.get("purpose", ""), req.get("purpose", "-"))])
+    rows.append(["여행 순간", " · ".join(MOMENT_LABEL_KO.get(m, m) for m in moments) or "-"])
+    summary = Table(
+        [[Paragraph(a, styles["moment_pill"]), Paragraph(b, styles["item_body"])] for a, b in rows],
+        colWidths=[26 * mm, 124 * mm],
+    )
+    summary.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.4, EARTH),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, EARTH),
+        ("BACKGROUND", (0, 0), (0, -1), IVORY),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(summary)
 
+    counts = _pack_counts(pack)
+    gap_count = len(_gap_combos(pack))
+    story.append(Spacer(1, 5 * mm))
+    story.append(Paragraph("하루방 에이전트 브리핑", styles["section_head"]))
+    story.append(Paragraph(
+        f"확인 후보 {counts['total']}곳 · 신뢰 신호 {counts['verified']} · 주의 신호 {counts['caution']} · 데이터 부족 조합 {gap_count}개",
+        styles["plan_note"],
+    ))
+    story.append(PageBreak())
+    return story
+
+
+def _gap_combos(pack: dict) -> list[str]:
     combos: list[str] = []
     for day in pack.get("itinerary", []) or []:
         for u in day.get("unavailable_moments") or []:
             r_ko = REGION_LABEL_KO.get(u.get("region", ""), u.get("region", ""))
             m_ko = MOMENT_LABEL_KO.get(u.get("moment", ""), u.get("moment", ""))
             combos.append(f"{r_ko} · {m_ko}")
+    return sorted(set(combos))
 
-    combos = sorted(set(combos))
+
+def _plan_notes_page(pack: dict, styles: dict) -> list:
+    story: list = []
+    story.append(Paragraph("데이터가 부족한 조합 메모", styles["section_head"]))
+    story.append(Paragraph(
+        "아래 항목은 없다는 뜻이 아니라, 저희가 참조하는 공공데이터 기준으로 근거가 부족한 조합입니다. "
+        "플랜을 확정하기 전 대체 지역이나 다른 여행 순간으로 조정해 보세요.",
+        styles["item_body"],
+    ))
+
+    combos = _gap_combos(pack)
     if combos:
         for c in combos:
             story.append(Paragraph(f"· {c}", styles["item_body"]))
@@ -552,7 +647,7 @@ def _honesty_page(pack: dict, styles: dict) -> list:
 
     story.append(Spacer(1, 8 * mm))
     story.append(Paragraph(
-        "Pack Your Jeju — 근거 있는 여행 준비.",
+        "Pack Your Jeju — 신뢰 기반 제주 여행플랜.",
         styles["closing"],
     ))
     return story
@@ -579,7 +674,7 @@ def build_pack_pdf(pack: dict, req: dict) -> bytes:
         pagesize=A4,
         leftMargin=20 * mm, rightMargin=20 * mm,
         topMargin=22 * mm, bottomMargin=22 * mm,
-        title="Pack Your Jeju — 여행 저널",
+        title="Pack Your Jeju — 여행플랜",
         author="Pack Your Jeju",
     )
     frame = Frame(
@@ -599,11 +694,13 @@ def build_pack_pdf(pack: dict, req: dict) -> bytes:
     from reportlab.platypus.doctemplate import NextPageTemplate
     story.append(NextPageTemplate("body"))
 
-    story.append(Paragraph("여행 일정", styles["section_head"]))
+    story += _plan_summary_page(req, pack, styles)
+
+    story.append(Paragraph("Day별 여행플랜", styles["section_head"]))
     for day in pack.get("itinerary", []) or []:
         story += _day_block(day, styles)
 
-    story += _honesty_page(pack, styles)
+    story += _plan_notes_page(pack, styles)
 
     doc.build(story)
     return buf.getvalue()

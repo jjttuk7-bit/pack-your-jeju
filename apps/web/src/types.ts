@@ -114,7 +114,7 @@ export interface ItineraryDayDto {
   items: ItineraryItemDto[];
   regions: string[];               // 이 요일에 방문할 지역들 (다중 지역 선택 시)
   // (region × moment) 조합 중 items가 하나도 없는 것들.
-  // 정직함 원칙(CLAUDE.md 절대 규칙 3): "저희 데이터로 확인되지 않았다"를 이유와 함께 노출.
+  // 신뢰 기반 원칙(CLAUDE.md 절대 규칙 3): "저희 데이터로 확인되지 않았다"를 이유와 함께 노출.
   unavailable_moments?: { region: string; moment: string }[];
 }
 

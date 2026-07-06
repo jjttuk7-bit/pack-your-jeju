@@ -294,7 +294,7 @@ export default function App() {
           >
             우리는 <span className="text-citrus-2 font-bold">근거 있는 것만</span> 담고,
             <br />
-            없는 건 <span className="text-mint font-bold">정직하게</span> 비워둡니다.
+            근거가 부족한 건 <span className="text-mint font-bold">분명하게</span> 알려드립니다.
           </motion.p>
 
           {state.step !== 'setup' && (
