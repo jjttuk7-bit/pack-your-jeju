@@ -10,6 +10,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -73,6 +74,20 @@ def smoke_kma_nowcast(region: str = "jeju_city") -> dict[str, Any]:
         with urlopen(req, timeout=8) as resp:
             status = getattr(resp, "status", 200)
             raw = resp.read().decode("utf-8", errors="replace")
+    except HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return {
+            "available": False,
+            "reason": f"HTTPError: HTTP Error {e.code}: {e.reason}",
+            "http_status": e.code,
+            "key_configured": True,
+            "key_env": key_name,
+            "base_date": base_date,
+            "base_time": base_time,
+            "nx": nx,
+            "ny": ny,
+            "error_sample": body[:240],
+        }
     except Exception as e:
         return {
             "available": False,
