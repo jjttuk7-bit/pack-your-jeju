@@ -67,24 +67,21 @@ export default function App() {
       return false;
     }
   });
+  const [showLanding, setShowLanding] = useState(false);
 
   const handleEnter = () => {
     try {
       localStorage.setItem(GATE_STORAGE_KEY, 'true');
     } catch {}
     setAuthenticated(true);
+    setShowLanding(false);
   };
 
-  // 앱 안에서 랜딩으로 복귀. 게이트 storage는 유지 — 랜딩에서 '여행 준비 시작하기'
-  // 다시 눌러도 코드 재입력 없이 진입 가능 (시연 편의).
+  // 앱 안에서 랜딩으로 복귀. 게이트 storage는 유지한다.
   const handleGoLanding = () => {
-    setAuthenticated(false);
+    setShowLanding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  // 게이트 미통과 상태에서는 랜딩만 렌더 — 하루방 위젯 · 상단 헤더 모두 감춤.
-  if (!authenticated) {
-    return <LandingPage onEnter={handleEnter} />;
-  }
 
   // Persist state to localStorage
   useEffect(() => {
@@ -94,6 +91,11 @@ export default function App() {
       console.error('Failed to save state to localStorage:', e);
     }
   }, [state]);
+
+  // 게이트 미통과 또는 홈 복귀 상태에서는 랜딩만 렌더 — 하루방 위젯 · 상단 헤더 모두 감춤.
+  if (!authenticated || showLanding) {
+    return <LandingPage onEnter={handleEnter} isUnlocked={authenticated} />;
+  }
 
   const handleFormSubmit = (info: TravelInfo, selectedMoments: MomentId[]) => {
     setState(prev => ({
