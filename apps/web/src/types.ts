@@ -142,3 +142,22 @@ export interface VerifyResponse {
   log_id: string | null;
   claims: VerifiedClaimDto[];
 }
+
+export interface RegionCoverageMomentDto {
+  moment: MomentId | string;
+  moment_label: string;
+  category: string;
+  verified: number;
+  caution: number;
+  coverage_gap: boolean;
+}
+
+export interface RegionCoveragePreview {
+  region: RegionId | string;
+  region_label: string;
+  total_places: number;
+  moments: RegionCoverageMomentDto[];
+  recommended_moments: string[];
+  weak_moments: string[];
+  briefing: string;
+}

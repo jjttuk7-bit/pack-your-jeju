@@ -10,6 +10,7 @@ import type {
   TravelInfo,
   MomentId,
   PackResponse,
+  RegionCoveragePreview,
   VerifyResponse,
 } from './types';
 
@@ -36,6 +37,18 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`);
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = (await res.json())?.detail?.message ?? '';
+    } catch {}
+    throw new Error(`${path} ${res.status} ${detail || res.statusText}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<PackResponse> {
   const body: Record<string, unknown> = {
     regions: info.regions,
@@ -48,6 +61,14 @@ export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<Pack
   const notes = info.specialNotes?.trim();
   if (notes) body.special_notes = notes;
   return post<PackResponse>('/pack', body);
+}
+
+export function requestRegionCoveragePreview(
+  region: string,
+): Promise<RegionCoveragePreview> {
+  return get<RegionCoveragePreview>(
+    `/region/coverage-preview?region=${encodeURIComponent(region)}`,
+  );
 }
 
 // 여행 저널 PDF 다운로드 — 서버가 조립한 pdf를 그대로 받아 브라우저 다운로드.

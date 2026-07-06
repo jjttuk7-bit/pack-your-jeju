@@ -29,6 +29,7 @@ from apps.api.engine import augment as augment_mod
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import haruban as haruban_mod
 from apps.api.engine import packpdf as packpdf_mod
+from apps.api.engine import region_coverage as region_coverage_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
@@ -154,6 +155,23 @@ def admin_metrics(window_hours: int = Query(24, ge=1, le=720)) -> dict[str, Any]
             "avg": float(lat.avg or 0.0),
         },
     }
+
+
+@app.get("/region/coverage-preview")
+def region_coverage_preview(region: str = Query(..., min_length=1)) -> dict[str, Any]:
+    """지역 선택 직후 보여주는 moment별 공공데이터 커버리지 프리뷰."""
+    try:
+        return region_coverage_mod.build_region_preview(region)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": type(e).__name__, "message": str(e)},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "coverage_preview_unavailable", "message": str(e)},
+        )
 
 
 @app.post("/pack")

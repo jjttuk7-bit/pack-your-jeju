@@ -1,7 +1,17 @@
-import { useState } from 'react';
-import { MapPin, HelpCircle, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  MapPin,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  ShieldCheck,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
 import { REGIONS, LANDMARK_HINTS } from '../data';
-import type { RegionId } from '../types';
+import type { RegionCoveragePreview, RegionId } from '../types';
+import { requestRegionCoveragePreview } from '../api';
 
 interface RegionChipsProps {
   value: RegionId[];                       // 다중 선택
@@ -16,7 +26,46 @@ interface RegionChipsProps {
  */
 export default function RegionChips({ value, onChange }: RegionChipsProps) {
   const [showHints, setShowHints] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, RegionCoveragePreview>>({});
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [unavailable, setUnavailable] = useState<Set<string>>(new Set());
   const selected = REGIONS.filter((r) => value.includes(r.value));
+  const regionSignature = value.join('|');
+
+  useEffect(() => {
+    const missing = value.filter((r) => !previews[r] && !loading[r] && !unavailable.has(r));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    for (const region of missing) {
+      setLoading((prev) => ({ ...prev, [region]: true }));
+      requestRegionCoveragePreview(region)
+        .then((preview) => {
+          if (cancelled) return;
+          setPreviews((prev) => ({ ...prev, [region]: preview }));
+        })
+        .catch(() => {
+          // 프리뷰 실패가 지역 선택 자체를 막으면 안 된다.
+          if (!cancelled) {
+            setUnavailable((prev) => {
+              const next = new Set(prev);
+              next.add(region);
+              return next;
+            });
+          }
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setLoading((prev) => ({ ...prev, [region]: false }));
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+    // 선택 지역이 바뀔 때 새로 필요한 프리뷰만 요청한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionSignature]);
 
   const toggle = (r: RegionId) => {
     if (value.includes(r)) {
@@ -59,11 +108,13 @@ export default function RegionChips({ value, onChange }: RegionChipsProps) {
       {selected.length > 0 && (
         <div className="mt-3 text-[11.5px] card-citrus px-3.5 py-2.5 leading-relaxed space-y-1.5">
           {selected.map((s) => (
-            <div key={s.value}>
-              <span className="font-serif-kr font-bold text-citrus-2 text-[13px]">{s.label}</span>
-              <span className="text-basalt-2 mx-1.5">에는</span>
-              <span className="text-basalt">{s.landmarks.join(' · ')}</span>
-            </div>
+            <RegionCoverageCard
+              key={s.value}
+              label={s.label}
+              landmarks={s.landmarks}
+              preview={previews[s.value]}
+              loading={!!loading[s.value]}
+            />
           ))}
         </div>
       )}
@@ -88,6 +139,69 @@ export default function RegionChips({ value, onChange }: RegionChipsProps) {
           ))}
           <p className="col-span-2 mt-1.5 pt-1.5 border-t border-earth/50 text-[10px] text-basalt-2/70 leading-relaxed">
             여기 없는 곳도 12지역 중 하나에 속해요.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RegionCoverageCard({
+  label,
+  landmarks,
+  preview,
+  loading,
+}: {
+  label: string;
+  landmarks: string[];
+  preview?: RegionCoveragePreview;
+  loading: boolean;
+}) {
+  const strong = preview?.recommended_moments
+    .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+    .filter(Boolean)
+    .slice(0, 3) as string[] | undefined;
+  const weak = preview?.weak_moments
+    .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+    .filter(Boolean)
+    .slice(0, 2) as string[] | undefined;
+
+  return (
+    <div className="border-b border-citrus/20 last:border-b-0 pb-2 last:pb-0">
+      <div>
+        <span className="font-serif-kr font-bold text-citrus-2 text-[13px]">{label}</span>
+        <span className="text-basalt-2 mx-1.5">에는</span>
+        <span className="text-basalt">{landmarks.join(' · ')}</span>
+      </div>
+
+      {loading && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-[10.5px] text-basalt-2">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          공공데이터 커버리지를 확인하는 중
+        </div>
+      )}
+
+      {preview && (
+        <div className="mt-2 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/80 border border-citrus/30 text-[10.5px] text-basalt">
+              <ShieldCheck className="w-3 h-3 text-mint" />
+              확인 후보 {preview.total_places}곳
+            </span>
+            {strong && strong.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/80 border border-mint/30 text-[10.5px] text-basalt">
+                강점 {strong.join(' · ')}
+              </span>
+            )}
+            {weak && weak.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/80 border border-citrus/30 text-[10.5px] text-basalt">
+                <AlertTriangle className="w-3 h-3 text-citrus-2" />
+                미확인 {weak.join(' · ')}
+              </span>
+            )}
+          </div>
+          <p className="text-[10.5px] text-basalt-2 leading-relaxed">
+            {preview.briefing}
           </p>
         </div>
       )}
