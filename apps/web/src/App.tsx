@@ -502,7 +502,11 @@ export default function App() {
         <HarubanChat
           info={state.info}
           selectedMomentIds={state.selectedMomentIds}
+          selectedPlanItems={state.selectedPlanItems || []}
+          visitChecks={state.visitChecks || {}}
           onApplySuggestion={handleHarubanApply}
+          onAddPlanItem={handleAddCustomPlanItem}
+          onOpenVerify={goToVerify}
         />
       )}
 

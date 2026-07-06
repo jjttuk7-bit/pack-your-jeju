@@ -8,13 +8,24 @@ import {
   RefreshCcw,
   ShieldCheck,
   AlertTriangle,
-  ChevronDown,
   Database,
   Compass,
   ListChecks,
+  Plus,
+  Route,
+  PackageCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 import HarubangMark from './marks/HarubangMark';
-import type { TravelInfo, MomentId, RegionId, CompanionValue, PurposeValue } from '../types';
+import type {
+  TravelInfo,
+  MomentId,
+  RegionId,
+  CompanionValue,
+  PurposeValue,
+  TravelPlanItem,
+  VisitCheck,
+} from '../types';
 import {
   requestHarubanChat,
   requestHarubanIntro,
@@ -22,15 +33,19 @@ import {
   type HarubanFormSuggestion,
   type HarubanIntroResponse,
 } from '../api';
-import PlaceDetail from './PlaceDetail';
+import { MOMENTS } from '../data';
 
 interface HarubanChatProps {
   info: TravelInfo;
   selectedMomentIds: MomentId[];
+  selectedPlanItems: TravelPlanItem[];
+  visitChecks: Record<string, VisitCheck>;
   onApplySuggestion: (
     info: Partial<TravelInfo>,
     selectedMoments: MomentId[] | null,
   ) => void;
+  onAddPlanItem: (item: TravelPlanItem) => void;
+  onOpenVerify: () => void;
 }
 
 // 채팅에는 봇 발화가 "텍스트만"인 경우와 "인사 + 카드 리스트"인 경우가 함께 오간다.
@@ -91,7 +106,11 @@ function formStateForApi(snap: FormStateSnapshot): Record<string, unknown> {
 export default function HarubanChat({
   info,
   selectedMomentIds,
+  selectedPlanItems,
+  visitChecks,
   onApplySuggestion,
+  onAddPlanItem,
+  onOpenVerify,
 }: HarubanChatProps) {
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<ChatEntry[]>([]);
@@ -237,38 +256,24 @@ export default function HarubanChat({
 
   const dismissSuggestion = () => setPendingSuggestion(null);
 
-  // 하이라이트 카드에서 "이 곳 폼에 넣기"를 눌렀을 때: 지역+순간을 폼에 합치는 제안.
-  // 이미 둘 다 있으면 상태가 그대로라 대시보드 재조립이 안 트리거 — 눈에 안 보이는 상태 방지 위해
-  // 실제로 변화가 생기는 경우에만 setState + 안내. 없으면 "이미 반영되어 있어요"로 사용자에게 명시.
-  const applyHighlightToForm = (regionId: string, momentId: string) => {
-    const existingRegions = info.regions ?? [];
-    const existingMoments = selectedMomentIds;
-    const regionAlreadyIn = existingRegions.includes(regionId as RegionId);
-    const momentAlreadyIn = existingMoments.includes(momentId as MomentId);
-
-    if (regionAlreadyIn && momentAlreadyIn) {
-      setEntries((prev) => [
-        ...prev,
-        { kind: 'assistant', content: '이 조건은 이미 폼에 있어요. 대시보드에서 확인해 주세요.' },
-      ]);
-      return;
-    }
-
-    const nextRegions = regionAlreadyIn
-      ? existingRegions
-      : ([...existingRegions, regionId] as RegionId[]);
-    const nextMoments = momentAlreadyIn
-      ? existingMoments
-      : ([...existingMoments, momentId] as MomentId[]);
-    onApplySuggestion({ regions: nextRegions }, nextMoments);
-
-    const added: string[] = [];
-    if (!regionAlreadyIn) added.push('지역');
-    if (!momentAlreadyIn) added.push('순간');
+  const addHighlightToPlan = (highlight: import('../api').HarubanIntroHighlight) => {
+    const item = planItemFromHighlight(highlight);
+    const alreadyInPlan = selectedPlanItems.some((planItem) => planItem.id === item.id);
+    if (!alreadyInPlan) onAddPlanItem(item);
     setEntries((prev) => [
       ...prev,
-      { kind: 'assistant', content: `폼에 ${added.join('·')} 반영했어요.` },
+      {
+        kind: 'assistant',
+        content: alreadyInPlan
+          ? `${highlight.name}은 이미 내 여행플랜에 담겨 있어요.`
+          : `${highlight.name}을 내 여행플랜에 담았어요. 이제 짐 목록과 공유 문구에도 반영됩니다.`,
+      },
     ]);
+  };
+
+  const openVerifyFromAgent = () => {
+    onOpenVerify();
+    setOpen(false);
   };
 
   return (
@@ -346,9 +351,11 @@ export default function HarubanChat({
                   <IntroBlock
                     key={i}
                     intro={entry.intro}
-                    currentRegions={currentSnapshot.regions}
-                    currentMoments={currentSnapshot.moments}
-                    onPickHighlight={applyHighlightToForm}
+                    selectedMoments={currentSnapshot.moments}
+                    selectedPlanItems={selectedPlanItems}
+                    visitChecks={visitChecks}
+                    onAddHighlightToPlan={addHighlightToPlan}
+                    onOpenVerify={openVerifyFromAgent}
                   />
                 );
               })}
@@ -443,20 +450,28 @@ function MessageBubble({ role, content }: { role: 'user' | 'assistant'; content:
   );
 }
 
-// ── 인사 블록: greeting 말풍선 + 하이라이트 카드 리스트 + 데이터 부족 섹션 ──
+// ── 인사 블록: greeting 말풍선 + 플랜 코치 액션 + 데이터 부족 섹션 ──
 function IntroBlock({
   intro,
-  currentRegions,
-  currentMoments,
-  onPickHighlight,
+  selectedMoments,
+  selectedPlanItems,
+  visitChecks,
+  onAddHighlightToPlan,
+  onOpenVerify,
 }: {
   intro: HarubanIntroResponse;
-  currentRegions: string[];
-  currentMoments: string[];
-  onPickHighlight: (regionId: string, momentId: string) => void;
+  selectedMoments: string[];
+  selectedPlanItems: TravelPlanItem[];
+  visitChecks: Record<string, VisitCheck>;
+  onAddHighlightToPlan: (highlight: import('../api').HarubanIntroHighlight) => void;
+  onOpenVerify: () => void;
 }) {
   const [showAllGaps, setShowAllGaps] = useState(false);
   const groupedGaps = useMemo(() => groupGapsByRegion(intro.gaps), [intro.gaps]);
+  const agentState = useMemo(
+    () => buildAgentState(intro, selectedMoments, selectedPlanItems, visitChecks),
+    [intro, selectedMoments, selectedPlanItems, visitChecks],
+  );
   const visibleGapGroups = showAllGaps ? groupedGaps : groupedGaps.slice(0, 3);
   const hiddenGapCount = Math.max(intro.gaps.length - visibleGapGroups.reduce(
     (sum, group) => sum + group.moments.length,
@@ -504,28 +519,15 @@ function IntroBlock({
           />
         </div>
         <p className="text-[11.5px] text-basalt-2 leading-relaxed">
-          확인 후보는 먼저 일정에 넣기 좋고, 데이터가 부족한 조합은 아래에서 범위를 줄여 다시 볼 수 있어요.
+          하루방은 장소를 다시 나열하지 않고, 현재 플랜에서 비어 있는 순간과 다음 행동을 정리합니다.
         </p>
       </div>
 
-      {/* 하이라이트 카드 */}
-      {intro.highlights.length > 0 && (
-        <div className="space-y-2">
-          {intro.highlights.map((h) => {
-            const regionIn = currentRegions.includes(h.region);
-            const momentIn = currentMoments.includes(h.moment);
-            const alreadyInForm = regionIn && momentIn;
-            return (
-              <HighlightCard
-                key={h.external_id}
-                highlight={h}
-                alreadyInForm={alreadyInForm}
-                onPick={() => onPickHighlight(h.region, h.moment)}
-              />
-            );
-          })}
-        </div>
-      )}
+      <AgentPlannerPanel
+        state={agentState}
+        onAddHighlightToPlan={onAddHighlightToPlan}
+        onOpenVerify={onOpenVerify}
+      />
 
       {/* 데이터 부족 조합: 접힌 브리핑 형태로 노출 */}
       {intro.gaps.length > 0 && (
@@ -631,146 +633,199 @@ function groupGapsByRegion(gaps: import('../api').HarubanIntroGap[]) {
   return Array.from(grouped.values());
 }
 
-function HighlightCard({
-  highlight,
-  alreadyInForm,
-  onPick,
+interface AgentState {
+  planCount: number;
+  publicPlanCount: number;
+  userAddedCount: number;
+  missingMomentLabels: string[];
+  matchedCount: number;
+  changedCount: number;
+  recommendedHighlight: import('../api').HarubanIntroHighlight | null;
+  recommendedAlreadyInPlan: boolean;
+}
+
+function buildAgentState(
+  intro: HarubanIntroResponse,
+  selectedMoments: string[],
+  selectedPlanItems: TravelPlanItem[],
+  visitChecks: Record<string, VisitCheck>,
+): AgentState {
+  const planMomentSet = new Set(
+    selectedPlanItems
+      .filter((item) => item.source === 'public_data')
+      .map((item) => item.moment),
+  );
+  const missingMomentLabels = selectedMoments
+    .filter((moment) => !planMomentSet.has(moment))
+    .map((moment) => MOMENTS.find((m) => m.id === moment)?.title ?? moment);
+  const recommendedHighlight = intro.highlights.find((highlight) => {
+    const planId = `public-${highlight.external_id}-${highlight.moment}`;
+    return !selectedPlanItems.some((item) => item.id === planId);
+  }) ?? null;
+
+  return {
+    planCount: selectedPlanItems.length,
+    publicPlanCount: selectedPlanItems.filter((item) => item.source === 'public_data').length,
+    userAddedCount: selectedPlanItems.filter((item) => item.source === 'user_added').length,
+    missingMomentLabels,
+    matchedCount: Object.values(visitChecks).filter((check) => check.status === 'matched').length,
+    changedCount: Object.values(visitChecks).filter((check) => check.status === 'changed').length,
+    recommendedHighlight,
+    recommendedAlreadyInPlan: recommendedHighlight
+      ? selectedPlanItems.some((item) => item.id === `public-${recommendedHighlight.external_id}-${recommendedHighlight.moment}`)
+      : false,
+  };
+}
+
+function planItemFromHighlight(highlight: import('../api').HarubanIntroHighlight): TravelPlanItem {
+  return {
+    id: `public-${highlight.external_id}-${highlight.moment}`,
+    name: highlight.name,
+    moment: highlight.moment,
+    source: 'public_data',
+    badge: highlight.badge === 'verified' || highlight.badge === 'caution' || highlight.badge === 'contradicted'
+      ? highlight.badge
+      : 'reference',
+    external_id: highlight.external_id,
+    region: highlight.region,
+    address: highlight.address,
+    note: highlight.note,
+  };
+}
+
+function AgentPlannerPanel({
+  state,
+  onAddHighlightToPlan,
+  onOpenVerify,
 }: {
-  highlight: import('../api').HarubanIntroHighlight;
-  alreadyInForm: boolean;
-  onPick: () => void;
+  state: AgentState;
+  onAddHighlightToPlan: (highlight: import('../api').HarubanIntroHighlight) => void;
+  onOpenVerify: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const isVerified = highlight.badge === 'verified';
-  const isCaution = highlight.badge === 'caution';
-  const badgeStyle = isVerified
-    ? 'bg-mint/10 text-mint border-mint/40'
-    : isCaution
-      ? 'bg-amber-50 text-amber-800 border-amber-200'
-      : 'bg-basalt-2/10 text-basalt-2 border-basalt-2/30';
-  const BadgeIcon = isCaution ? AlertTriangle : ShieldCheck;
-  const badgeLabel = isVerified ? '확인됨' : isCaution ? '주의' : highlight.badge;
-
-  // 썸네일: 제주 ITS API로 병합된 visitjeju CDN 이미지. 결측 시 렌더 안 함.
-  const thumbnail = (highlight.amenities as any)?.thumbnail_path as string | undefined;
-
   return (
-    <div
-      className={`rounded-xl border bg-white shadow-sm transition overflow-hidden ${
-        open ? 'border-citrus/40' : 'border-earth/70'
-      }`}
-    >
-      {thumbnail && (
-        <div className="relative w-full h-32 bg-earth/30 overflow-hidden">
-          <img
-            src={thumbnail}
-            alt={highlight.name}
-            loading="lazy"
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const el = e.currentTarget as HTMLImageElement;
-              el.style.display = 'none';
-            }}
-          />
+    <div className="rounded-2xl border border-basalt/10 bg-gradient-to-br from-[#FDFBF7] to-[#F4FBF8] p-3 shadow-sm space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-basalt uppercase tracking-wider">
+          <Route className="w-3 h-3 text-citrus-2" />
+          Plan Coach
+        </div>
+        <span className="rounded-full bg-white border border-earth px-2 py-0.5 text-[10px] font-bold text-basalt-2">
+          플랜 {state.planCount}개
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        <CoachMetric label="공공 후보" value={`${state.publicPlanCount}`} tone="mint" />
+        <CoachMetric label="사용자 메모" value={`${state.userAddedCount}`} tone="amber" />
+        <CoachMetric label="확인 완료" value={`${state.matchedCount}`} tone="stone" />
+      </div>
+
+      <div className="rounded-xl border border-earth bg-white/75 p-2.5">
+        <div className="flex items-start gap-2">
+          <ClipboardCheck className="w-4 h-4 text-citrus-2 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-[12px] font-bold text-basalt">
+              {state.missingMomentLabels.length > 0
+                ? '아직 플랜에 비어 있는 순간이 있어요.'
+                : '선택한 순간이 플랜에 들어오기 시작했어요.'}
+            </p>
+            <p className="mt-0.5 text-[11px] text-basalt-2 leading-relaxed">
+              {state.missingMomentLabels.length > 0
+                ? state.missingMomentLabels.slice(0, 3).join(' · ')
+                : '이제 Day별 균형과 짐 목록을 함께 맞추면 됩니다.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {state.changedCount > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-900 leading-relaxed">
+          방문 후 정보가 달랐다고 표시한 항목이 {state.changedCount}개 있어요. 이 신호는 나중에 수정 요청 데이터로 분리해 쌓을 수 있습니다.
         </div>
       )}
-      {/* 헤더 — 클릭 시 확장 */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="w-full text-left p-3 space-y-1.5 focus:outline-none focus:ring-2 focus:ring-citrus/30 rounded-xl"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] text-basalt-2/70 mb-0.5">
-              {highlight.region_label} · {highlight.moment_label}
-            </div>
-            <div className="font-serif-kr font-bold text-[13.5px] text-basalt leading-snug break-keep">
-              {highlight.name}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${badgeStyle}`}
-            >
-              <BadgeIcon className="w-2.5 h-2.5" />
-              {badgeLabel}
-            </div>
-            <ChevronDown
-              className={`w-3.5 h-3.5 text-basalt-2/60 transition-transform ${
-                open ? 'rotate-180' : ''
-              }`}
-            />
-          </div>
-        </div>
 
-        {highlight.address && (
-          <div className="text-[11px] text-basalt-2 leading-snug break-keep">
-            {highlight.address}
-          </div>
+      <div className="space-y-1.5">
+        {state.recommendedHighlight && (
+          <ActionButton
+            icon={<Plus className="w-3.5 h-3.5" />}
+            title={`${state.recommendedHighlight.name} 담기`}
+            desc={`${state.recommendedHighlight.region_label} · ${state.recommendedHighlight.moment_label} 후보를 내 플랜에 바로 추가`}
+            disabled={state.recommendedAlreadyInPlan}
+            onClick={() => onAddHighlightToPlan(state.recommendedHighlight!)}
+          />
         )}
-
-        {highlight.reason && (
-          <div className="text-[11px] text-basalt leading-relaxed border-l-2 border-citrus/40 pl-2 mt-1">
-            {highlight.reason}
-          </div>
+        {state.userAddedCount > 0 && (
+          <ActionButton
+            icon={<ShieldCheck className="w-3.5 h-3.5" />}
+            title="직접 추가 장소 검증하기"
+            desc="사용자가 적어둔 장소·메모를 리뷰 검증 화면에서 확인"
+            onClick={onOpenVerify}
+          />
         )}
-
-        {!open && (
-          <div className="text-[10px] text-citrus-2/80 font-semibold pt-0.5">
-            자세히 보기 →
-          </div>
-        )}
-      </button>
-
-      {/* 확장 상세 — 근거 있는 값만. */}
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            key="detail"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 pb-3 pt-1 border-t border-earth/50">
-              <PlaceDetail
-                externalId={highlight.external_id}
-                address={highlight.address}
-                category={highlight.category}
-                amenities={highlight.amenities}
-                freshness={highlight.freshness}
-                transit={highlight.transit}
-                hygieneGrade={highlight.hygiene_grade}
-                note={highlight.note}
-                sources={highlight.sources}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 액션 라인 — 항상 노출 */}
-      <div className="flex items-center gap-2 px-3 pb-3">
-        {alreadyInForm ? (
-          <span className="text-[11px] px-2 py-1 rounded-md bg-mint/10 text-mint border border-mint/40 inline-flex items-center gap-1">
-            <Check className="w-3 h-3" />
-            이미 폼에 있어요
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onPick}
-            className="text-[11px] px-2 py-1 rounded-md bg-citrus text-white hover:bg-citrus-2 transition inline-flex items-center gap-1"
-          >
-            <Check className="w-3 h-3" />
-            이 조건 폼에 반영
-          </button>
-        )}
+        <ActionButton
+          icon={<PackageCheck className="w-3.5 h-3.5" />}
+          title="짐 목록은 플랜 기준으로 보기"
+          desc="중앙의 내 플랜 맞춤 짐 섹션에 선택한 장소 유형이 반영됩니다"
+          disabled
+          onClick={() => {}}
+        />
       </div>
     </div>
+  );
+}
+
+function CoachMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'mint' | 'amber' | 'stone';
+}) {
+  const toneClass = {
+    mint: 'text-mint bg-mint/10 border-mint/20',
+    amber: 'text-amber-800 bg-amber-50 border-amber-100',
+    stone: 'text-basalt-2 bg-white border-earth',
+  }[tone];
+  return (
+    <div className={`rounded-xl border px-2 py-2 ${toneClass}`}>
+      <div className="text-[9.5px] font-semibold opacity-80">{label}</div>
+      <div className="font-serif-kr text-[15px] font-bold leading-none mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function ActionButton({
+  icon,
+  title,
+  desc,
+  disabled = false,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="w-full rounded-xl border border-earth bg-white px-3 py-2.5 text-left transition hover:border-citrus/50 hover:bg-orange-50/40 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-white disabled:hover:border-earth"
+    >
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 rounded-full bg-citrus/10 text-citrus-2 p-1">
+          {icon}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[12px] font-bold text-basalt">{title}</span>
+          <span className="block mt-0.5 text-[10.5px] text-basalt-2 leading-snug">{desc}</span>
+        </span>
+      </div>
+    </button>
   );
 }
 
