@@ -236,7 +236,7 @@ TOOL_RUNNERS = {
 # ─── 시스템 프롬프트 ───
 
 _BASE_SYSTEM_PROMPT = (
-    "너는 '하루방'이다. 제주 여행 준비를 돕는 정직 에이전트 캐릭터로, "
+    "너는 '하루방 에이전트'이다. 제주 여행 준비를 돕는 신뢰 기반 에이전트 캐릭터로, "
     "제주 상징 돌하르방을 캐릭터화한 존재다.\n\n"
     "말투: 정중하고 부드러운 존댓말. 무거운 격식은 피하고, 짧고 따뜻하게. "
     "이모지는 쓰지 않는다.\n\n"
@@ -620,7 +620,7 @@ def _compute_gaps(
     matrix: dict[tuple[str, str], int],
     req: filters_mod.PackRequest,
 ) -> list[dict]:
-    """items=0인 조합을 정직 문구와 함께 나열."""
+    """items=0인 조합을 데이터 부족 안내와 함께 나열."""
     gaps: list[dict] = []
     for (r, m), n in matrix.items():
         if n == 0:
@@ -667,7 +667,7 @@ def _template_greeting(
     """LLM 없어도 항상 나오는 안전 문구.
 
     형식: "{동행자}와 {지역} {목적}이시라구요? 저희 데이터로 확인된 곳 N곳 보여드릴게요."
-    조합에 빈 것이 있으면 두 번째 문장으로 정직하게 덧붙임.
+    조합에 빈 것이 있으면 두 번째 문장으로 데이터 부족 범위를 덧붙임.
     """
     companion_ko = COMPANION_LABEL_KO.get(req.companion, "")
     purpose_ko = PURPOSE_LABEL_KO.get(req.purpose, "")
@@ -686,7 +686,7 @@ def _template_greeting(
 
     tail = ""
     if gaps:
-        tail = f" (확인되지 않은 조합 {len(gaps)}개는 아래에 정직하게 알려드려요.)"
+        tail = f" (데이터가 부족한 조합 {len(gaps)}개는 아래에 따로 묶어둘게요.)"
 
     return (head + body + tail).strip()
 
@@ -728,7 +728,7 @@ def _llm_compose(
     }
 
     system = (
-        "너는 '하루방'이다. 제주 여행 정직 에이전트 캐릭터.\n"
+        "너는 '하루방 에이전트'이다. 제주 여행 신뢰 기반 에이전트 캐릭터.\n"
         "말투: 부드러운 존댓말, 짧고 따뜻하게, 이모지 없이.\n\n"
         "역할: 사용자가 폼에서 지역·순간을 방금 골랐다. "
         "저희 데이터로 확인된 후보들과 확인되지 않은 조합이 아래 JSON에 있다. "
@@ -736,7 +736,7 @@ def _llm_compose(
         "절대 규칙:\n"
         "- candidates에 없는 장소·주소·운영시간·수치를 지어내지 마라.\n"
         "- '가장 좋은 곳' 같은 단정 대신 '저희 데이터로 확인된 곳' 톤을 유지하라.\n"
-        "- 확인되지 않은 조합(gaps)은 인사에서 정직하게 언급하되 '없다'고 단언하지 마라.\n"
+        "- 확인되지 않은 조합(gaps)은 인사에서 데이터 부족 범위로 언급하되 '없다'고 단언하지 마라.\n"
         "- reasons는 반드시 candidates의 external_id를 key로 써라. 다른 id를 지어내지 마라.\n\n"
         "출력 형식은 아래 JSON 스키마 그대로:\n"
         '{\n'

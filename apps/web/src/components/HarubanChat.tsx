@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Loader2, Check, RefreshCcw, ShieldCheck, AlertTriangle, ChevronDown } from 'lucide-react';
+import {
+  X,
+  Send,
+  Loader2,
+  Check,
+  RefreshCcw,
+  ShieldCheck,
+  AlertTriangle,
+  ChevronDown,
+  Database,
+  Compass,
+  ListChecks,
+} from 'lucide-react';
 import HarubangMark from './marks/HarubangMark';
 import type { TravelInfo, MomentId, RegionId, CompanionValue, PurposeValue } from '../types';
 import {
@@ -143,7 +155,7 @@ export default function HarubanChat({
         setError(
           resp.reason?.includes('form invalid') || resp.reason?.includes('no moments')
             ? '지역과 순간을 먼저 하나씩 골라주세요.'
-            : `하루방이 답을 못 드렸어요: ${resp.reason || 'unknown'}`,
+            : `하루방 에이전트가 답을 못 드렸어요: ${resp.reason || 'unknown'}`,
         );
         return;
       }
@@ -182,8 +194,8 @@ export default function HarubanChat({
       if (!resp.available) {
         setError(
           resp.reason?.includes('OPENAI_API_KEY')
-            ? '하루방은 아직 잠들어 있어요. 곧 깨어날게요.'
-            : `하루방이 답을 못 드렸어요: ${resp.reason || 'unknown'}`,
+            ? '하루방 에이전트는 아직 준비 중이에요. 곧 연결할게요.'
+            : `하루방 에이전트가 답을 못 드렸어요: ${resp.reason || 'unknown'}`,
         );
         return;
       }
@@ -267,7 +279,7 @@ export default function HarubanChat({
         id="haruban-fab"
         onClick={() => setOpen((v) => !v)}
         className="fixed bottom-5 right-5 z-40 w-16 h-16 rounded-full bg-white/95 backdrop-blur-sm shadow-jeju-chip border-2 border-earth flex items-center justify-center hover:-translate-y-0.5 transition"
-        aria-label="하루방 열기"
+        aria-label="하루방 에이전트 열기"
       >
         <HarubangMark className="w-12 h-12" />
       </button>
@@ -287,9 +299,9 @@ export default function HarubanChat({
             <div className="flex items-center gap-2 px-4 py-3 border-b border-earth/60 bg-[#FDF6EA] rounded-t-2xl">
               <HarubangMark className="w-8 h-8" />
               <div className="flex-1 min-w-0">
-                <div className="font-serif-kr font-bold text-[14px] text-basalt">하루방</div>
+                <div className="font-serif-kr font-bold text-[14px] text-basalt">하루방 에이전트</div>
                 <div className="text-[10px] text-basalt-2/70 leading-tight">
-                  제주 여행길 지킴이
+                  공공데이터 기반 여행 조율
                 </div>
               </div>
               <button
@@ -310,7 +322,7 @@ export default function HarubanChat({
             >
               {entries.length === 0 && !introLoading && (
                 <div className="text-[12px] text-basalt-2/70 leading-relaxed px-1">
-                  안녕하세요. 제주 여행 준비를 돕는 하루방입니다.
+                  안녕하세요. 제주 여행 준비를 돕는 하루방 에이전트입니다.
                   <br />
                   아래 폼에서 <b>지역</b>과 <b>순간</b>을 골라주시면, 저희 데이터로 확인된 곳들을
                   먼저 보여드릴게요.
@@ -343,12 +355,12 @@ export default function HarubanChat({
 
               {introLoading && (
                 <div className="flex items-center gap-1.5 text-[11px] text-basalt-2/60 px-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> 하루방이 저희 데이터를 뒤지고 있어요...
+                  <Loader2 className="w-3 h-3 animate-spin" /> 하루방 에이전트가 데이터를 조회하고 있어요...
                 </div>
               )}
               {loading && (
                 <div className="flex items-center gap-1.5 text-[11px] text-basalt-2/60 px-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> 하루방이 확인 중이에요...
+                  <Loader2 className="w-3 h-3 animate-spin" /> 하루방 에이전트가 근거를 확인 중이에요...
                 </div>
               )}
               {error && (
@@ -431,7 +443,7 @@ function MessageBubble({ role, content }: { role: 'user' | 'assistant'; content:
   );
 }
 
-// ── 인사 블록: greeting 말풍선 + 하이라이트 카드 리스트 + gaps 섹션 ──
+// ── 인사 블록: greeting 말풍선 + 하이라이트 카드 리스트 + 데이터 부족 섹션 ──
 function IntroBlock({
   intro,
   currentRegions,
@@ -443,6 +455,14 @@ function IntroBlock({
   currentMoments: string[];
   onPickHighlight: (regionId: string, momentId: string) => void;
 }) {
+  const [showAllGaps, setShowAllGaps] = useState(false);
+  const groupedGaps = useMemo(() => groupGapsByRegion(intro.gaps), [intro.gaps]);
+  const visibleGapGroups = showAllGaps ? groupedGaps : groupedGaps.slice(0, 3);
+  const hiddenGapCount = Math.max(intro.gaps.length - visibleGapGroups.reduce(
+    (sum, group) => sum + group.moments.length,
+    0,
+  ), 0);
+
   return (
     <div className="space-y-2.5">
       {/* greeting */}
@@ -452,18 +472,40 @@ function IntroBlock({
         </div>
       </div>
 
-      {/* 커버리지 요약 (근거 있는 신호) */}
-      <div className="text-[10.5px] text-basalt-2/70 px-1 flex flex-wrap gap-x-3 gap-y-0.5">
-        <span>저희 데이터 확인 {intro.coverage.total}곳</span>
-        <span className="text-mint">· verified {intro.coverage.verified}</span>
-        {intro.coverage.caution > 0 && (
-          <span className="text-amber-700">· caution {intro.coverage.caution}</span>
-        )}
-        {intro.coverage.gap_combos > 0 && (
-          <span className="text-basalt-2/60">
-            · 확인 안 된 조합 {intro.coverage.gap_combos}
+      {/* 에이전트 브리핑 */}
+      <div className="rounded-2xl border border-earth bg-white/80 p-3 shadow-sm space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-citrus-2 uppercase tracking-wider">
+            <Compass className="w-3 h-3" />
+            Agent Briefing
+          </div>
+          <span className="text-[10px] text-basalt-2/60">
+            선택 조건 기준
           </span>
-        )}
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          <BriefingMetric
+            icon={<Database className="w-3 h-3" />}
+            label="확인 후보"
+            value={`${intro.coverage.total}곳`}
+            tone="verified"
+          />
+          <BriefingMetric
+            icon={<ShieldCheck className="w-3 h-3" />}
+            label="신뢰 신호"
+            value={`${intro.coverage.verified}`}
+            tone="verified"
+          />
+          <BriefingMetric
+            icon={<AlertTriangle className="w-3 h-3" />}
+            label="데이터 부족"
+            value={`${intro.coverage.gap_combos}`}
+            tone={intro.coverage.gap_combos > 0 ? 'gap' : 'quiet'}
+          />
+        </div>
+        <p className="text-[11.5px] text-basalt-2 leading-relaxed">
+          확인 후보는 먼저 일정에 넣기 좋고, 데이터가 부족한 조합은 아래에서 범위를 줄여 다시 볼 수 있어요.
+        </p>
       </div>
 
       {/* 하이라이트 카드 */}
@@ -485,21 +527,108 @@ function IntroBlock({
         </div>
       )}
 
-      {/* gaps: 정직 UX 마감 */}
+      {/* 데이터 부족 조합: 접힌 브리핑 형태로 노출 */}
       {intro.gaps.length > 0 && (
-        <div className="rounded-xl border border-dashed border-basalt-2/30 bg-white/60 p-3 space-y-1.5">
-          <div className="text-[10.5px] font-bold text-basalt-2/80 uppercase tracking-wider">
-            아직 확인되지 않은 조합
-          </div>
-          {intro.gaps.map((g, i) => (
-            <div key={i} className="text-[11.5px] text-basalt-2 leading-relaxed">
-              · {g.note}
+        <div className="rounded-xl border border-dashed border-amber-300/70 bg-amber-50/60 p-3 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-amber-800 uppercase tracking-wider">
+                <ListChecks className="w-3 h-3" />
+                데이터가 부족한 조합
+              </div>
+              <p className="mt-1 text-[11px] text-basalt-2 leading-relaxed">
+                “없다”는 뜻이 아니라, 저희가 참조하는 공공데이터 기준으로 아직 근거가 부족한 범위예요.
+              </p>
             </div>
-          ))}
+            <span className="shrink-0 rounded-full bg-white border border-amber-200 px-2 py-0.5 text-[10px] text-amber-800 font-semibold">
+              {intro.gaps.length}개
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            {visibleGapGroups.map((group) => (
+              <div key={group.region} className="rounded-lg bg-white/75 border border-amber-100 px-2.5 py-2">
+                <div className="text-[11.5px] font-bold text-basalt">
+                  {group.regionLabel}
+                </div>
+                <div className="mt-0.5 text-[11px] text-basalt-2 leading-relaxed">
+                  {group.moments.join(' · ')}
+                </div>
+              </div>
+            ))}
+            {!showAllGaps && hiddenGapCount > 0 && (
+              <div className="text-[10.5px] text-basalt-2/70 px-1">
+                그 외 {hiddenGapCount}개 조합은 접어두었어요.
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setShowAllGaps(false)}
+              className="rounded-lg border border-earth bg-white px-2.5 py-1.5 text-[11px] font-serif-kr font-bold text-basalt-2 hover:bg-[#FDF6EA] transition"
+            >
+              확인 후보 먼저 보기
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAllGaps((v) => !v)}
+              className="rounded-lg bg-amber-100/80 px-2.5 py-1.5 text-[11px] font-serif-kr font-bold text-amber-900 hover:bg-amber-100 transition"
+            >
+              {showAllGaps ? '요약만 보기' : '전체 조합 펼치기'}
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
+}
+
+function BriefingMetric({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  tone: 'verified' | 'gap' | 'quiet';
+}) {
+  const toneClass = {
+    verified: 'border-mint/30 bg-mint/10 text-mint',
+    gap: 'border-amber-200 bg-amber-50 text-amber-800',
+    quiet: 'border-earth bg-[#FDF6EA] text-basalt-2',
+  }[tone];
+
+  return (
+    <div className={`rounded-xl border px-2 py-2 ${toneClass}`}>
+      <div className="flex items-center gap-1 text-[10px] font-semibold opacity-90">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-0.5 font-serif-kr text-[14px] font-bold leading-none">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function groupGapsByRegion(gaps: import('../api').HarubanIntroGap[]) {
+  const grouped = new Map<string, { region: string; regionLabel: string; moments: string[] }>();
+  gaps.forEach((gap) => {
+    const current = grouped.get(gap.region) ?? {
+      region: gap.region,
+      regionLabel: gap.region_label,
+      moments: [],
+    };
+    if (!current.moments.includes(gap.moment_label)) {
+      current.moments.push(gap.moment_label);
+    }
+    grouped.set(gap.region, current);
+  });
+  return Array.from(grouped.values());
 }
 
 function HighlightCard({
@@ -665,7 +794,7 @@ function SuggestionCard({
   return (
     <div className="rounded-xl border-2 border-dashed border-citrus/50 bg-citrus/5 p-3 space-y-2">
       <div className="text-[10px] font-bold text-citrus-2 uppercase tracking-wider">
-        하루방의 폼 반영 제안
+        하루방 에이전트의 폼 반영 제안
       </div>
       <p className="text-[11.5px] text-basalt leading-relaxed">{suggestion.reason}</p>
       {fields.length > 0 && (
