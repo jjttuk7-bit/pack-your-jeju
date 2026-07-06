@@ -218,6 +218,37 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               </div>
             </section>
 
+            <section className="px-5 pb-16 lg:px-10">
+              <div className="mx-auto grid max-w-6xl items-center gap-8 rounded-[34px] border border-orange-100/80 bg-white/55 p-4 shadow-pyj-card backdrop-blur lg:grid-cols-[0.86fr_1.14fr] lg:p-7">
+                <div className="px-1 py-4 lg:px-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
+                    Arrival Mood
+                  </p>
+                  <h2 className="mt-3 font-serif-kr text-[36px] font-bold leading-tight text-basalt sm:text-[44px]">
+                    비행기가 제주 위를 지날 때,
+                    <br />
+                    여행은 이미 시작됩니다.
+                  </h2>
+                  <p className="mt-4 text-[14px] leading-7 text-basalt-2 sm:text-[15px]">
+                    해변의 곡선, 낮은 오름, 바람에 흔들리는 감귤나무까지.
+                    Pack Your Jeju는 설렘을 누르지 않고, 필요한 확인만 조용히 더해
+                    여행플랜으로 이어갑니다.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {['지역 선택', '하루방 에이전트', '내 여행플랜', '짐싸기', '방문 확인'].map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-earth bg-[#FDF6EA]/80 px-3 py-1.5 text-[11px] font-bold text-basalt-2"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <JejuArrivalScene />
+              </div>
+            </section>
+
             <section className="border-y border-orange-100/70 bg-white/60 px-5 py-7">
               <div className="mx-auto grid max-w-6xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <StatBlock big="4,422" label="관광지 · 카페 · 음식점" />
@@ -495,6 +526,113 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function JejuArrivalScene() {
+  return (
+    <div className="pyj-arrival-scene" aria-label="비행기와 제주 해변, 오름, 감귤나무가 있는 애니메이션 장면">
+      <div className="pyj-arrival-sky">
+        <span className="pyj-arrival-cloud pyj-arrival-cloud-a" />
+        <span className="pyj-arrival-cloud pyj-arrival-cloud-b" />
+        <span className="pyj-arrival-cloud pyj-arrival-cloud-c" />
+        <span className="pyj-arrival-plane" aria-hidden="true">
+          <svg viewBox="0 0 88 52" role="img">
+            <path
+              d="M8 29c19-8 39-17 61-26 3-1 7 0 9 2 2 3 1 6-2 8L52 29l15 13c1 1 0 3-2 3l-23-8-17 10c-2 1-4 0-3-2l8-13-21 3c-5 1-6-4-1-6Z"
+              fill="#FFF8EC"
+              stroke="#2E3235"
+              strokeWidth="2.4"
+              strokeLinejoin="round"
+            />
+            <path d="M48 30 33 13" stroke="#E7683A" strokeWidth="2.4" strokeLinecap="round" />
+            <path d="M30 32 19 23" stroke="#4A8779" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        </span>
+      </div>
+
+      <svg className="pyj-arrival-island" viewBox="0 0 720 410" aria-hidden="true">
+        <defs>
+          <linearGradient id="pyjSea" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#BEE3DF" />
+            <stop offset="100%" stopColor="#4A8779" />
+          </linearGradient>
+          <linearGradient id="pyjSand" x1="0" x2="1">
+            <stop offset="0%" stopColor="#F9E4BE" />
+            <stop offset="100%" stopColor="#F4C985" />
+          </linearGradient>
+          <linearGradient id="pyjOreum" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#7FAE89" />
+            <stop offset="100%" stopColor="#4A8779" />
+          </linearGradient>
+        </defs>
+
+        <rect x="0" y="0" width="720" height="410" rx="34" fill="#FDF6EA" />
+        <path
+          className="pyj-arrival-sea"
+          d="M0 250C96 214 175 246 270 223c116-28 177-88 290-67 74 14 115 64 160 80v174H0Z"
+          fill="url(#pyjSea)"
+        />
+        <path
+          className="pyj-arrival-wave pyj-arrival-wave-a"
+          d="M39 276c60-18 108 9 168-5 64-15 111-51 175-43 44 5 71 29 109 30"
+          fill="none"
+          stroke="#FFF8EC"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.72"
+        />
+        <path
+          className="pyj-arrival-wave pyj-arrival-wave-b"
+          d="M16 326c72-14 120 19 196-1 59-15 91-42 159-33 50 7 84 32 132 31"
+          fill="none"
+          stroke="#FFF8EC"
+          strokeWidth="4"
+          strokeLinecap="round"
+          opacity="0.48"
+        />
+        <path
+          d="M0 337c116-40 217-50 338-30 134 22 229-7 382-76v179H0Z"
+          fill="url(#pyjSand)"
+        />
+        <path
+          d="M119 207c42-82 124-92 174-16 47 72 101 61 144 6 43-56 111-53 150 6 26 39 60 44 133 25v55H0v-43c43 2 79-5 119-33Z"
+          fill="url(#pyjOreum)"
+          opacity="0.92"
+        />
+        <path
+          d="M84 231c53-25 91-28 133-7M456 232c45-18 93-16 136 3"
+          fill="none"
+          stroke="#D5E9E1"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.38"
+        />
+
+        <g className="pyj-arrival-tree pyj-arrival-tree-a">
+          <path d="M584 264c12 33 7 69-3 105" stroke="#6F5136" strokeWidth="10" strokeLinecap="round" />
+          <path d="M539 257c9-46 54-75 98-55 46 20 52 83 8 106-42 23-95-3-106-51Z" fill="#4A8779" />
+          <circle cx="571" cy="241" r="12" fill="#E7683A" />
+          <circle cx="621" cy="250" r="11" fill="#E7683A" />
+          <circle cx="599" cy="283" r="10" fill="#C24B26" />
+        </g>
+        <g className="pyj-arrival-tree pyj-arrival-tree-b">
+          <path d="M91 294c9 24 7 49 0 76" stroke="#6F5136" strokeWidth="8" strokeLinecap="round" />
+          <path d="M55 283c10-37 47-55 80-39 34 17 38 66 2 84-35 18-74-5-82-45Z" fill="#5C9B7F" />
+          <circle cx="83" cy="270" r="9" fill="#E7683A" />
+          <circle cx="113" cy="288" r="8" fill="#C24B26" />
+        </g>
+
+        <path
+          d="M274 363c62 16 138 16 210-1"
+          fill="none"
+          stroke="#C9A97F"
+          strokeWidth="4"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
+      </svg>
     </div>
   );
 }

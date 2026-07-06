@@ -243,6 +243,120 @@
     animation: pyj-cta-glance 5.6s ease-in-out infinite;
   }
 
+  .pyj-arrival-scene {
+    position: relative;
+    min-height: 460px;
+    overflow: hidden;
+    border-radius: 30px;
+    border: 1px solid rgba(201, 169, 127, 0.34);
+    background:
+      radial-gradient(420px 180px at 28% 15%, rgba(255, 255, 255, 0.88), transparent 62%),
+      linear-gradient(180deg, #DDF1F2 0%, #FDF6EA 58%, #F8E0B5 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.72),
+      0 18px 48px -28px rgba(46, 50, 53, 0.22);
+  }
+
+  .pyj-arrival-scene::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 42%),
+      radial-gradient(520px 180px at 85% 88%, rgba(231, 104, 58, 0.14), transparent 64%);
+  }
+
+  .pyj-arrival-sky {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .pyj-arrival-cloud {
+    position: absolute;
+    width: 98px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.76);
+    filter: blur(0.2px);
+    box-shadow:
+      22px -10px 0 rgba(255, 255, 255, 0.58),
+      48px 2px 0 rgba(255, 255, 255, 0.52);
+    animation: pyj-cloud-sail 28s linear infinite;
+  }
+
+  .pyj-arrival-cloud-a {
+    top: 64px;
+    left: -140px;
+  }
+
+  .pyj-arrival-cloud-b {
+    top: 132px;
+    left: -220px;
+    width: 72px;
+    height: 20px;
+    opacity: 0.7;
+    animation-duration: 36s;
+    animation-delay: -14s;
+  }
+
+  .pyj-arrival-cloud-c {
+    top: 46px;
+    left: -260px;
+    width: 56px;
+    height: 16px;
+    opacity: 0.46;
+    animation-duration: 42s;
+    animation-delay: -24s;
+  }
+
+  .pyj-arrival-plane {
+    position: absolute;
+    top: 72px;
+    left: -120px;
+    z-index: 4;
+    width: 96px;
+    filter: drop-shadow(0 12px 16px rgba(46, 50, 53, 0.16));
+    transform-origin: 50% 50%;
+    animation: pyj-plane-cross 13s cubic-bezier(0.42, 0, 0.2, 1) infinite;
+  }
+
+  .pyj-arrival-island {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    z-index: 2;
+    width: min(920px, 118%);
+    height: auto;
+    transform: translateX(-50%);
+  }
+
+  .pyj-arrival-wave {
+    stroke-dasharray: 32 18;
+    animation: pyj-wave-line 8s ease-in-out infinite;
+  }
+
+  .pyj-arrival-wave-b {
+    animation-duration: 10.5s;
+    animation-delay: -3s;
+  }
+
+  .pyj-arrival-sea {
+    animation: pyj-sea-breathe 7.5s ease-in-out infinite;
+  }
+
+  .pyj-arrival-tree {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: pyj-tree-sway 5.8s ease-in-out infinite;
+  }
+
+  .pyj-arrival-tree-b {
+    animation-duration: 6.6s;
+    animation-delay: -2s;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .pyj-sea-haze,
     .pyj-wind,
@@ -251,7 +365,12 @@
     .pyj-ticket-card,
     .pyj-ticket-card::before,
     .pyj-primary-cta::after,
-    .pyj-soft-cta::after {
+    .pyj-soft-cta::after,
+    .pyj-arrival-cloud,
+    .pyj-arrival-plane,
+    .pyj-arrival-wave,
+    .pyj-arrival-sea,
+    .pyj-arrival-tree {
       animation: none;
     }
   }
@@ -295,4 +414,33 @@
   0%, 56% { transform: translateX(-120%); opacity: 0; }
   66% { opacity: 0.65; }
   82%, 100% { transform: translateX(120%); opacity: 0; }
+}
+
+@keyframes pyj-cloud-sail {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(100vw + 420px)); }
+}
+
+@keyframes pyj-plane-cross {
+  0% { transform: translate3d(-12vw, 28px, 0) rotate(4deg) scale(0.92); opacity: 0; }
+  8% { opacity: 1; }
+  45% { transform: translate3d(43vw, -10px, 0) rotate(-2deg) scale(1); }
+  72% { opacity: 1; }
+  100% { transform: translate3d(92vw, 34px, 0) rotate(5deg) scale(0.94); opacity: 0; }
+}
+
+@keyframes pyj-wave-line {
+  0%, 100% { stroke-dashoffset: 0; transform: translateX(0); }
+  50% { stroke-dashoffset: -38; transform: translateX(10px); }
+}
+
+@keyframes pyj-sea-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+@keyframes pyj-tree-sway {
+  0%, 100% { transform: rotate(0deg); }
+  45% { transform: rotate(-1.8deg); }
+  72% { transform: rotate(1.2deg); }
 }
