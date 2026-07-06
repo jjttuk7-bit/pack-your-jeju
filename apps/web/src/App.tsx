@@ -6,11 +6,14 @@ import TravelForm from './components/TravelForm';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
 import HarubanChat from './components/HarubanChat';
+import LandingPage from './components/LandingPage';
 import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import StoneWallPattern from './components/marks/StoneWallPattern';
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
+// 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
+const GATE_STORAGE_KEY = 'pack_your_jeju_gate_v1';
 
 const defaultState: SavedTravel = {
   info: {
@@ -55,6 +58,27 @@ export default function App() {
   });
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // 시연용 문지기 상태. 초대 코드 통과 여부만 localStorage에 저장한다.
+  const [authenticated, setAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(GATE_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleEnter = () => {
+    try {
+      localStorage.setItem(GATE_STORAGE_KEY, 'true');
+    } catch {}
+    setAuthenticated(true);
+  };
+
+  // 게이트 미통과 상태에서는 랜딩만 렌더 — 하루방 위젯 · 상단 헤더 모두 감춤.
+  if (!authenticated) {
+    return <LandingPage onEnter={handleEnter} />;
+  }
 
   // Persist state to localStorage
   useEffect(() => {
