@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Home } from 'lucide-react';
 import { TravelInfo, MomentId, SavedTravel } from './types';
 import TravelForm from './components/TravelForm';
 import PackingDashboard from './components/PackingDashboard';
@@ -73,6 +73,12 @@ export default function App() {
       localStorage.setItem(GATE_STORAGE_KEY, 'true');
     } catch {}
     setAuthenticated(true);
+  };
+
+  // 앱 안에서 랜딩으로 복귀. 게이트 storage는 유지 — 랜딩에서 '여행 준비 시작하기'
+  // 다시 눌러도 코드 재입력 없이 진입 가능 (시연 편의).
+  const handleGoLanding = () => {
+    setAuthenticated(false);
   };
 
   // 게이트 미통과 상태에서는 랜딩만 렌더 — 하루방 위젯 · 상단 헤더 모두 감춤.
@@ -220,14 +226,20 @@ export default function App() {
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
         <header className="pt-2 pb-8" id="app-header">
           <div className="flex items-start gap-4 mb-2">
-            <motion.div
+            {/* 마스코트 클릭 = 처음 화면 (관례상 로고=홈). */}
+            <motion.button
+              type="button"
+              onClick={handleGoLanding}
+              aria-label="처음 화면으로"
               initial={{ opacity: 0, scale: 0.75, rotate: -12 }}
               animate={{ opacity: 1, scale: 1, rotate: 0 }}
               transition={{ duration: 0.6, type: 'spring' }}
-              className="shrink-0 -mt-1"
+              whileHover={{ scale: 1.06, rotate: -6 }}
+              whileTap={{ scale: 0.95 }}
+              className="shrink-0 -mt-1 rounded-full focus:outline-none focus:ring-2 focus:ring-citrus/40"
             >
               <CitrusMark className="w-[68px] h-[68px]" />
-            </motion.div>
+            </motion.button>
             <div className="flex-1 min-w-0">
               <motion.p
                 initial={{ opacity: 0, x: -6 }}
@@ -255,6 +267,19 @@ export default function App() {
                 혼저옵서예. 짐 싸기 전에 확인부터.
               </motion.p>
             </div>
+            {/* 명시적 '처음 화면' 아이콘 버튼 (로고 클릭과 병행 — 발견성 강화). */}
+            <motion.button
+              type="button"
+              onClick={handleGoLanding}
+              aria-label="처음 화면으로"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35, duration: 0.4 }}
+              className="shrink-0 -mt-1 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-earth bg-white/70 hover:bg-white transition text-[10.5px] font-semibold text-basalt-2 hover:text-basalt"
+            >
+              <Home className="w-3 h-3" />
+              <span>처음</span>
+            </motion.button>
           </div>
 
           <WaveLine className="w-full h-5 mt-3" />
