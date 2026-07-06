@@ -94,10 +94,14 @@
   .text-citrus    { color: var(--pyj-citrus); }
   .text-citrus-2  { color: var(--pyj-citrus-2); }
   .text-mint      { color: var(--pyj-mint); }
+  .bg-basalt      { background-color: var(--pyj-basalt); }
+  .bg-basalt-2    { background-color: var(--pyj-basalt-2); }
   .bg-citrus      { background-color: var(--pyj-citrus); }
   .bg-citrus-2    { background-color: var(--pyj-citrus-2); }
   .bg-mint        { background-color: var(--pyj-mint); }
+  .bg-earth       { background-color: var(--pyj-earth); }
   .border-earth   { border-color: rgba(201, 169, 127, 0.4); }
   .border-citrus  { border-color: var(--pyj-citrus); }
   .border-mint    { border-color: var(--pyj-mint); }
+  .border-basalt-2 { border-color: var(--pyj-basalt-2); }
 }
