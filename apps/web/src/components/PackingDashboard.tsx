@@ -414,20 +414,89 @@ function buildShareText(
   const moments = selectedMomentIds
     .map((id) => MOMENTS.find((m) => m.id === id)?.title ?? id)
     .join(' · ');
-  const items = collectPackItems(packResp).slice(0, 6);
+  const companion = COMPANIONS.find((c) => c.value === info.companion)?.label ?? info.companion;
+  const purpose = PURPOSES.find((p) => p.value === info.purpose)?.label ?? info.purpose;
+  const signals = countPackSignals(packResp);
+  const itinerary = packResp.itinerary ?? [];
+  const planLines = itinerary.length > 0
+    ? itinerary.flatMap((day) => buildShareDayLines(day))
+    : collectPackItems(packResp).slice(0, 8).map((item, idx) =>
+      `${idx + 1}. ${item.name} (${shareBadgeLabel(item.badge)})`);
+  const gapLines = collectUnavailableCombos(packResp).slice(0, 5);
   const url = typeof window !== 'undefined' ? window.location.href : 'https://pack-your-jeju.vercel.app/';
   return [
-    'Pack Your Jeju 여행팩',
+    'Pack Your Jeju 여행플랜',
     `지역: ${regions || '선택 전'}`,
     `일정: ${info.startDate}부터 ${info.durationDays}일`,
+    `동행: ${companion}`,
+    `목적: ${purpose}`,
     `순간: ${moments || '선택 전'}`,
     '',
-    '추천 후보',
-    ...items.map((item, idx) => `${idx + 1}. ${item.name}`),
+    '하루방 에이전트 브리핑',
+    `확인 후보 ${signals.total}곳 · 신뢰 신호 ${signals.verified} · 주의 신호 ${signals.caution} · 데이터 부족 조합 ${signals.gaps}개`,
     '',
-    '공공데이터 근거와 주의 신호는 Pack Your Jeju에서 확인할 수 있어요.',
+    'Day별 여행플랜',
+    ...(planLines.length > 0 ? planLines : ['아직 공유할 후보가 없습니다.']),
+    ...(gapLines.length > 0 ? ['', '데이터가 부족한 조합 메모', ...gapLines.map((x) => `- ${x}`)] : []),
+    '',
+    '장소별 근거와 주의 신호는 Pack Your Jeju에서 확인할 수 있어요.',
     url,
   ].join('\n');
+}
+
+function countPackSignals(packResp: PackResponse): { total: number; verified: number; caution: number; gaps: number } {
+  const items = collectPackItems(packResp);
+  return {
+    total: items.length,
+    verified: items.filter((item) => item.badge === 'verified').length,
+    caution: items.filter((item) => item.badge === 'caution').length,
+    gaps: collectUnavailableCombos(packResp).length,
+  };
+}
+
+function buildShareDayLines(day: ItineraryDayDto): string[] {
+  const regionLabel = (day.regions ?? [])
+    .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
+    .join(' · ');
+  const header = `Day ${day.day} (${day.date}${regionLabel ? ` · ${regionLabel}` : ''})`;
+  const itemLines = (day.items ?? []).slice(0, 4).map((item, idx) => {
+    const moment = MOMENTS.find((m) => m.id === item.moment)?.title ?? item.moment;
+    return `- ${shareSlotLabel(item, idx)}: ${item.name} (${moment} · ${shareBadgeLabel(item.badge)})`;
+  });
+  const rest = Math.max((day.items?.length ?? 0) - itemLines.length, 0);
+  return [
+    header,
+    ...itemLines,
+    ...(rest > 0 ? [`- 그 외 후보 ${rest}곳은 링크에서 확인`] : []),
+  ];
+}
+
+function collectUnavailableCombos(packResp: PackResponse): string[] {
+  const combos = new Set<string>();
+  (packResp.itinerary ?? []).forEach((day) => {
+    (day.unavailable_moments ?? []).forEach((item) => {
+      const region = REGIONS.find((x) => x.value === item.region)?.label ?? item.region;
+      const moment = MOMENTS.find((m) => m.id === item.moment)?.title ?? item.moment;
+      combos.add(`${region} · ${moment}`);
+    });
+  });
+  return Array.from(combos);
+}
+
+function shareBadgeLabel(badge: PackItemDto['badge']): string {
+  if (badge === 'verified') return '신뢰 신호';
+  if (badge === 'caution') return '주의 신호';
+  if (badge === 'contradicted') return '변경 확인';
+  return '근거 참고';
+}
+
+function shareSlotLabel(item: ItineraryItemDto, index: number): string {
+  const moment = item.moment;
+  if (moment === 'local_food') return '점심·저녁 후보';
+  if (moment === 'quiet_cafe' || moment === 'local_market' || moment === 'citrus') return '오후 후보';
+  if (moment === 'sunset') return '저녁 후보';
+  if (moment === 'oreum' || moment === 'beach_walk' || moment === 'gotjawal') return '오전·오후 후보';
+  return ['오전 후보', '점심 후보', '오후 후보', '저녁 후보'][Math.min(index, 3)];
 }
 
 function resolveItemCoordinate(item: PackItemDto): { lat: number; lng: number } | null {
