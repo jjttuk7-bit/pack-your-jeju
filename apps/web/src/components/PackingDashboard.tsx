@@ -17,6 +17,10 @@ import {
   ChevronDown,
   Download,
   BookOpenCheck,
+  Share2,
+  MapPinned,
+  Copy,
+  Check,
 } from 'lucide-react';
 import type {
   TravelInfo,
@@ -78,6 +82,8 @@ export default function PackingDashboard(props: Props) {
   // PDF 저장 상태
   const [pdfLoading, setPdfLoading] = useState<boolean>(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState<boolean>(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const handleDownloadPdf = async () => {
     if (pdfLoading) return;
@@ -114,6 +120,24 @@ export default function PackingDashboard(props: Props) {
     () => PURPOSES.find((p) => p.value === info.purpose)?.label ?? info.purpose,
     [info.purpose]
   );
+  const packItems = useMemo(() => collectPackItems(packResp), [packResp]);
+  const shareText = useMemo(
+    () => packResp ? buildShareText(info, selectedMomentIds, packResp) : '',
+    [info, selectedMomentIds, packResp]
+  );
+
+  const handleCopyShare = async () => {
+    if (!shareText) return;
+    setShareCopied(false);
+    setShareError(null);
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1800);
+    } catch (_e) {
+      setShareError('브라우저에서 복사를 허용하지 않았어요.');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -177,31 +201,56 @@ export default function PackingDashboard(props: Props) {
             프론트는 파일만 받아 저장한다. LLM 없이도 항상 동작. */}
         {packResp && !loading && !error && (
           <div className="pt-1">
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={pdfLoading}
-              className="w-full rounded-2xl px-4 py-3 bg-citrus text-white font-serif-kr font-bold text-[13.5px] hover:bg-citrus-2 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-jeju-chip"
-            >
-              {pdfLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  여행 저널 만드는 중…
-                </>
-              ) : (
-                <>
-                  <BookOpenCheck className="w-4 h-4" />
-                  이 여행을 저널로 저장
-                  <Download className="w-3.5 h-3.5 opacity-80" />
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={pdfLoading}
+                className="rounded-2xl px-3 py-3 bg-citrus text-white font-serif-kr font-bold text-[13px] hover:bg-citrus-2 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5 shadow-jeju-chip"
+              >
+                {pdfLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    저널 생성 중
+                  </>
+                ) : (
+                  <>
+                    <BookOpenCheck className="w-4 h-4" />
+                    저널 저장
+                    <Download className="w-3.5 h-3.5 opacity-80" />
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyShare}
+                className="rounded-2xl px-3 py-3 border border-earth bg-white/80 text-basalt font-serif-kr font-bold text-[13px] hover:bg-[#FDF6EA] transition inline-flex items-center justify-center gap-1.5"
+              >
+                {shareCopied ? (
+                  <>
+                    <Check className="w-4 h-4 text-mint" />
+                    복사 완료
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4 text-citrus-2" />
+                    결과 공유
+                    <Copy className="w-3.5 h-3.5 text-basalt-2/70" />
+                  </>
+                )}
+              </button>
+            </div>
             <p className="mt-1.5 text-[10.5px] text-stone-500 text-center leading-snug">
-              공공데이터 근거로 확인된 곳만 담긴 PDF입니다. 없는 것은 정직하게 비웠습니다.
+              공공데이터 근거로 확인된 곳을 담고, 근거가 부족한 항목은 별도로 안내합니다.
             </p>
             {pdfError && (
               <p className="mt-1.5 text-[10.5px] text-rose-700 text-center">
                 {pdfError}
+              </p>
+            )}
+            {shareError && (
+              <p className="mt-1.5 text-[10.5px] text-rose-700 text-center">
+                {shareError}
               </p>
             )}
           </div>
@@ -222,6 +271,13 @@ export default function PackingDashboard(props: Props) {
           </span>
           <p>{packResp.intro.text}</p>
         </motion.div>
+      )}
+
+      {packResp && !loading && !error && (
+        <TripMapCard
+          items={packItems}
+          regions={info.regions}
+        />
       )}
 
       {/* 로딩 · 에러 */}
@@ -333,6 +389,232 @@ export default function PackingDashboard(props: Props) {
 
 // ─── 하위 컴포넌트 ─────────────────────────────────────
 
+function collectPackItems(packResp: PackResponse | null): PackItemDto[] {
+  if (!packResp) return [];
+  const source = packResp.itinerary?.length
+    ? packResp.itinerary.flatMap((day) => day.items)
+    : packResp.sections.flatMap((section) => section.items);
+  const seen = new Set<string>();
+  return source.filter((item) => {
+    const key = item.external_id || item.name;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildShareText(
+  info: TravelInfo,
+  selectedMomentIds: MomentId[],
+  packResp: PackResponse,
+): string {
+  const regions = info.regions
+    .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
+    .join(' · ');
+  const moments = selectedMomentIds
+    .map((id) => MOMENTS.find((m) => m.id === id)?.title ?? id)
+    .join(' · ');
+  const items = collectPackItems(packResp).slice(0, 6);
+  const url = typeof window !== 'undefined' ? window.location.href : 'https://pack-your-jeju.vercel.app/';
+  return [
+    'Pack Your Jeju 여행팩',
+    `지역: ${regions || '선택 전'}`,
+    `일정: ${info.startDate}부터 ${info.durationDays}일`,
+    `순간: ${moments || '선택 전'}`,
+    '',
+    '추천 후보',
+    ...items.map((item, idx) => `${idx + 1}. ${item.name}`),
+    '',
+    '공공데이터 근거와 주의 신호는 Pack Your Jeju에서 확인할 수 있어요.',
+    url,
+  ].join('\n');
+}
+
+function resolveItemCoordinate(item: PackItemDto): { lat: number; lng: number } | null {
+  const raw = item as any;
+  const amenities = (item.amenities ?? {}) as Record<string, unknown>;
+  const lat = toNumber(
+    raw.latitude ?? raw.lat ?? amenities.latitude ?? amenities.lat ?? amenities.mapy ?? amenities.y,
+  );
+  const lng = toNumber(
+    raw.longitude ?? raw.lng ?? raw.lon ?? amenities.longitude ?? amenities.lng ?? amenities.lon ?? amenities.mapx ?? amenities.x,
+  );
+  if (lat == null || lng == null) return null;
+  if (lat < 32 || lat > 34 || lng < 125 || lng > 128) return null;
+  return { lat, lng };
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function TripMapCard({
+  items,
+  regions,
+}: {
+  items: PackItemDto[];
+  regions: TravelInfo['regions'];
+}) {
+  const mapRef = React.useRef<HTMLDivElement | null>(null);
+  const [mapStatus, setMapStatus] = useState<'idle' | 'ready' | 'fallback'>('idle');
+  const naverKey = import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined;
+  const markerItems = useMemo(
+    () => items
+      .map((item) => ({ item, coord: resolveItemCoordinate(item) }))
+      .filter((x): x is { item: PackItemDto; coord: { lat: number; lng: number } } => !!x.coord)
+      .slice(0, 12),
+    [items],
+  );
+
+  useEffect(() => {
+    if (!naverKey || !mapRef.current) {
+      setMapStatus('fallback');
+      return;
+    }
+
+    let cancelled = false;
+    let markers: any[] = [];
+
+    const ensureScript = () =>
+      new Promise<void>((resolve, reject) => {
+        const w = window as any;
+        if (w.naver?.maps) {
+          resolve();
+          return;
+        }
+        const existing = document.getElementById('naver-map-sdk');
+        if (existing) {
+          existing.addEventListener('load', () => resolve(), { once: true });
+          existing.addEventListener('error', () => reject(new Error('naver map load failed')), { once: true });
+          return;
+        }
+        const script = document.createElement('script');
+        script.id = 'naver-map-sdk';
+        script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(naverKey)}`;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('naver map load failed'));
+        document.head.appendChild(script);
+      });
+
+    ensureScript()
+      .then(() => {
+        if (cancelled || !mapRef.current) return;
+        const w = window as any;
+        const center = markerItems[0]?.coord ?? { lat: 33.38, lng: 126.53 };
+        const map = new w.naver.maps.Map(mapRef.current, {
+          center: new w.naver.maps.LatLng(center.lat, center.lng),
+          zoom: markerItems.length > 0 ? 10 : 9,
+          minZoom: 8,
+          mapDataControl: false,
+          scaleControl: false,
+          logoControlOptions: {
+            position: w.naver.maps.Position.BOTTOM_LEFT,
+          },
+        });
+        markers = markerItems.map(({ item, coord }, idx) => new w.naver.maps.Marker({
+          position: new w.naver.maps.LatLng(coord.lat, coord.lng),
+          map,
+          title: item.name,
+          icon: {
+            content: `<div style="width:26px;height:26px;border-radius:999px;background:#E7683A;color:#fff;border:2px solid #fff;box-shadow:0 6px 14px rgba(46,50,53,.18);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;">${idx + 1}</div>`,
+            size: new w.naver.maps.Size(26, 26),
+            anchor: new w.naver.maps.Point(13, 13),
+          },
+        }));
+        if (markerItems.length > 1) {
+          const bounds = new w.naver.maps.LatLngBounds();
+          markerItems.forEach(({ coord }) => bounds.extend(new w.naver.maps.LatLng(coord.lat, coord.lng)));
+          map.fitBounds(bounds, { top: 36, right: 36, bottom: 36, left: 36 });
+        }
+        setMapStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setMapStatus('fallback');
+      });
+
+    return () => {
+      cancelled = true;
+      markers.forEach((marker) => marker.setMap(null));
+      markers = [];
+    };
+  }, [naverKey, markerItems]);
+
+  return (
+    <div className="card-jeju p-5 space-y-3" id="trip-map-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-citrus-2 uppercase tracking-wider mb-1.5">
+            <MapPinned className="w-3 h-3" />
+            이번 여행 지도
+          </span>
+          <h3 className="font-serif-kr font-bold text-[15px] text-basalt tracking-tight">
+            선택한 제주를 한눈에 보기
+          </h3>
+        </div>
+        <span className="rounded-full border border-earth bg-[#FDF6EA] px-2 py-1 text-[10px] font-semibold text-basalt-2">
+          마커 {markerItems.length}곳
+        </span>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-earth bg-[#FDF6EA]">
+        <div ref={mapRef} className="h-[220px] w-full">
+          {mapStatus !== 'ready' && <FallbackJejuMap regions={regions} />}
+        </div>
+      </div>
+
+      <p className="text-[10.5px] text-basalt-2 leading-relaxed">
+        좌표가 확인된 장소만 지도 마커로 표시합니다. 좌표가 없는 장소는 아래 장소 카드의 근거와 주소에서 확인해 주세요.
+      </p>
+    </div>
+  );
+}
+
+function FallbackJejuMap({ regions }: { regions: TravelInfo['regions'] }) {
+  const labels = regions
+    .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
+    .slice(0, 4);
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#FDF6EA]">
+      <svg viewBox="0 0 360 220" className="absolute inset-0 h-full w-full" aria-hidden="true">
+        <path
+          d="M31 121C42 80 83 48 135 39c58-10 131 4 170 33 35 26 42 68 17 97-29 33-92 45-157 37-67-8-123-33-137-66-3-7-3-13 3-19Z"
+          fill="#D5E9E1"
+          opacity="0.55"
+        />
+        <path
+          d="M42 116C56 82 94 58 141 49c54-10 117 1 154 27 32 22 38 58 15 82-25 26-79 39-137 34-61-5-116-27-130-57-3-7-3-13-1-19Z"
+          fill="#FFF8EC"
+          stroke="#C9A97F"
+          strokeWidth="2"
+        />
+        <path
+          d="M73 146C118 166 205 177 287 146"
+          fill="none"
+          stroke="#4A8779"
+          strokeOpacity="0.22"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+        <p className="font-serif-kr text-[15px] font-bold text-basalt">
+          {labels.length > 0 ? labels.join(' · ') : '제주'} 중심 여행팩
+        </p>
+        <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">
+          네이버 지도 키 또는 좌표가 준비되면 이 영역에 장소 마커가 표시됩니다.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SummaryLine({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="flex items-center gap-1.5 min-w-0">
@@ -397,7 +679,7 @@ function ItineraryDayCard({ day }: { day: ItineraryDayDto }) {
   );
 }
 
-// (region × moment) 조합 중 items로 채워지지 않은 것들을 정직 문구로 노출.
+// (region x moment) 조합 중 items로 채워지지 않은 항목을 근거 부족 안내로 노출.
 // TRUST_ENGINE.md §2 인식론 규칙: "coverage_gap일 때 절대 '없다'로 단언하지 않는다."
 function UnavailableNote({
   unavailable,
