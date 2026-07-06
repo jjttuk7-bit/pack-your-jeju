@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar,
   Users,
@@ -7,16 +7,39 @@ import {
   Sparkles,
   Check,
   ArrowRight,
+  X,
+  Plus,
 } from 'lucide-react';
 import type { TravelInfo, MomentId, RegionId, CompanionValue, PurposeValue } from '../types';
 import { COMPANIONS, PURPOSES, MOMENTS } from '../data';
 import RegionChips from './RegionChips';
 import MomentIcon from './marks/MomentIcon';
+import HarubangMark from './marks/HarubangMark';
+import {
+  requestHarubanAugment,
+  type HarubanAugmentSuggestion,
+} from '../api';
 
 interface TravelFormProps {
   onSubmit: (info: TravelInfo, selectedMoments: MomentId[]) => void;
   initialInfo?: TravelInfo;
   initialMoments?: MomentId[];
+}
+
+// 제안 하나를 세션 안에서 유일하게 식별. 사용자가 거절하거나 반영한 뒤
+// 같은 라벨로 다시 뜨는 걸 억제.
+function suggestionKey(s: HarubanAugmentSuggestion): string {
+  return `${s.field}|${s.kind}|${s.values.join(',')}`;
+}
+
+// debounce된 값 반환.
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return v;
 }
 
 export default function TravelForm({ onSubmit, initialInfo, initialMoments }: TravelFormProps) {
@@ -32,6 +55,96 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
   const [activeTab, setActiveTab] = useState<'basic' | 'moments'>('basic');
   const [errorMsg, setErrorMsg] = useState('');
   const NOTES_MAX = 300;
+
+  // ── Phase E · 하루방 증강 상태 ──────────────────────
+  const [suggestions, setSuggestions] = useState<HarubanAugmentSuggestion[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  // 폼 상태를 debounce → 400ms 안정되면 서버에 요청.
+  // 각 값을 문자열/JSON으로 debounce (배열은 stringify).
+  const formSignature = JSON.stringify({
+    regions,
+    moments: selectedMomentIds,
+    companion,
+    purpose,
+    start_date: startDate,
+    days: durationDays,
+  });
+  const debouncedSig = useDebounced(formSignature, 400);
+  const inflightRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    // 폼 임계 미달(지역이 없거나 순간이 없는 상태에도) 제안이 유용한 순간이 있지만
+    // v1에선 지역이 하나라도 있을 때만 요청 (백엔드 카운트에 지역 필요).
+    if (regions.length === 0) {
+      setSuggestions([]);
+      return;
+    }
+    // 이전 요청 취소 (in-flight overwrite 방지)
+    if (inflightRef.current) inflightRef.current.abort();
+    const ac = new AbortController();
+    inflightRef.current = ac;
+
+    (async () => {
+      try {
+        const resp = await requestHarubanAugment({
+          regions,
+          moments: selectedMomentIds,
+          companion,
+          purpose,
+          start_date: startDate,
+          days: durationDays,
+        });
+        if (ac.signal.aborted) return;
+        // 거절한 제안은 제외.
+        setSuggestions(
+          resp.suggestions.filter((s) => !dismissed.has(suggestionKey(s))),
+        );
+      } catch (_e) {
+        // 서버 장애 등은 조용히 무시 (원 폼 UX 방해 금지).
+        if (!ac.signal.aborted) setSuggestions([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSig]);
+
+  // 제안 반영
+  const applyRegionAdd = (values: string[]) => {
+    setRegions((prev) => {
+      const next = new Set<RegionId>(prev);
+      for (const v of values) next.add(v as RegionId);
+      return Array.from(next);
+    });
+  };
+  const applyMomentAdd = (values: string[]) => {
+    setSelectedMomentIds((prev) => {
+      const next = new Set<MomentId>(prev);
+      for (const v of values) next.add(v as MomentId);
+      return Array.from(next);
+    });
+  };
+  const applySuggestion = (s: HarubanAugmentSuggestion) => {
+    if (s.field === 'regions') applyRegionAdd(s.values);
+    else if (s.field === 'moments') applyMomentAdd(s.values);
+    // dismiss 상태에도 넣어 재요청 시 다시 뜨지 않게.
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(suggestionKey(s));
+      return next;
+    });
+    setSuggestions((prev) => prev.filter((x) => suggestionKey(x) !== suggestionKey(s)));
+  };
+  const dismissSuggestion = (s: HarubanAugmentSuggestion) => {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(suggestionKey(s));
+      return next;
+    });
+    setSuggestions((prev) => prev.filter((x) => suggestionKey(x) !== suggestionKey(s)));
+  };
+
+  const suggestionsFor = (field: string) =>
+    suggestions.filter((s) => s.field === field);
 
   const toggleMoment = (id: MomentId) => {
     setSelectedMomentIds((prev) =>
@@ -130,6 +243,13 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
           </div>
 
           <RegionChips value={regions} onChange={setRegions} />
+
+          {/* 하루방 · 지역 증강 제안 */}
+          <HarubanHintList
+            items={suggestionsFor('regions')}
+            onApply={applySuggestion}
+            onDismiss={dismissSuggestion}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -315,6 +435,13 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
             })}
           </div>
 
+          {/* 하루방 · 순간 증강 제안 */}
+          <HarubanHintList
+            items={suggestionsFor('moments')}
+            onApply={applySuggestion}
+            onDismiss={dismissSuggestion}
+          />
+
           <div id="special-notes-field">
             <label
               htmlFor="special-notes-input"
@@ -368,5 +495,76 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
         </motion.div>
       )}
     </div>
+  );
+}
+
+// ── 하루방 증강 힌트 카드 리스트 ─────────────────────────
+// 특정 필드에 대한 제안들을 세로로 렌더. 카드마다 반영/거절 버튼.
+// 항목이 없으면 아무 것도 렌더하지 않음 (원 폼 레이아웃 유지).
+function HarubanHintList({
+  items,
+  onApply,
+  onDismiss,
+}: {
+  items: HarubanAugmentSuggestion[];
+  onApply: (s: HarubanAugmentSuggestion) => void;
+  onDismiss: (s: HarubanAugmentSuggestion) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <AnimatePresence initial={false}>
+      <motion.div
+        key="haruban-hints"
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        className="space-y-2 -mt-1"
+      >
+        {items.map((s) => (
+          <div
+            key={suggestionKey(s)}
+            className="rounded-2xl border border-dashed border-citrus/40 bg-citrus/5 p-3"
+          >
+            <div className="flex items-start gap-2">
+              <HarubangMark className="w-7 h-7 shrink-0" />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="text-[10.5px] font-bold text-citrus-2 uppercase tracking-wider">
+                  하루방의 조언
+                </div>
+                <p className="text-[12px] text-basalt leading-relaxed">
+                  {s.reason}
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {s.labels.map((label) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-citrus/40 text-[11px] text-citrus-2 font-semibold"
+                    >
+                      + {label}
+                    </span>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onApply(s)}
+                    className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-citrus text-white text-[11px] font-serif-kr font-bold hover:bg-citrus-2 transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    폼에 추가
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(s)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-earth bg-white text-basalt-2 text-[11px] hover:bg-black/5 transition"
+                    aria-label="이 조언 닫기"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+    </AnimatePresence>
   );
 }

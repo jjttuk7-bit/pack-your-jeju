@@ -195,3 +195,26 @@ export function requestHarubanIntro(
     form_state: formState,
   });
 }
+
+// Phase E — 폼 필드 증강 제안.
+export interface HarubanAugmentSuggestion {
+  field: string;
+  kind: string;
+  values: string[];
+  labels: string[];
+  reason: string;
+  counts: Record<string, unknown>;
+}
+export interface HarubanAugmentResponse {
+  available: boolean;
+  suggestions: HarubanAugmentSuggestion[];
+  llm_used: boolean;
+  reason: string;
+}
+export function requestHarubanAugment(
+  formState: Record<string, unknown>,
+): Promise<HarubanAugmentResponse> {
+  return post<HarubanAugmentResponse>('/agent/augment', {
+    form_state: formState,
+  });
+}

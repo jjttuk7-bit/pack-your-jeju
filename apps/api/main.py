@@ -25,6 +25,7 @@ from sqlalchemy import text
 from apps.api import bootstrap, db
 from apps.api.engine import agent as agent_mod
 from apps.api.engine import assemble as assemble_mod
+from apps.api.engine import augment as augment_mod
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import haruban as haruban_mod
 from apps.api.engine import packpdf as packpdf_mod
@@ -320,6 +321,36 @@ def agent_intro(body: HarubangIntroBody) -> dict[str, Any]:
         "gaps": intro.gaps,
         "llm_used": intro.llm_used,
         "reason": intro.reason,
+    }
+
+
+class HarubangAugmentBody(BaseModel):
+    form_state: dict = Field(default_factory=dict)
+
+
+@app.post("/agent/augment")
+def agent_augment(body: HarubangAugmentBody) -> dict[str, Any]:
+    """Phase E — 폼 필드 증강 제안.
+
+    폼 값 변경 시 프론트가 debounce 후 호출. 필드별 add/tune 제안 목록.
+    카운트는 결정적 SQL, 이유 문구는 LLM이 다듬음 (없으면 템플릿 그대로).
+    """
+    result = augment_mod.build_augment(body.form_state)
+    return {
+        "available": result.available,
+        "suggestions": [
+            {
+                "field": s.field,
+                "kind": s.kind,
+                "values": s.values,
+                "labels": s.labels,
+                "reason": s.reason,
+                "counts": s.counts,
+            }
+            for s in result.suggestions
+        ],
+        "llm_used": result.llm_used,
+        "reason": result.reason,
     }
 
 
