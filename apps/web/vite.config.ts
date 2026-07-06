@@ -70,6 +70,10 @@ export default defineConfig(() => {
           ],
           runtimeCaching: [],
           cleanupOutdatedCaches: true,
+          // 새 SW가 대기하지 않고 즉시 활성화되어 현재 열려있는 클라이언트도 갱신.
+          // 발표 D-day에 사용자마다 배포 반영 시점이 어긋나는 상황을 방지.
+          skipWaiting: true,
+          clientsClaim: true,
         },
         devOptions: {
           enabled: false,
