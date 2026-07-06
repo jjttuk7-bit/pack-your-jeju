@@ -135,8 +135,10 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     근거 있게.
                   </h1>
                   <p className="mt-5 max-w-2xl text-[15px] leading-8 text-basalt-2 sm:text-[17px]">
-                    떠나기 전부터 제주가 가까워지는 여행 준비. 지역, 기간, 동행자,
-                    여행 순간을 고르면 하루방이 공공데이터로 확인한 장소와 주의 신호를
+                    떠나기 전부터 제주가 가까워지는 여행 준비.
+                    <br className="hidden sm:block" />
+                    지역, 기간, 동행자, 여행 순간을 고르면 하루방 에이전트가
+                    공공데이터로 확인한 장소와 주의 신호를
                     여행팩에 차분히 담아드립니다.
                   </p>
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -171,7 +173,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                           Live Preview
                         </p>
                         <h2 className="mt-1 font-serif-kr text-[23px] font-bold text-basalt">
-                          구좌 커버리지 미리보기
+                          구좌 근거 현황 미리보기
                         </h2>
                       </div>
                       <span className="pyj-citrus-breathe">
@@ -193,7 +195,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       />
                       <PreviewRow
                         icon={<MessageCircleQuestion className="h-4 w-4" />}
-                        title="하루방 상담"
+                        title="하루방 에이전트"
                         body="선택한 지역과 순간을 기준으로 후보를 다시 조회합니다."
                         tone="agent"
                       />
@@ -232,11 +234,11 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   <FeatureCard
                     icon={<MapPin className="h-5 w-5" />}
                     title="지역 줌인"
-                    body="구좌·애월·성산처럼 지역을 고르면 순간별 데이터 커버리지를 먼저 보여줍니다."
+                    body="구좌·애월·성산처럼 지역을 고르면 순간별 근거 현황을 먼저 보여줍니다."
                   />
                   <FeatureCard
                     icon={<MessageCircleQuestion className="h-5 w-5" />}
-                    title="하루방 상담"
+                    title="하루방 에이전트"
                     body="대화 중에도 장소명과 주소는 DB 후보 안에서만 말하고, 근거가 없으면 확인 불가로 남깁니다."
                   />
                   <FeatureCard
@@ -283,13 +285,19 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               <div className="mx-auto max-w-6xl">
                 <SectionHeader
                   eyebrow="How It Works"
-                  title="사용자는 여행을 고르고, 시스템은 근거를 고릅니다."
-                  body="경진대회 버전의 방향성은 단순 추천앱이 아니라 지역 커버리지, 신뢰기반 RAG, 사용자 기록이 다시 신뢰 신호가 되는 순환 구조입니다."
+                  title={
+                    <>
+                      사용자는 여행을 고르고,
+                      <br />
+                      시스템은 근거를 고릅니다.
+                    </>
+                  }
+                  body="경진대회 버전의 방향성은 단순 추천앱이 아니라 지역별 근거 현황, 신뢰기반 RAG, 사용자 기록이 다시 신뢰 신호가 되는 순환 구조입니다."
                 />
                 <div className="mt-8 grid gap-4 lg:grid-cols-5">
                   {[
-                    ['1', '지역 선택', '지역별 커버리지와 약한 순간을 먼저 확인합니다.'],
-                    ['2', '하루방 상담', '매 턴 DB 후보를 다시 조회해 자연어로 조립합니다.'],
+                    ['1', '지역 선택', '지역별 근거 현황과 약한 순간을 먼저 확인합니다.'],
+                    ['2', '하루방 에이전트', '매 턴 DB 후보를 다시 조회해 자연어로 조립합니다.'],
                     ['3', '여행팩 생성', '근거 배지와 접근성 신호를 포함해 일정으로 묶습니다.'],
                     ['4', 'PDF 저장', '현재 확정 버전을 여행 저널로 아카이브합니다.'],
                     ['5', '방문 기록', '체크인 데이터가 다음 추천의 신뢰 신호가 됩니다.'],
@@ -317,7 +325,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     이제 실제 여행팩을 만들어 볼 차례입니다.
                   </h2>
                   <p className="mt-3 max-w-2xl text-[14px] leading-7 text-basalt-2">
-                    진입하면 지역 정밀 설정, 하루방 추천, 근거 기반 장소 카드, PDF 여행 저널까지
+                    진입하면 지역 정밀 설정, 하루방 에이전트 추천, 근거 기반 장소 카드, PDF 여행 저널까지
                     한 흐름으로 확인할 수 있습니다.
                   </p>
                 </div>
@@ -419,7 +427,7 @@ function SectionHeader({
   body,
 }: {
   eyebrow: string;
-  title: string;
+  title: React.ReactNode;
   body: string;
 }) {
   return (
