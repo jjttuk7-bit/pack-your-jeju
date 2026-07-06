@@ -469,12 +469,29 @@ function PackItemCard({
   header?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // 썸네일: 제주 ITS API로 병합된 visitjeju CDN 이미지. 결측 시 렌더 안 함.
+  const thumbnail = (it.amenities as any)?.thumbnail_path as string | undefined;
   return (
     <div
-      className={`rounded-2xl border bg-[#FDFBF7] transition ${
+      className={`rounded-2xl border bg-[#FDFBF7] transition overflow-hidden ${
         open ? 'border-orange-200 shadow-sm' : 'border-stone-100 hover:border-orange-200'
       }`}
     >
+      {thumbnail && (
+        <div className="relative w-full aspect-[16/9] bg-stone-100 overflow-hidden">
+          <img
+            src={thumbnail}
+            alt={it.name}
+            loading="lazy"
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // 로드 실패 시 조용히 숨김 (원 없는 척 안 함).
+              const el = e.currentTarget as HTMLImageElement;
+              el.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -522,12 +522,29 @@ function HighlightCard({
   const BadgeIcon = isCaution ? AlertTriangle : ShieldCheck;
   const badgeLabel = isVerified ? '확인됨' : isCaution ? '주의' : highlight.badge;
 
+  // 썸네일: 제주 ITS API로 병합된 visitjeju CDN 이미지. 결측 시 렌더 안 함.
+  const thumbnail = (highlight.amenities as any)?.thumbnail_path as string | undefined;
+
   return (
     <div
-      className={`rounded-xl border bg-white shadow-sm transition ${
+      className={`rounded-xl border bg-white shadow-sm transition overflow-hidden ${
         open ? 'border-citrus/40' : 'border-earth/70'
       }`}
     >
+      {thumbnail && (
+        <div className="relative w-full h-32 bg-earth/30 overflow-hidden">
+          <img
+            src={thumbnail}
+            alt={highlight.name}
+            loading="lazy"
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const el = e.currentTarget as HTMLImageElement;
+              el.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
       {/* 헤더 — 클릭 시 확장 */}
       <button
         type="button"

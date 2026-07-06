@@ -68,9 +68,36 @@ export default function PlaceDetail(props: PlaceDetailProps) {
   const accessibility = boolish(amenities?.accessibility);
   // amenities.phone은 문자열 값. 채워져 있으면 근거 있는 정보.
   const phone = typeof amenities?.phone === 'string' ? (amenities?.phone as string) : null;
+  // 제주 ITS API 병합 필드
+  const introduction = typeof amenities?.introduction === 'string'
+    ? (amenities?.introduction as string) : null;
+  const tag = typeof amenities?.tag === 'string'
+    ? (amenities?.tag as string) : null;
+  const tagList = tag ? tag.split(',').map((t) => t.trim()).filter(Boolean) : [];
 
   return (
     <div className="space-y-2 pt-2 pb-1 text-[11.5px] text-basalt-2">
+      {/* 공공데이터 소개 문구 (있으면) */}
+      {introduction && (
+        <div className="rounded-lg bg-white border border-earth/60 px-2.5 py-1.5 text-[11.5px] text-basalt leading-relaxed">
+          {introduction}
+        </div>
+      )}
+
+      {/* 태그 chips (있으면) — 공공데이터 근거 태그 그대로 노출 */}
+      {tagList.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {tagList.map((t) => (
+            <span
+              key={t}
+              className="text-[10px] px-1.5 py-0.5 rounded-md bg-citrus/10 text-citrus-2 border border-citrus/30"
+            >
+              #{t}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* 주소 */}
       <DetailRow icon={<MapPin className="w-3.5 h-3.5" />} label="주소">
         {address ? (
