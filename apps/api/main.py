@@ -32,6 +32,7 @@ from apps.api.engine import packpdf as packpdf_mod
 from apps.api.engine import region_coverage as region_coverage_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
+from apps.api.engine import weather as weather_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
 
 _bootstrap_result: dict = {"applied": 0, "failed": 0, "errors": []}
@@ -90,6 +91,14 @@ def health() -> dict:
             "failed": _bootstrap_result["failed"],
         },
     }
+
+
+@app.get("/weather/kma-smoke")
+def weather_kma_smoke(
+    region: str = Query(default="jeju_city", description="제주 권역 id"),
+) -> dict[str, Any]:
+    """기상청/data.go.kr 키 스모크 테스트. 키 값은 응답에 노출하지 않는다."""
+    return weather_mod.smoke_kma_nowcast(region)
 
 
 @app.get("/admin/metrics")
