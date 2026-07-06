@@ -127,6 +127,11 @@ class Filters:
     purpose: Purpose
     per_moment: tuple[MomentFilter, ...] = field(default_factory=tuple)
 
+    @property
+    def region(self) -> Region:
+        """대표 지역 (첫 번째). 하위 호환 필드."""
+        return self.regions[0] if self.regions else ""
+
 
 class UnknownRegion(ValueError):
     pass
