@@ -1,14 +1,19 @@
-"""gpt-5.3-mini 호출 유틸.
+"""LLM 호출 유틸.
 
 원칙 (CLAUDE.md 절대 규칙 5·6, DECISIONS D-12):
-  - 모델은 gpt-5.3-mini 하나로 고정. Gateway/스왑 로직 없음.
-  - GPT-5 계열이므로 max_completion_tokens 파라미터 사용.
+  - 원래는 gpt-5.3-mini 고정이나, 아이펠톤 게이트웨이 키가 아직 확보되지 않아
+    발표 데모 안전판으로 gpt-4o-mini 임시 사용. 발표 후 gpt-5.3-mini로 복원.
+  - Gateway/스왑 로직은 만들지 않는다. MODEL 상수 한 줄만 바뀜.
   - OPENAI_API_KEY 미설정 시: LLMUnavailable 예외 없이 UNAVAILABLE 신호 반환.
     호출부(assemble/verify)는 이 신호를 보고 템플릿/규칙 폴백으로 진행한다.
     (데모 안전판 — CLAUDE.md 절대 규칙 6)
 
 프롬프트 공통 규칙 (TRUST_ENGINE §5):
   "제공된 데이터에 없는 장소명·수치·시간을 만들지 마라. JSON 외 출력 금지."
+
+파라미터 노트:
+  - gpt-4o 계열은 max_tokens · GPT-5 계열은 max_completion_tokens.
+  - openai>=1.40 SDK는 gpt-4o에서도 max_completion_tokens 허용 (호환 유지).
 """
 from __future__ import annotations
 
@@ -16,7 +21,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-MODEL = "gpt-5.3-mini"
+# CLAUDE.md 절대 규칙 5 임시 예외: 아이펠톤 gpt-5.3-mini 게이트웨이 키가 아직 없어
+# 발표 데모용으로 gpt-4o-mini 임시 사용. 발표 후 "gpt-5.3-mini"로 되돌린다.
+MODEL = "gpt-4o-mini"
 
 NO_HALLUCINATION_CLAUSE = (
     "제공된 데이터에 없는 장소명·수치·시간을 만들지 마라. "
