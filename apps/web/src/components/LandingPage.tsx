@@ -67,9 +67,18 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
   };
 
   return (
-    <div className="min-h-screen text-basalt antialiased relative overflow-hidden">
+    <div className="pyj-landing min-h-screen text-basalt antialiased relative overflow-hidden">
       <div className="pointer-events-none fixed inset-x-0 bottom-0 h-44 -z-10 opacity-70">
         <StoneWallPattern className="w-full h-full" />
+      </div>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <span className="pyj-wind pyj-wind-a" />
+        <span className="pyj-wind pyj-wind-b" />
+        <span className="pyj-wind pyj-wind-c" />
+        <span className="pyj-citrus-drift pyj-citrus-drift-a" />
+        <span className="pyj-citrus-drift pyj-citrus-drift-b" />
+        <span className="pyj-citrus-drift pyj-citrus-drift-c" />
+        <span className="pyj-sea-haze" />
       </div>
 
       <AnimatePresence>
@@ -90,7 +99,9 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   className="inline-flex items-center gap-2 rounded-full border border-earth bg-white/70 px-3 py-2 text-left shadow-sm transition hover:bg-white"
                   aria-label="Pack Your Jeju 홈"
                 >
-                  <CitrusMark className="h-9 w-9" />
+                  <span className="pyj-citrus-breathe">
+                    <CitrusMark className="h-9 w-9" />
+                  </span>
                   <span>
                     <span className="block font-serif-kr text-[15px] font-bold leading-none">
                       Pack Your Jeju
@@ -103,7 +114,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <button
                   type="button"
                   onClick={scrollToGate}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-basalt px-4 py-2 text-[12px] font-bold text-white shadow-jeju-chip transition hover:bg-basalt-2"
+                  className="pyj-soft-cta inline-flex items-center gap-1.5 rounded-full bg-basalt px-4 py-2 text-[12px] font-bold text-white shadow-jeju-chip transition hover:bg-basalt-2"
                 >
                   {isUnlocked ? '대시보드로 이동' : '여행 준비 시작'}
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -111,30 +122,30 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               </nav>
 
               <div className="mx-auto mt-14 grid max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-                <div>
+                <div className="relative">
                   <div className="inline-flex items-center gap-2 rounded-full border border-citrus/25 bg-citrus/10 px-3 py-1.5 text-[11px] font-bold text-citrus-2">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    근거 없이 답하지 않는 제주 여행팩
+                    <Sparkles className="h-3.5 w-3.5" />
+                    신뢰 기반 제주 여행팩
                   </div>
                   <h1 className="mt-5 font-serif-kr text-[44px] font-bold leading-[1.04] tracking-tight text-basalt sm:text-[58px] lg:text-[68px]">
-                    제주 여행을
+                    이번 제주는,
                     <br />
-                    추천보다 먼저
+                    설렘부터
                     <br />
-                    확인합니다.
+                    근거 있게.
                   </h1>
                   <p className="mt-5 max-w-2xl text-[15px] leading-8 text-basalt-2 sm:text-[17px]">
-                    지역, 기간, 동행자, 여행 순간을 고르면 공공데이터로 확인된 장소와
-                    주의 신호를 분리해 보여줍니다. 하루방은 매번 근거를 다시 확인하고,
-                    확인되지 않은 조합은 정직하게 비워 둡니다.
+                    떠나기 전부터 제주가 가까워지는 여행 준비. 지역, 기간, 동행자,
+                    여행 순간을 고르면 하루방이 공공데이터로 확인한 장소와 주의 신호를
+                    여행팩에 차분히 담아드립니다.
                   </p>
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                     <button
                       type="button"
                       onClick={scrollToGate}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-citrus px-6 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
+                      className="pyj-primary-cta inline-flex items-center justify-center gap-2 rounded-2xl bg-citrus px-6 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
                     >
-                      {isUnlocked ? '내 여행팩으로 돌아가기' : '접근 코드로 시작하기'}
+                      {isUnlocked ? '내 제주팩 열기' : '제주팩 만들러 가기'}
                       <ArrowRight className="h-4 w-4" />
                     </button>
                     <a
@@ -147,7 +158,12 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   </div>
                 </div>
 
-                <div className="rounded-[28px] border border-orange-100/70 bg-white/85 p-4 shadow-pyj-card backdrop-blur">
+                <motion.div
+                  initial={{ opacity: 0, y: 18, rotate: -1.2 }}
+                  animate={{ opacity: 1, y: 0, rotate: 0 }}
+                  transition={{ duration: 0.72, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  className="pyj-ticket-card rounded-[28px] border border-orange-100/70 bg-white/85 p-4 shadow-pyj-card backdrop-blur"
+                >
                   <div className="rounded-[22px] bg-[#FDF6EA] p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -158,7 +174,9 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                           구좌 커버리지 미리보기
                         </h2>
                       </div>
-                      <CitrusMark className="h-14 w-14" />
+                      <span className="pyj-citrus-breathe">
+                        <CitrusMark className="h-14 w-14" />
+                      </span>
                     </div>
                     <div className="mt-5 space-y-3">
                       <PreviewRow
@@ -190,7 +208,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       </p>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               </div>
             </section>
 
@@ -207,8 +225,8 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               <div className="mx-auto max-w-6xl">
                 <SectionHeader
                   eyebrow="Trust Engine"
-                  title="추천을 만들기 전에, 먼저 검증합니다."
-                  body="Pack Your Jeju의 핵심은 더 많은 장소를 채우는 것이 아니라, 확인 가능한 것과 확인되지 않은 것을 사용자가 구분할 수 있게 만드는 것입니다."
+                  title="설렘을 깨지 않도록, 먼저 확인합니다."
+                  body="Pack Your Jeju의 핵심은 더 많은 장소를 채우는 것이 아니라, 확인 가능한 정보와 아직 근거가 부족한 정보를 사용자가 구분할 수 있게 만드는 것입니다."
                 />
                 <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <FeatureCard
@@ -256,7 +274,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   <DarkFeature icon={<Database />} title="DB 근거 우선" body="장소·주소·운영 관련 사실은 조회된 값만 사용합니다." />
                   <DarkFeature icon={<ShieldCheck />} title="4분기 fallback" body="out_of_scope, coverage_gap, retrieval_miss, contradicted로 비는 이유를 나눕니다." />
                   <DarkFeature icon={<Package />} title="일정 조립" body="선택 지역과 순간을 요일별 여행팩으로 정리합니다." />
-                  <DarkFeature icon={<BookOpenCheck />} title="정직한 기록" body="PDF에는 확인된 것과 확인되지 않은 것을 함께 남깁니다." />
+                  <DarkFeature icon={<BookOpenCheck />} title="검증 기록" body="PDF에는 확인된 정보와 근거가 부족한 조합을 함께 남깁니다." />
                 </div>
               </div>
             </section>
