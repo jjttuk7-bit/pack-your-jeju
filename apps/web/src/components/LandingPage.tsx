@@ -5,13 +5,17 @@ import {
   AlertTriangle,
   ArrowRight,
   BookOpenCheck,
+  Camera,
   CheckCircle2,
+  CloudSun,
   Database,
   FileText,
   LockKeyhole,
   MapPin,
   MessageCircleQuestion,
   Package,
+  RefreshCw,
+  Route,
   Search,
   ShieldCheck,
   Sparkles,
@@ -283,6 +287,80 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
 
             <section className="px-5 py-16 lg:px-10">
               <div className="mx-auto max-w-6xl">
+                <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
+                      Pack Your Jeju Trust Cycle
+                    </p>
+                    <h2 className="mt-3 font-serif-kr text-[36px] font-bold leading-tight text-basalt">
+                      공공데이터로 계획하고,
+                      <br />
+                      방문 기록으로 다시 좋아집니다.
+                    </h2>
+                    <p className="mt-4 text-[14px] leading-7 text-basalt-2">
+                      Pack Your Jeju는 추천에서 끝나지 않습니다. 공공데이터로 만든 여행플랜을
+                      사용자가 실제로 실행하고, 방문 기록과 수정 신호가 다시 하루방 에이전트의
+                      신뢰 신호로 돌아오는 순환형 AI 여행플랜 서비스입니다.
+                    </p>
+                    <div className="mt-5 rounded-2xl border border-citrus/20 bg-citrus/8 p-4">
+                      <p className="font-serif-kr text-[15px] font-bold leading-relaxed text-basalt">
+                        “공공데이터로 여행을 계획하고, 실제 방문 기록으로 제주 여행 신뢰도를
+                        다시 키우는 서비스”
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="relative overflow-hidden rounded-[28px] border border-orange-100/80 bg-white p-4 shadow-pyj-card">
+                    <div className="absolute left-1/2 top-1/2 hidden h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-citrus/35 lg:block" />
+                    <div className="absolute left-1/2 top-1/2 hidden h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#FDF6EA] text-citrus-2 shadow-sm lg:flex">
+                      <RefreshCw className="h-6 w-6" />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <CycleNode
+                        step="01"
+                        icon={<CloudSun className="h-4 w-4" />}
+                        title="공공데이터 API"
+                        body="관광·교통·기상·수정요청 데이터를 1차 근거로 수집합니다."
+                      />
+                      <CycleNode
+                        step="02"
+                        icon={<Database className="h-4 w-4" />}
+                        title="정보 기반 정리"
+                        body="지역·순간별 확인 후보와 데이터 부족 범위를 나눕니다."
+                      />
+                      <CycleNode
+                        step="03"
+                        icon={<MessageCircleQuestion className="h-4 w-4" />}
+                        title="하루방 에이전트"
+                        body="DB 후보 안에서 상담하고, 조건에 맞는 대안을 조율합니다."
+                      />
+                      <CycleNode
+                        step="04"
+                        icon={<Route className="h-4 w-4" />}
+                        title="여행플랜 생성"
+                        body="Day별 플랜, 지도, PDF, 공유 텍스트로 실행 가능하게 만듭니다."
+                      />
+                      <CycleNode
+                        step="05"
+                        icon={<Camera className="h-4 w-4" />}
+                        title="방문 기록"
+                        body="사용자의 체크인·메모·사진·수정 요청이 구조화됩니다."
+                      />
+                      <CycleNode
+                        step="06"
+                        icon={<ShieldCheck className="h-4 w-4" />}
+                        title="신뢰 신호 강화"
+                        body="최근 방문 확인이 다음 여행자의 플랜과 상담에 반영됩니다."
+                        tone="mint"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="px-5 py-16 lg:px-10">
+              <div className="mx-auto max-w-6xl">
                 <SectionHeader
                   eyebrow="How It Works"
                   title={
@@ -476,6 +554,40 @@ function DarkFeature({
       <div className="mb-3 text-citrus">{icon}</div>
       <h3 className="font-serif-kr text-[16px] font-bold text-white">{title}</h3>
       <p className="mt-2 text-[12.5px] leading-relaxed text-white/70">{body}</p>
+    </div>
+  );
+}
+
+function CycleNode({
+  step,
+  icon,
+  title,
+  body,
+  tone = 'citrus',
+}: {
+  step: string;
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  tone?: 'citrus' | 'mint';
+}) {
+  const toneClass = {
+    citrus: 'bg-citrus/10 text-citrus-2 border-citrus/20',
+    mint: 'bg-mint/10 text-mint border-mint/25',
+  }[tone];
+
+  return (
+    <div className="relative rounded-2xl border border-orange-100/80 bg-[#FDFBF7] p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${toneClass}`}>
+          {icon}
+        </div>
+        <span className="font-serif-kr text-[22px] font-bold leading-none text-basalt/12">
+          {step}
+        </span>
+      </div>
+      <h3 className="font-serif-kr text-[15px] font-bold text-basalt">{title}</h3>
+      <p className="mt-2 text-[12px] leading-relaxed text-basalt-2">{body}</p>
     </div>
   );
 }
