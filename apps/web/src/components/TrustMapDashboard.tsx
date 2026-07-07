@@ -43,18 +43,18 @@ const DEFAULT_MOMENTS: MomentId[] = ['oreum', 'beach_walk', 'local_food'];
 const NOTES_MAX = 300;
 
 const REGION_HOTSPOTS: RegionHotspot[] = [
-  { id: 'hallim', x: 14, y: 50 },
-  { id: 'aewol', x: 25, y: 42 },
-  { id: 'jeju_city', x: 47, y: 34 },
-  { id: 'jocheon', x: 62, y: 40 },
-  { id: 'gujwa', x: 76, y: 46 },
-  { id: 'udo', x: 90, y: 38 },
-  { id: 'seongsan', x: 85, y: 57 },
-  { id: 'pyoseon', x: 75, y: 67 },
-  { id: 'namwon', x: 60, y: 73 },
-  { id: 'seogwipo', x: 47, y: 76 },
-  { id: 'andeok', x: 29, y: 72 },
-  { id: 'daejeong', x: 17, y: 67 },
+  { id: 'hallim', x: 15, y: 50 },
+  { id: 'aewol', x: 27, y: 41 },
+  { id: 'jeju_city', x: 49, y: 31 },
+  { id: 'jocheon', x: 64, y: 38 },
+  { id: 'gujwa', x: 78, y: 45 },
+  { id: 'udo', x: 94, y: 39 },
+  { id: 'seongsan', x: 89, y: 60 },
+  { id: 'pyoseon', x: 75, y: 69 },
+  { id: 'namwon', x: 61, y: 77 },
+  { id: 'seogwipo', x: 47, y: 79 },
+  { id: 'andeok', x: 28, y: 71 },
+  { id: 'daejeong', x: 13, y: 73 },
 ];
 
 export default function TrustMapDashboard({
@@ -314,47 +314,49 @@ function JejuSilhouetteMap({
   return (
     <div className="relative mx-auto mt-4 aspect-[567/312] w-full max-w-4xl overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F7E6CC]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.85),rgba(255,247,232,0.25)_45%,rgba(222,178,124,0.15))]" />
-      <img
-        src="/jeju_silhouette_refined.svg"
-        alt="제주도 실루엣"
-        className="absolute inset-[5%] h-[90%] w-[90%] object-contain opacity-[0.18] [filter:sepia(1)_saturate(1.7)_hue-rotate(336deg)]"
-      />
-      <div className="absolute inset-[7%] rounded-[50%] border border-citrus/10 bg-citrus/5 blur-2xl" />
+      <div className="absolute inset-[4%]">
+        <div className="absolute inset-[3%] rounded-[50%] border border-citrus/10 bg-citrus/5 blur-2xl" />
+        <img
+          src="/jeju_silhouette_refined.svg"
+          alt="제주도 실루엣"
+          className="absolute inset-0 h-full w-full object-contain opacity-[0.34] mix-blend-multiply [filter:sepia(1)_saturate(1.35)_hue-rotate(336deg)]"
+        />
 
-      {REGION_HOTSPOTS.map((spot) => {
-        const region = REGIONS.find((r) => r.value === spot.id);
-        const active = activeRegion === spot.id;
-        const selected = selectedRegions.includes(spot.id);
-        const tone = getRegionTone(previews[spot.id], selectedMoments, loading);
-        return (
-          <button
-            key={spot.id}
-            type="button"
-            onClick={() => onInspect(spot.id)}
-            onDoubleClick={() => onToggle(spot.id)}
-            aria-pressed={selected}
-            aria-label={`${region?.label ?? spot.id} 근거 보기`}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1.5 text-[11px] font-bold shadow-sm transition hover:-translate-y-[55%] focus:outline-none focus:ring-2 focus:ring-citrus/35 ${
-              selected
-                ? 'border-citrus bg-citrus text-white shadow-jeju-chip'
-                : active
-                  ? 'border-citrus bg-white text-citrus-2'
-                  : 'border-white/90 bg-white/86 text-basalt hover:border-citrus/50'
-            }`}
-            style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-          >
-            <span
-              className={`mr-1 inline-block h-2 w-2 rounded-full ${toneDotClass(tone)}`}
-              aria-hidden="true"
-            />
-            {selected && <Check className="mr-0.5 inline h-2.5 w-2.5 stroke-[4]" />}
-            {region?.label}
-          </button>
-        );
-      })}
+        {REGION_HOTSPOTS.map((spot) => {
+          const region = REGIONS.find((r) => r.value === spot.id);
+          const active = activeRegion === spot.id;
+          const selected = selectedRegions.includes(spot.id);
+          const tone = getRegionTone(previews[spot.id], selectedMoments, loading);
+          return (
+            <button
+              key={spot.id}
+              type="button"
+              onClick={() => onInspect(spot.id)}
+              onDoubleClick={() => onToggle(spot.id)}
+              aria-pressed={selected}
+              aria-label={`${region?.label ?? spot.id} 근거 보기`}
+              className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-[10.5px] font-bold shadow-sm transition hover:-translate-y-[55%] focus:outline-none focus:ring-2 focus:ring-citrus/35 ${
+                selected
+                  ? 'border-citrus bg-citrus text-white shadow-jeju-chip'
+                  : active
+                    ? 'border-citrus bg-white text-citrus-2'
+                    : 'border-white/90 bg-white/88 text-basalt hover:border-citrus/50'
+              }`}
+              style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+            >
+              <span
+                className={`mr-1 inline-block h-2 w-2 rounded-full ${toneDotClass(tone)}`}
+                aria-hidden="true"
+              />
+              {selected && <Check className="mr-0.5 inline h-2.5 w-2.5 stroke-[4]" />}
+              {region?.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <div className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/80 bg-white/72 px-3 py-2 text-[10.5px] leading-relaxed text-basalt-2 backdrop-blur">
-        한 번 누르면 근거를 보고, 선택 버튼으로 플랜 후보에 담습니다. 숫자 점수는 만들지 않고 실제 커버리지와 후보만 표시합니다.
+      <div className="absolute left-3 top-3 rounded-full border border-white/80 bg-white/75 px-3 py-1.5 text-[10px] font-semibold text-basalt-2 backdrop-blur">
+        제주 실루엣 기준 위치 보정
       </div>
     </div>
   );
