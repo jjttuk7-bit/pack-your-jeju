@@ -1,0 +1,311 @@
+{
+  "generated_at": "2026-07-07T14:52:11.375621+00:00",
+  "cases": [
+    {
+      "id": "G01",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "바굼지오름",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "큰바리메오름",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "고내봉(고내오름,고니오름,망오름)",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    },
+    {
+      "id": "G02",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "바굼지오름",
+            "caution",
+            "이용자 정보 수정요청 이력 · 접근성 관련 정보 미확인"
+          ],
+          [
+            "큰바리메오름",
+            "caution",
+            "이용자 정보 수정요청 이력 · 접근성 관련 정보 미확인"
+          ],
+          [
+            "고내봉(고내오름,고니오름,망오름)",
+            "caution",
+            "이용자 정보 수정요청 이력 · 접근성 관련 정보 미확인"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    },
+    {
+      "id": "G03",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "금능포구",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "엉알해안산책로",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "판포포구",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    },
+    {
+      "id": "G04",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "badge",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "금능포구",
+            "caution",
+            "정보 유효기간 경과/임박 · 이용자 정보 수정요청 이력"
+          ],
+          [
+            "엉알해안산책로",
+            "caution",
+            "정보 유효기간 경과/임박 · 이용자 정보 수정요청 이력"
+          ],
+          [
+            "판포포구",
+            "caution",
+            "정보 유효기간 경과/임박 · 이용자 정보 수정요청 이력"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    },
+    {
+      "id": "G05",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "items": [],
+        "fallback": {
+          "reason": "coverage_gap",
+          "message": "저희가 참조하는 공공데이터 기준으로 확인되지 않습니다.",
+          "stats": {
+            "region": "andeok",
+            "primary_category": "experience"
+          }
+        },
+        "observed": [
+          "coverage_gap"
+        ]
+      }
+    },
+    {
+      "id": "G08",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "용담밭담",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "시나르",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "다인숯불갈비",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    },
+    {
+      "id": "G09",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "verified",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "용담밭담",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "시나르",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ],
+          [
+            "다인숯불갈비",
+            "caution",
+            "이용자 정보 수정요청 이력"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    },
+    {
+      "id": "G11",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "입산봉(삿갓오름)",
+            "caution",
+            "인근 지역 결과 · 이용자 정보 수정요청 이력"
+          ],
+          [
+            "거슨새미오름",
+            "caution",
+            "인근 지역 결과 · 이용자 정보 수정요청 이력"
+          ],
+          [
+            "안친오름",
+            "caution",
+            "인근 지역 결과 · 이용자 정보 수정요청 이력"
+          ]
+        ],
+        "fallback": null,
+        "observed": [
+          "retrieval_miss"
+        ]
+      }
+    },
+    {
+      "id": "G12",
+      "endpoint": "verify",
+      "passed": true,
+      "bucket": "verified",
+      "reason": "",
+      "debug": {
+        "verdicts": [
+          [
+            "어제 새별오름 다녀왔는데 정말 좋았어요.",
+            "outdated",
+            "새별오름"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "G13",
+      "endpoint": "verify",
+      "passed": true,
+      "bucket": "fallback",
+      "reason": "",
+      "debug": {
+        "verdicts": [
+          [
+            "제주시 '가상특이한이름카페12345'에서 커피 마셨어요",
+            "coverage_gap",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "id": "G14",
+      "endpoint": "verify",
+      "passed": true,
+      "bucket": "verified",
+      "reason": "",
+      "debug": {
+        "verdicts": [
+          [
+            "애월오누이 제주 정말 맛있어요, 강추합니다.",
+            "verified",
+            "애월오누이 제주"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "G15",
+      "endpoint": "pack",
+      "passed": true,
+      "bucket": "verified",
+      "reason": "",
+      "debug": {
+        "items": [
+          [
+            "바굼지오름",
+            "caution",
+            "이용자 정보 수정요청 이력 · 아이 동반 관련 정보 미확인"
+          ],
+          [
+            "큰바리메오름",
+            "caution",
+            "이용자 정보 수정요청 이력 · 아이 동반 관련 정보 미확인"
+          ],
+          [
+            "고내봉(고내오름,고니오름,망오름)",
+            "caution",
+            "이용자 정보 수정요청 이력 · 아이 동반 관련 정보 미확인"
+          ]
+        ],
+        "fallback": null,
+        "observed": []
+      }
+    }
+  ],
+  "metrics": {
+    "verified_precision": 1.0,
+    "fallback_accuracy": 1.0,
+    "badge_accuracy": 1.0
+  },
+  "thresholds": {
+    "verified_precision": 0.9,
+    "fallback_accuracy": 0.9,
+    "badge_accuracy": 0.8
+  },
+  "green": true
+}

@@ -342,6 +342,59 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               </div>
             </section>
 
+            <section className="px-5 pb-16 lg:px-10">
+              <div className="mx-auto max-w-6xl overflow-hidden rounded-[30px] border border-mint/20 bg-[#F4FBF8] shadow-pyj-card">
+                <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className="border-b border-mint/15 p-6 lg:border-b-0 lg:border-r lg:p-8">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-mint">
+                      Golden Set Gate
+                    </p>
+                    <h2 className="mt-3 font-serif-kr text-[34px] font-bold leading-tight text-basalt">
+                      믿을 만하다는 말을,
+                      <br />
+                      숫자로 남겼습니다.
+                    </h2>
+                    <p className="mt-4 text-[14px] leading-7 text-basalt-2">
+                      제주를 담다는 배포 전 골든셋을 통과해야 합니다. 검증 후보, fallback_reason,
+                      주의 배지, 리뷰 검증 케이스를 같은 기준으로 반복 실행해 기본 GPT 답변보다
+                      근거 추적 가능성이 높은지 확인합니다.
+                    </p>
+                    <div className="mt-5 rounded-2xl border border-mint/20 bg-white/80 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[12px] font-bold text-basalt-2">현재 게이트</span>
+                        <span className="rounded-full bg-mint px-3 py-1 text-[11px] font-bold text-white">
+                          12 / 12 통과
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11.5px] leading-relaxed text-basalt-2">
+                        실행: `python -m packages.eval.run --out docs/eval`
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 p-5 sm:grid-cols-3 lg:p-8">
+                    {[
+                      ['Verified Precision', '1.00', '근거 후보 조건 충족'],
+                      ['Fallback Accuracy', '1.00', '확인 불가 사유 분리'],
+                      ['Badge Accuracy', '1.00', '주의·반증 배지 판정'],
+                    ].map(([label, value, body]) => (
+                      <div key={label} className="rounded-3xl border border-mint/15 bg-white p-4">
+                        <CheckCircle2 className="h-5 w-5 text-mint" />
+                        <div className="mt-4 font-serif-kr text-[34px] font-bold leading-none text-basalt">
+                          {value}
+                        </div>
+                        <div className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-mint">
+                          {label}
+                        </div>
+                        <p className="mt-2 text-[11.5px] leading-relaxed text-basalt-2">
+                          {body}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section className="bg-basalt px-5 py-16 text-white lg:px-10">
               <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr]">
                 <div>

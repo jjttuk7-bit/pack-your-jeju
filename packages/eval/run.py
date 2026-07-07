@@ -23,6 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
