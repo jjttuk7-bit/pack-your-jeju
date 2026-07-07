@@ -7,10 +7,8 @@ from __future__ import annotations
 import apps.api.engine.llm as llm
 
 
-def test_model_is_temporarily_pinned_to_gpt_4o_mini():
-    # 2026-07-06 데모 운영 예외:
-    # gpt-5.3-mini 키 수령 전까지 gpt-4o-mini로 테스트한다.
-    assert llm.MODEL == "gpt-4o-mini"
+def test_model_is_pinned_to_gpt_5_mini():
+    assert llm.MODEL == "gpt-5-mini"
 
 
 def test_is_available_false_when_key_missing(monkeypatch):
