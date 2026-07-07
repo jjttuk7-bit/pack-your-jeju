@@ -21,17 +21,17 @@ interface RegionChipsProps {
 
 const REGION_MAP_POINTS: Record<RegionId, { x: number; y: number; short: string }> = {
   jeju_city: { x: 48, y: 27, short: '제주시' },
-  aewol: { x: 28, y: 35, short: '애월' },
-  hallim: { x: 17, y: 49, short: '한림' },
-  jocheon: { x: 62, y: 31, short: '조천' },
-  gujwa: { x: 75, y: 36, short: '구좌' },
-  seongsan: { x: 84, y: 52, short: '성산' },
-  udo: { x: 91, y: 42, short: '우도' },
-  pyoseon: { x: 73, y: 66, short: '표선' },
-  namwon: { x: 58, y: 74, short: '남원' },
-  seogwipo: { x: 45, y: 78, short: '서귀포' },
-  andeok: { x: 28, y: 75, short: '안덕' },
-  daejeong: { x: 15, y: 69, short: '대정' },
+  aewol: { x: 30, y: 32, short: '애월' },
+  hallim: { x: 19, y: 42, short: '한림' },
+  jocheon: { x: 64, y: 30, short: '조천' },
+  gujwa: { x: 77, y: 36, short: '구좌' },
+  seongsan: { x: 87, y: 48, short: '성산' },
+  udo: { x: 94, y: 34, short: '우도' },
+  pyoseon: { x: 76, y: 64, short: '표선' },
+  namwon: { x: 61, y: 73, short: '남원' },
+  seogwipo: { x: 45, y: 76, short: '서귀포' },
+  andeok: { x: 29, y: 70, short: '안덕' },
+  daejeong: { x: 16, y: 62, short: '대정' },
 };
 
 /**
@@ -258,7 +258,7 @@ function JejuRegionMap({
       </div>
 
       <div
-        className="relative aspect-[1.65/1] overflow-hidden rounded-[18px] border border-orange-100/70 bg-[#FDF6EA]"
+        className="relative aspect-[1.75/1] overflow-hidden rounded-[18px] border border-orange-100/70 bg-[#FDF6EA]"
         aria-label="제주 지역 지도 선택"
       >
         <svg
@@ -269,44 +269,81 @@ function JejuRegionMap({
         >
           <defs>
             <linearGradient id="jeju-map-land" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#FFF8EC" />
-              <stop offset="55%" stopColor="#F8E5C8" />
-              <stop offset="100%" stopColor="#F2D2AA" />
+              <stop offset="0%" stopColor="#FFF7E8" />
+              <stop offset="45%" stopColor="#F5DFB9" />
+              <stop offset="100%" stopColor="#EBC58F" />
             </linearGradient>
             <radialGradient id="jeju-map-center" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#4A8779" stopOpacity="0.18" />
+              <stop offset="0%" stopColor="#557B69" stopOpacity="0.34" />
+              <stop offset="48%" stopColor="#7EA18D" stopOpacity="0.16" />
               <stop offset="100%" stopColor="#4A8779" stopOpacity="0" />
             </radialGradient>
+            <linearGradient id="jeju-map-sea" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor="#BFE3DE" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="#7FB7AA" stopOpacity="0.34" />
+            </linearGradient>
+            <filter id="jeju-map-soft-shadow" x="-12%" y="-18%" width="124%" height="138%">
+              <feDropShadow dx="0" dy="10" stdDeviation="9" floodColor="#8B6D43" floodOpacity="0.16" />
+            </filter>
           </defs>
           <path
-            d="M31 121C42 80 83 48 135 39c58-10 131 4 170 33 35 26 42 68 17 97-29 33-92 45-157 37-67-8-123-33-137-66-3-7-3-13 3-19Z"
-            fill="#D5E9E1"
-            opacity="0.55"
+            d="M31 124C43 83 83 54 139 41c55-13 117-5 160 18 39 21 59 51 51 80-8 28-45 51-96 61-56 12-126 7-174-12-40-16-62-39-61-63 0-5 4-6 12-1Z"
+            fill="url(#jeju-map-sea)"
+            opacity="0.78"
           />
           <path
-            d="M42 116C56 82 94 58 141 49c54-10 117 1 154 27 32 22 38 58 15 82-25 26-79 39-137 34-61-5-116-27-130-57-3-7-3-13-1-19Z"
+            d="M43 119C47 100 68 84 94 71c31-16 68-26 104-27 37-1 79 6 111 22 31 16 49 37 47 59-2 23-26 43-61 55-39 14-91 18-141 12-49-6-91-21-111-43-8-9-7-20 0-30Z"
             fill="url(#jeju-map-land)"
             stroke="#C9A97F"
-            strokeWidth="2"
+            strokeWidth="2.4"
+            filter="url(#jeju-map-soft-shadow)"
           />
           <path
-            d="M63 119C78 94 111 78 151 72c45-7 95 2 124 21"
+            d="M57 122C74 96 111 77 156 69c52-10 107 0 143 22"
             fill="none"
-            stroke="#E7683A"
-            strokeOpacity="0.18"
-            strokeWidth="2"
+            stroke="#8E6B3F"
+            strokeOpacity="0.14"
+            strokeWidth="2.2"
             strokeLinecap="round"
           />
           <path
-            d="M72 145C116 166 204 177 288 146"
+            d="M65 151C105 173 196 184 298 151"
             fill="none"
             stroke="#4A8779"
-            strokeOpacity="0.18"
+            strokeOpacity="0.16"
             strokeWidth="2"
             strokeLinecap="round"
           />
-          <circle cx="179" cy="117" r="40" fill="url(#jeju-map-center)" />
-          <circle cx="328" cy="84" r="10" fill="#F6E0BE" stroke="#C9A97F" strokeWidth="1.5" />
+          <path
+            d="M121 127C139 94 158 81 181 79c26-2 48 14 65 48-37 13-83 14-125 0Z"
+            fill="url(#jeju-map-center)"
+          />
+          <path
+            d="M136 126C147 106 162 95 181 94c20-1 36 9 48 31"
+            fill="none"
+            stroke="#557B69"
+            strokeOpacity="0.22"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M36 91c14-5 28-8 42-8M291 69c15 6 27 14 36 24M82 183c27 9 57 14 89 15M226 199c29-3 57-10 80-20"
+            fill="none"
+            stroke="#6EA99D"
+            strokeOpacity="0.24"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <circle cx="338" cy="75" r="10" fill="#F6E0BE" stroke="#C9A97F" strokeWidth="1.5" />
+          <circle cx="338" cy="75" r="15" fill="none" stroke="#7FB7AA" strokeOpacity="0.22" strokeWidth="3" />
+          <path
+            d="M28 147c9 7 24 14 41 18M314 164c13-5 24-12 32-21"
+            fill="none"
+            stroke="#F07A3B"
+            strokeOpacity="0.16"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
 
         {regions.map((region) => {
