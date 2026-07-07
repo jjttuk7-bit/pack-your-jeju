@@ -216,7 +216,9 @@ export default function PackingDashboard(props: Props) {
   ]);
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-5" id="packing-dashboard">
+    <div className="w-full max-w-6xl mx-auto" id="packing-dashboard">
+      <div className="grid gap-5 lg:grid-cols-[430px_minmax(0,1fr)] lg:items-start">
+        <aside className="space-y-5 lg:sticky lg:top-6">
       {/* 요약 카드 */}
       <div
         className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
@@ -333,6 +335,13 @@ export default function PackingDashboard(props: Props) {
           onSetVisitCheck={onSetVisitCheck}
         />
       )}
+
+      {packResp && !loading && !error && (
+        <TrustFeedbackLoopCard />
+      )}
+        </aside>
+
+        <main className="space-y-5">
 
       {/* 로딩 · 에러 */}
       {loading && (
@@ -482,6 +491,8 @@ export default function PackingDashboard(props: Props) {
             );
           })}
         </div>
+      </div>
+        </main>
       </div>
     </div>
   );
@@ -835,6 +846,38 @@ function PlanItemRow({
   );
 }
 
+function TrustFeedbackLoopCard() {
+  return (
+    <div className="rounded-[24px] border border-mint/20 bg-[#F4FBF8] p-5 shadow-pyj-card">
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-mint">
+        <ClipboardCheck className="h-3 w-3" />
+        Trust Feedback Loop
+      </span>
+      <h3 className="mt-2 font-serif-kr text-[16px] font-bold text-basalt">
+        방문 기록이 다음 신뢰 신호가 됩니다.
+      </h3>
+      <div className="mt-4 grid gap-2 text-[11px] font-semibold text-basalt-2">
+        {[
+          ['1', '방문 후 피드백 작성'],
+          ['2', '신뢰도 점수 업데이트'],
+          ['3', '공공데이터 수정요청 큐 저장'],
+          ['4', '다음 여행팩 판단에 반영'],
+        ].map(([step, label]) => (
+          <div key={step} className="flex items-center gap-2 rounded-2xl border border-mint/15 bg-white/78 px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mint text-[10px] font-bold text-white">
+              {step}
+            </span>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[10.5px] leading-relaxed text-basalt-2">
+        사용자가 남긴 메모는 추천 사실로 즉시 쓰지 않고, 검토 가능한 수정요청 큐와 방문 신호로 분리 저장합니다.
+      </p>
+    </div>
+  );
+}
+
 function VisitButton({
   label,
   active,
@@ -894,6 +937,23 @@ function publicDataStatusLabel(status: string): string {
   return status;
 }
 
+function checkRequiredLabel(key: string): string {
+  const labels: Record<string, string> = {
+    public_data: '공공데이터 반증 확인',
+    user_condition: '동행자 조건 확인',
+    weather: '날씨 영향 확인',
+    movement: '이동·주차 확인',
+    operation_info: '운영 정보 확인',
+    visit_feedback: '방문 피드백 확인',
+    recency: '최신성 확인',
+  };
+  return labels[key] ?? key;
+}
+
+function checkRequiredText(keys: string[] | undefined): string {
+  return (keys ?? []).map(checkRequiredLabel).join(' · ');
+}
+
 function buildShareText(
   info: TravelInfo,
   selectedMomentIds: MomentId[],
@@ -912,7 +972,7 @@ function buildShareText(
   const signals = countPackSignals(packResp);
   const planLines = planItems.length > 0
     ? buildSelectedPlanLines(planItems, visitChecks)
-    : ['아직 내 여행플랜에 담은 장소가 없습니다.'];
+    : buildItineraryShareLines(packResp);
   const gapLines = collectUnavailableCombos(packResp).slice(0, 5);
   const url = typeof window !== 'undefined' ? window.location.href : 'https://pack-your-jeju.vercel.app/';
   return [
@@ -927,7 +987,7 @@ function buildShareText(
     `확인 후보 ${signals.total}곳 · 신뢰 신호 ${signals.verified} · 주의 신호 ${signals.caution} · 데이터 부족 조합 ${signals.gaps}개`,
     '',
     'Day별 여행플랜',
-    ...(planLines.length > 0 ? planLines : ['아직 공유할 후보가 없습니다.']),
+    ...(planLines.length > 0 ? planLines : ['아직 내 여행플랜에 담은 장소가 없습니다.']),
     ...(gapLines.length > 0 ? ['', '데이터가 부족한 조합 메모', ...gapLines.map((x) => `- ${x}`)] : []),
     '',
     '장소별 근거와 주의 신호는 제주를 담다에서 확인할 수 있어요.',
@@ -962,11 +1022,36 @@ function buildSelectedPlanLines(
       const moment = MOMENTS.find((m) => m.id === item.moment)?.title
         ?? (item.source === 'user_added' ? '사용자 추가' : String(item.moment));
       const source = item.source === 'public_data' ? shareBadgeLabel(item.badge ?? 'reference') : '검증 전 메모';
-      const visit = visitChecks[item.id] ? ` · ${visitStatusLabel(visitChecks[item.id].status)}` : '';
-      lines.push(`- ${item.name} (${moment} · ${source}${visit})`);
+      const visit = visitChecks[item.id];
+      lines.push(`- ${item.name}`);
+      lines.push(`  · 순간: ${moment}`);
+      lines.push(`  · 근거 상태: ${source}`);
+      if (typeof item.trust_score === 'number') {
+        const scoreText = visit?.updatedTrustScore != null
+          ? `${visit.previousTrustScore ?? item.trust_score}점 → ${visit.updatedTrustScore}점`
+          : `${item.trust_score}점`;
+        lines.push(`  · 신뢰도: ${scoreText}`);
+      }
+      if (item.check_required?.length) {
+        lines.push(`  · 확인 필요: ${checkRequiredText(item.check_required)}`);
+      }
+      if (item.address) lines.push(`  · 주소: ${item.address}`);
+      if (item.note) lines.push(`  · 주의 메모: ${item.note}`);
+      if (visit) {
+        lines.push(`  · 방문 피드백: ${visitStatusLabel(visit.status)}${visit.memo ? ` - ${visit.memo}` : ''}`);
+        if (visit.publicDataStatus) {
+          lines.push(`  · 수정요청 큐: ${publicDataStatusLabel(visit.publicDataStatus)}`);
+        }
+      }
     });
   });
   return lines;
+}
+
+function buildItineraryShareLines(packResp: PackResponse): string[] {
+  const days = packResp.itinerary ?? [];
+  if (days.length === 0) return [];
+  return days.flatMap(buildShareDayLines);
 }
 
 function buildShareDayLines(day: ItineraryDayDto): string[] {
@@ -976,7 +1061,10 @@ function buildShareDayLines(day: ItineraryDayDto): string[] {
   const header = `Day ${day.day} (${day.date}${regionLabel ? ` · ${regionLabel}` : ''})`;
   const itemLines = (day.items ?? []).slice(0, 4).map((item, idx) => {
     const moment = MOMENTS.find((m) => m.id === item.moment)?.title ?? item.moment;
-    return `- ${shareSlotLabel(item, idx)}: ${item.name} (${moment} · ${shareBadgeLabel(item.badge)})`;
+    const checks = item.check_required?.length ? ` · 확인 필요: ${checkRequiredText(item.check_required)}` : '';
+    const score = typeof item.trust_score === 'number' ? ` · 신뢰도 ${item.trust_score}점` : '';
+    const address = item.address ? ` · 주소: ${item.address}` : '';
+    return `- ${shareSlotLabel(item, idx)}: ${item.name} (${moment} · ${shareBadgeLabel(item.badge)}${score}${checks}${address})`;
   });
   const rest = Math.max((day.items?.length ?? 0) - itemLines.length, 0);
   return [
@@ -1449,7 +1537,7 @@ function PackItemCard({
         </div>
         {(it.check_required?.length ?? 0) > 0 && (
           <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[10.5px] font-semibold text-amber-900">
-            확인 필요: {it.check_required?.join(' · ')}
+            확인 필요: {checkRequiredText(it.check_required)}
           </div>
         )}
       </button>

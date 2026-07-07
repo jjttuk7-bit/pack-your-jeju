@@ -290,6 +290,58 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               </div>
             </section>
 
+            <section className="px-5 pb-16 lg:px-10">
+              <div className="mx-auto max-w-6xl rounded-[30px] border border-orange-100/80 bg-white/80 p-5 shadow-pyj-card backdrop-blur lg:p-8">
+                <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
+                      GPT vs 제주를 담다
+                    </p>
+                    <h2 className="mt-3 font-serif-kr text-[34px] font-bold leading-tight text-basalt">
+                      그럴듯한 추천보다,
+                      <br />
+                      검증 가능한 추천을 보여줍니다.
+                    </h2>
+                    <p className="mt-4 text-[14px] leading-7 text-basalt-2">
+                      기본 GPT는 여행지를 매끄럽게 말할 수 있지만, 현재 영업 여부·수정요청·지역별
+                      데이터 공백을 스스로 증명하지 못합니다. 제주를 담다는 먼저 DB를 조회하고,
+                      GPT는 조회된 근거를 정리하는 역할만 맡습니다.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-3xl border border-rose-100 bg-rose-50/50 p-4">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-rose-700">
+                        <AlertTriangle className="h-3 w-3" />
+                        기본 GPT 답변
+                      </span>
+                      <p className="mt-3 font-serif-kr text-[16px] font-bold text-basalt">
+                        “성산 근처 맛집과 카페를 추천해드릴게요.”
+                      </p>
+                      <ul className="mt-3 space-y-2 text-[11.5px] leading-relaxed text-rose-900/80">
+                        <li>· 장소가 최신 공공데이터에 있는지 불명확</li>
+                        <li>· 영업 변경·수정요청 이력 확인 불가</li>
+                        <li>· 데이터가 부족한 조합도 그럴듯하게 채울 위험</li>
+                      </ul>
+                    </div>
+                    <div className="rounded-3xl border border-mint/20 bg-mint/8 p-4">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-mint">
+                        <ShieldCheck className="h-3 w-3" />
+                        제주를 담다 RAG
+                      </span>
+                      <p className="mt-3 font-serif-kr text-[16px] font-bold text-basalt">
+                        “확인 후보 126곳, 주의 신호 10곳, 데이터 부족 조합 4개.”
+                      </p>
+                      <ul className="mt-3 space-y-2 text-[11.5px] leading-relaxed text-basalt-2">
+                        <li>· 비짓제주·교통·수정요청 DB 후보만 사용</li>
+                        <li>· 신뢰도 점수와 확인 필요 항목을 분리 표시</li>
+                        <li>· 방문 피드백은 수정요청 큐와 다음 신뢰 신호로 연결</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section className="bg-basalt px-5 py-16 text-white lg:px-10">
               <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr]">
                 <div>
