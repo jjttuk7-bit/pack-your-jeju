@@ -34,6 +34,8 @@ const REGION_MAP_POINTS: Record<RegionId, { x: number; y: number; short: string 
   daejeong: { x: 16, y: 62, short: '대정' },
 };
 
+const isString = (value: string | undefined): value is string => Boolean(value);
+
 /**
  * 제주 12지역 칩 UI — 다중 선택.
  * 자유입력을 만들지 않아 region_normalized 정규화 오류를 원천 차단 (D-10).
@@ -92,55 +94,67 @@ export default function RegionChips({ value, onChange }: RegionChipsProps) {
   };
 
   return (
-    <div>
-      <label className="block text-[10.5px] font-bold text-basalt-2 mb-2.5 flex items-center gap-1 uppercase tracking-[0.14em]">
-        <MapPin className="w-3 h-3 text-basalt-2/60" /> 제주 어디로
-        <span className="ml-auto normal-case tracking-normal text-[10px] text-basalt-2/60 font-normal">
-          여러 지역 선택 가능 · <span className="text-citrus-2 font-semibold">{value.length}곳</span>
-        </span>
-      </label>
-
-      <JejuRegionMap
-        regions={REGIONS}
-        selected={value}
-        onToggle={toggle}
-      />
-
-      <div className="flex flex-wrap gap-1.5" id="region-chips">
-        {REGIONS.map((r) => {
-          const active = value.includes(r.value);
-          return (
-            <button
-              key={r.value}
-              type="button"
-              id={`region-chip-${r.value}`}
-              onClick={() => toggle(r.value)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-200 flex items-center gap-1 cursor-pointer hover:-translate-y-px ${
-                active
-                  ? 'border-citrus bg-citrus text-white shadow-jeju-chip'
-                  : 'border-earth bg-white/70 text-basalt hover:border-citrus/60 hover:text-citrus-2 hover:shadow-sm'
-              }`}
-            >
-              {active && <Check className="w-3 h-3 stroke-[4]" />}
-              <span>{r.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {selected.length > 0 && (
-        <div className="mt-3 text-[11.5px] card-citrus px-3.5 py-2.5 leading-relaxed space-y-1.5">
-          {selected.map((s) => (
-            <RegionCoverageCard
-              key={s.value}
-              label={s.label}
-              landmarks={s.landmarks}
-              preview={previews[s.value]}
-              loading={!!loading[s.value]}
-            />
-          ))}
+    <div className="space-y-3">
+      <section className="rounded-[26px] border border-earth bg-gradient-to-br from-white via-[#FFF9EF] to-[#F6E7D2] p-3.5 sm:p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <label className="flex items-center gap-1.5 text-[10.5px] font-bold text-citrus-2 uppercase tracking-[0.16em]">
+              <MapPin className="w-3.5 h-3.5" /> Jeju Area Board
+            </label>
+            <h3 className="mt-1 font-serif-kr text-[18px] font-bold leading-tight text-basalt">
+              지도에서 여행 범위를 먼저 잡아보세요.
+            </h3>
+          </div>
+          <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[10.5px] font-bold text-citrus-2 ring-1 ring-citrus/20">
+            {value.length}곳 선택
+          </span>
         </div>
-      )}
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1.38fr)_minmax(205px,0.9fr)]">
+          <JejuRegionMap
+            regions={REGIONS}
+            selected={value}
+            onToggle={toggle}
+          />
+          <RegionInsightPanel
+            selected={selected}
+            previews={previews}
+            loading={loading}
+          />
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-white/70 bg-white/55 p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-basalt-2/70">
+              빠른 선택
+            </p>
+            <p className="text-[10px] text-basalt-2/60">
+              여러 지역 선택 가능
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5" id="region-chips">
+            {REGIONS.map((r) => {
+              const active = value.includes(r.value);
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  id={`region-chip-${r.value}`}
+                  onClick={() => toggle(r.value)}
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-200 flex items-center gap-1 cursor-pointer hover:-translate-y-px ${
+                    active
+                      ? 'border-citrus bg-citrus text-white shadow-jeju-chip'
+                      : 'border-earth bg-white/80 text-basalt hover:border-citrus/60 hover:text-citrus-2 hover:shadow-sm'
+                  }`}
+                >
+                  {active && <Check className="w-3 h-3 stroke-[4]" />}
+                  <span>{r.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       <button
         type="button"
@@ -166,6 +180,122 @@ export default function RegionChips({ value, onChange }: RegionChipsProps) {
         </div>
       )}
     </div>
+  );
+}
+
+function RegionInsightPanel({
+  selected,
+  previews,
+  loading,
+}: {
+  selected: RegionEntry[];
+  previews: Record<string, RegionCoveragePreview>;
+  loading: Record<string, boolean>;
+}) {
+  const loadedPreviews = selected
+    .map((s) => previews[s.value])
+    .filter(Boolean);
+  const totalPlaces = loadedPreviews.reduce((sum, preview) => sum + preview.total_places, 0);
+  const strongLabels = Array.from(new Set(
+    loadedPreviews.flatMap((preview) =>
+      preview.recommended_moments
+        .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+        .filter(isString),
+    ),
+  )).slice(0, 3);
+  const weakLabels = Array.from(new Set(
+    loadedPreviews.flatMap((preview) =>
+      preview.weak_moments
+        .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+        .filter(isString),
+    ),
+  )).slice(0, 2);
+  const isLoading = selected.some((s) => loading[s.value]);
+
+  return (
+    <aside className="rounded-[22px] border border-earth bg-white/78 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2/70">
+        선택 해석
+      </p>
+
+      {selected.length === 0 ? (
+        <div className="mt-5 rounded-2xl border border-dashed border-earth bg-[#FFF9EF] px-3 py-4 text-center">
+          <p className="font-serif-kr text-[15px] font-bold text-basalt">
+            아직 지역을 고르지 않았어요.
+          </p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-basalt-2">
+            지도나 빠른 선택에서 지역을 누르면, 하루방 에이전트가 참고할 데이터 범위가 정리됩니다.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-3">
+          <div>
+            <p className="font-serif-kr text-[18px] font-bold leading-tight text-basalt">
+              {selected.map((s) => s.label).join(' · ')}
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">
+              선택한 권역을 기준으로 후보와 데이터 부족 조합을 먼저 확인합니다.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-mint/20 bg-mint/5 px-3 py-2">
+              <p className="text-[10px] text-basalt-2">확인 후보</p>
+              <p className="mt-0.5 font-serif-kr text-[20px] font-bold text-mint">
+                {loadedPreviews.length > 0 ? totalPlaces.toLocaleString() : isLoading ? '...' : '-'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-citrus/20 bg-citrus/5 px-3 py-2">
+              <p className="text-[10px] text-basalt-2">선택 지역</p>
+              <p className="mt-0.5 font-serif-kr text-[20px] font-bold text-citrus-2">
+                {selected.length}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            {strongLabels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {strongLabels.map((label) => (
+                  <span key={label} className="inline-flex items-center gap-1 rounded-full border border-mint/25 bg-white px-2 py-0.5 text-[10.5px] text-basalt">
+                    <ShieldCheck className="h-3 w-3 text-mint" />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
+            {weakLabels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {weakLabels.map((label) => (
+                  <span key={label} className="inline-flex items-center gap-1 rounded-full border border-citrus/25 bg-white px-2 py-0.5 text-[10.5px] text-basalt">
+                    <AlertTriangle className="h-3 w-3 text-citrus-2" />
+                    {label} 미확인
+                  </span>
+                ))}
+              </div>
+            )}
+            {isLoading && (
+              <div className="inline-flex items-center gap-1.5 text-[10.5px] text-basalt-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                근거 현황 확인 중
+              </div>
+            )}
+          </div>
+
+          <div className="max-h-[190px] space-y-2 overflow-y-auto pr-1">
+            {selected.map((s) => (
+              <RegionCoverageCard
+                key={s.value}
+                label={s.label}
+                landmarks={s.landmarks}
+                preview={previews[s.value]}
+                loading={!!loading[s.value]}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -242,7 +372,7 @@ function JejuRegionMap({
   onToggle: (region: RegionId) => void;
 }) {
   return (
-    <div className="mb-3 rounded-2xl border border-earth bg-white/65 p-3 shadow-sm">
+    <div className="h-full rounded-[22px] border border-earth bg-white/65 p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2 mb-2">
         <div>
           <p className="font-serif-kr text-[13px] font-bold text-basalt">

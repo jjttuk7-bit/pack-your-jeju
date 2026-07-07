@@ -275,7 +275,7 @@ export default function App() {
       </div>
 
       {/* Container */}
-      <div className="w-full max-w-lg flex flex-col flex-1" id="app-container">
+      <div className="w-full max-w-3xl flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
         <header className="pt-2 pb-8" id="app-header">
@@ -342,7 +342,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35, duration: 0.5 }}
-            className="font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-md"
+            className="font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-2xl"
           >
             우리는 <span className="text-citrus-2 font-bold">근거 있는 것만</span> 담고,
             <br />

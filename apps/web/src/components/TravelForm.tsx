@@ -186,7 +186,7 @@ export default function TravelForm({ onSubmit, initialInfo, initialMoments }: Tr
   };
 
   return (
-    <div className="w-full max-w-md mx-auto card-jeju p-6 sm:p-8" id="travel-form">
+    <div className="w-full max-w-2xl mx-auto card-jeju p-5 sm:p-7" id="travel-form">
       <div className="relative flex items-center mb-8 pb-3" id="form-tab-nav">
         <button
           onClick={() => setActiveTab('basic')}
