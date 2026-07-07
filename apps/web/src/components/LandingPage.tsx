@@ -538,16 +538,28 @@ function JejuArrivalScene() {
         <span className="pyj-arrival-cloud pyj-arrival-cloud-b" />
         <span className="pyj-arrival-cloud pyj-arrival-cloud-c" />
         <span className="pyj-arrival-plane" aria-hidden="true">
-          <svg viewBox="0 0 88 52" role="img">
+          <svg viewBox="0 0 132 72" role="img">
             <path
-              d="M8 29c19-8 39-17 61-26 3-1 7 0 9 2 2 3 1 6-2 8L52 29l15 13c1 1 0 3-2 3l-23-8-17 10c-2 1-4 0-3-2l8-13-21 3c-5 1-6-4-1-6Z"
+              d="M11 39c16-6 34-10 56-12l34-19c8-4 17-2 20 3 3 6-2 12-10 14L82 34l24 16c3 2 2 6-2 6L70 47 43 63c-4 2-8 0-6-4l11-18-33 4c-8 1-11-4-4-6Z"
               fill="#FFF8EC"
               stroke="#2E3235"
-              strokeWidth="2.4"
+              strokeWidth="2.6"
               strokeLinejoin="round"
             />
-            <path d="M48 30 33 13" stroke="#E7683A" strokeWidth="2.4" strokeLinecap="round" />
-            <path d="M30 32 19 23" stroke="#4A8779" strokeWidth="2.4" strokeLinecap="round" />
+            <path
+              d="M52 29c17-2 38-3 58-2"
+              fill="none"
+              stroke="#4A8779"
+              strokeWidth="2"
+              strokeLinecap="round"
+              opacity="0.75"
+            />
+            <path d="M77 35 58 14" stroke="#E7683A" strokeWidth="3" strokeLinecap="round" />
+            <path d="M50 40 31 25" stroke="#4A8779" strokeWidth="3" strokeLinecap="round" />
+            <path d="M98 22 112 9" stroke="#E7683A" strokeWidth="3" strokeLinecap="round" />
+            <circle cx="66" cy="30" r="2.2" fill="#2E3235" opacity="0.7" />
+            <circle cx="76" cy="29" r="2.1" fill="#2E3235" opacity="0.62" />
+            <circle cx="86" cy="28" r="2" fill="#2E3235" opacity="0.54" />
           </svg>
         </span>
       </div>
