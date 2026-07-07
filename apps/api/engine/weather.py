@@ -55,13 +55,43 @@ def _clean_forecast_text(raw_text: str) -> str:
             continue
         if stripped.startswith(("7777", "====", "----")):
             continue
+        if _is_machine_code_row(stripped):
+            continue
         lines.append(stripped)
     return re.sub(r"\s+", " ", " ".join(lines)).strip()
 
 
+def _is_machine_code_row(line: str) -> bool:
+    tokens = line.split()
+    if len(tokens) < 5:
+        return False
+    digit_chars = sum(1 for ch in line if ch.isdigit())
+    compact_chars = sum(1 for ch in line if not ch.isspace())
+    digit_ratio = digit_chars / max(compact_chars, 1)
+    long_number_tokens = sum(1 for token in tokens if re.fullmatch(r"\d{8,12}", token))
+    region_code_tokens = sum(1 for token in tokens if re.fullmatch(r"\d{2}[A-Z]\d{5}", token))
+    return digit_ratio > 0.45 and (long_number_tokens >= 2 or region_code_tokens >= 1)
+
+
+def _issued_at_label(raw_text: str) -> str | None:
+    patterns = (
+        r"발표시각\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*(\d{1,2})시",
+        r"발표\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*(\d{1,2})시",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, raw_text)
+        if match:
+            year, month, day, hour = match.groups()
+            return f"{int(year)}년 {int(month)}월 {int(day)}일 {int(hour):02d}시 발표"
+    return None
+
+
 def _forecast_summary(text: str) -> str:
     if not text:
-        return "기상청 예보 문장을 가져왔지만 요약할 내용이 없습니다."
+        return (
+            "기상청 API허브 응답은 확인했지만 여행자가 읽을 수 있는 문장형 예보가 없어 "
+            "최신 예보 원문 확인이 필요합니다."
+        )
     sentences = re.split(r"(?<=[.!?。])\s+|(?<=다\.)\s*", text)
     candidates = [s.strip() for s in sentences if s.strip()]
     if not candidates:
@@ -72,6 +102,7 @@ def _forecast_summary(text: str) -> str:
 def parse_kma_api_hub_forecast(raw_text: str) -> dict[str, Any]:
     """Normalize KMA API Hub short forecast text into weather signals."""
     text = _clean_forecast_text(raw_text)
+    issued_at_label = _issued_at_label(raw_text)
     signals: list[str] = []
     labels: list[str] = []
     for signal, keywords, label in SIGNAL_RULES:
@@ -80,13 +111,13 @@ def parse_kma_api_hub_forecast(raw_text: str) -> dict[str, Any]:
             labels.append(label)
 
     if not labels:
-        labels = ["날씨 특이 신호 없음"]
+        labels = ["날씨 특이 신호 없음"] if text else ["예보 문장 확인 필요"]
 
     severe = {"heavy_rain", "wind", "wave", "fog", "heat", "snow"}
     risk_level = "caution" if any(signal in severe for signal in signals) else (
         "watch" if signals else "normal"
     )
-    return {
+    result = {
         "available": bool(text),
         "provider": "kma_api_hub",
         "risk_level": risk_level,
@@ -95,6 +126,9 @@ def parse_kma_api_hub_forecast(raw_text: str) -> dict[str, Any]:
         "summary": _forecast_summary(text),
         "raw_length": len(raw_text),
     }
+    if issued_at_label:
+        result["issued_at_label"] = issued_at_label
+    return result
 
 
 def smoke_kma_nowcast(region: str = "jeju_city") -> dict[str, Any]:

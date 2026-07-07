@@ -197,6 +197,7 @@ def _weather_meta(weather_snapshot: dict | None) -> dict:
         "risk_level": weather_snapshot.get("risk_level"),
         "signals": list(weather_snapshot.get("signals") or []),
         "labels": list(weather_snapshot.get("labels") or []),
+        "issued_at_label": weather_snapshot.get("issued_at_label"),
     }
     summary = weather_snapshot.get("summary")
     if summary:

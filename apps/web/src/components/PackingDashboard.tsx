@@ -870,6 +870,9 @@ function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
       <h3 className="mt-2 font-serif-kr text-[16px] font-bold text-basalt">
         기상청 예보를 여행 판단에 반영합니다.
       </h3>
+      <p className="mt-1 text-[10.5px] font-semibold text-basalt-2/75">
+        {weather.issued_at_label ?? '기상청 최신 발표 기준'}
+      </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {labels.map((label) => (
           <span
@@ -1009,7 +1012,12 @@ function checkRequiredText(keys: string[] | undefined): string {
   return (keys ?? []).map(checkRequiredLabel).join(' · ');
 }
 
-function itemWeatherNotice(it: PackItemDto): { labels: string[]; summary?: string; status: string } | null {
+function itemWeatherNotice(it: PackItemDto): {
+  labels: string[];
+  summary?: string;
+  issuedAt?: string;
+  status: string;
+} | null {
   const weather = it.score_breakdown?.weather_fit;
   if (!weather) return null;
   const labels = weather.labels ?? [];
@@ -1019,6 +1027,7 @@ function itemWeatherNotice(it: PackItemDto): { labels: string[]; summary?: strin
   return {
     labels: labels.length ? labels : ['날씨 확인 필요'],
     summary: weather.summary,
+    issuedAt: weather.issued_at_label,
     status: weather.status,
   };
 }
@@ -1623,6 +1632,9 @@ function PackItemCard({
               <CloudSun className="h-3 w-3 text-sky-700" />
               기상청 날씨 신호
             </div>
+            <p className="mt-0.5 text-[10px] font-semibold text-sky-900/65">
+              {weatherNotice.issuedAt ?? '기상청 최신 발표 기준'}
+            </p>
             <div className="mt-1 flex flex-wrap gap-1">
               {weatherNotice.labels.map((label) => (
                 <span key={label} className="rounded-full bg-white px-2 py-0.5 font-semibold text-sky-900">

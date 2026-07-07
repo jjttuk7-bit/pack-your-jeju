@@ -149,6 +149,7 @@ export type TrustScoreBreakdown = Record<
     signals?: string[];
     labels?: string[];
     summary?: string;
+    issued_at_label?: string;
   }
 >;
 
@@ -159,6 +160,7 @@ export interface WeatherSnapshotDto {
   signals?: string[];
   labels?: string[];
   summary?: string;
+  issued_at_label?: string;
   region?: string;
   source?: string;
   http_status?: number;

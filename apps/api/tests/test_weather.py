@@ -33,3 +33,29 @@ def test_parse_kma_api_hub_forecast_marks_clear_text_as_normal():
     assert parsed["signals"] == []
     assert parsed["risk_level"] == "normal"
     assert parsed["labels"] == ["날씨 특이 신호 없음"]
+
+
+def test_parse_kma_api_hub_forecast_hides_machine_code_rows():
+    raw = """
+    11000000 199001010000 210012310000 A 울산 11A00000 201501221100 210012310000 A 서해5도
+    210012310000 B 서해5도 11A00101 201610131800 210012310000 C 백령도
+    """
+
+    parsed = parse_kma_api_hub_forecast(raw)
+
+    assert parsed["available"] is False
+    assert parsed["labels"] == ["예보 문장 확인 필요"]
+    assert "11000000" not in parsed["summary"]
+    assert "210012310000" not in parsed["summary"]
+    assert "여행자가 읽을 수 있는 문장형 예보" in parsed["summary"]
+
+
+def test_parse_kma_api_hub_forecast_exposes_issued_at_label():
+    raw = """
+    발표시각 2026년 7월 8일 05시
+    제주도는 오늘 오후 비가 오겠습니다.
+    """
+
+    parsed = parse_kma_api_hub_forecast(raw)
+
+    assert parsed["issued_at_label"] == "2026년 7월 8일 05시 발표"
