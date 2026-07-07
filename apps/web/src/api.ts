@@ -11,6 +11,8 @@ import type {
   MomentId,
   PackResponse,
   RegionCoveragePreview,
+  VisitSignalResponse,
+  VisitCheckStatus,
   VerifyResponse,
 } from './types';
 
@@ -109,6 +111,18 @@ export async function downloadPackPdf(
 
 export function requestVerify(text: string): Promise<VerifyResponse> {
   return post<VerifyResponse>('/verify', { text });
+}
+
+export function requestVisitSignal(body: {
+  external_id: string;
+  place_name?: string;
+  status: VisitCheckStatus;
+  mismatch_reason?: string;
+  memo?: string;
+  previous_trust_score?: number;
+  score_breakdown?: Record<string, unknown>;
+}): Promise<VisitSignalResponse> {
+  return post<VisitSignalResponse>('/visit-signals', body);
 }
 
 // 자연어 상담 레이어 (신뢰 기반 에이전트 Phase A).

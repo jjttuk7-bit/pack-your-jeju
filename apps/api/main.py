@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from collections import Counter
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 import os
 
@@ -31,6 +31,7 @@ from apps.api.engine import haruban as haruban_mod
 from apps.api.engine import packpdf as packpdf_mod
 from apps.api.engine import region_coverage as region_coverage_mod
 from apps.api.engine import trust as trust_mod
+from apps.api.engine import visit_signals as visit_signals_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.engine import weather as weather_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
@@ -79,6 +80,26 @@ class PackBody(BaseModel):
     # 사용자 자유 텍스트. 사실 검증에는 영향 없음(폼이 구조화 필터를 이미 제공).
     # assemble.py의 감성 문구 톤에만 반영 — 새 장소·수치·시간 생성 금지 원칙 유지.
     special_notes: str | None = Field(default=None, max_length=500)
+
+
+VisitSignalStatus = Literal[
+    "visited",
+    "not_visited",
+    "changed",
+    "info_mismatch",
+    "satisfied",
+    "unsatisfied",
+]
+
+
+class VisitSignalBody(BaseModel):
+    external_id: str = Field(min_length=1, max_length=200)
+    place_name: str | None = Field(default=None, max_length=200)
+    status: VisitSignalStatus
+    mismatch_reason: str | None = Field(default=None, max_length=80)
+    memo: str | None = Field(default=None, max_length=500)
+    previous_trust_score: int | None = Field(default=None, ge=0, le=100)
+    score_breakdown: dict[str, Any] | None = None
 
 
 @app.get("/health")
@@ -181,6 +202,24 @@ def region_coverage_preview(region: str = Query(..., min_length=1)) -> dict[str,
             status_code=503,
             detail={"error": "coverage_preview_unavailable", "message": str(e)},
         )
+
+
+@app.post("/visit-signals")
+def visit_signals(body: VisitSignalBody) -> dict[str, Any]:
+    """방문 기록 저장.
+
+    DB 저장이 실패해도 데모 흐름을 깨지 않고, 신뢰도 변화 시뮬레이션은 반환한다.
+    """
+    result = visit_signals_mod.save_visit_signal(body.model_dump())
+    return {
+        "saved": result.saved,
+        "db_available": result.db_available,
+        "signal_id": result.signal_id,
+        "previous_trust_score": result.previous_trust_score,
+        "updated_trust_score": result.updated_trust_score,
+        "trust_delta": result.trust_delta,
+        "message": result.message,
+    }
 
 
 @app.post("/pack")
@@ -463,6 +502,9 @@ def _serialize_section(section: trust_mod.Section) -> dict:
                 "amenities": it.amenities,
                 "hygiene_grade": it.hygiene_grade,
                 "region": it.region_normalized,
+                "trust_score": it.trust_score,
+                "score_breakdown": it.score_breakdown,
+                "check_required": it.check_required,
             }
             for it in section.items
         ],

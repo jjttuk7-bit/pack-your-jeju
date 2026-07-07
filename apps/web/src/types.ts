@@ -74,12 +74,25 @@ export interface TravelPlanItem {
   note?: string | null;
   day?: number | null;
   date?: string | null;
+  trust_score?: number;
+  score_breakdown?: TrustScoreBreakdown;
+  check_required?: string[];
 }
 
-export type VisitCheckStatus = 'visited' | 'matched' | 'changed';
+export type VisitCheckStatus =
+  | 'visited'
+  | 'not_visited'
+  | 'changed'
+  | 'info_mismatch'
+  | 'satisfied'
+  | 'unsatisfied';
 
 export interface VisitCheck {
   status: VisitCheckStatus;
+  previousTrustScore?: number;
+  updatedTrustScore?: number;
+  trustDelta?: number;
+  saved?: boolean;
   memo?: string;
   updatedAt: string;
 }
@@ -118,6 +131,28 @@ export interface PackItemDto {
   amenities?: Record<string, unknown> | null;
   hygiene_grade?: string | null;
   region?: string;
+  trust_score?: number;
+  score_breakdown?: TrustScoreBreakdown;
+  check_required?: string[];
+}
+
+export type TrustScoreBreakdown = Record<
+  string,
+  {
+    points: number;
+    max: number;
+    status: string;
+  }
+>;
+
+export interface VisitSignalResponse {
+  saved: boolean;
+  db_available: boolean;
+  signal_id: string | null;
+  previous_trust_score: number;
+  updated_trust_score: number;
+  trust_delta: number;
+  message: string;
 }
 
 export type FallbackReason = 'out_of_scope' | 'contradicted' | 'retrieval_miss' | 'coverage_gap';

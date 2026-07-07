@@ -63,3 +63,22 @@ CREATE TABLE IF NOT EXISTS query_log (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS query_log_created_at_idx ON query_log (created_at DESC);
+
+-- visit_signal: 제안서 핵심 루프 "다녀올수록 신뢰도가 자란다"의 저장소.
+-- 방문 신호는 새 추천 사실을 만들지 않고, 장소 신뢰 점수의 visit_signal 축에만 반영한다.
+CREATE TABLE IF NOT EXISTS visit_signal (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  external_id TEXT NOT NULL,
+  place_name TEXT,
+  status TEXT NOT NULL CHECK (
+    status IN ('visited', 'not_visited', 'changed', 'info_mismatch', 'satisfied', 'unsatisfied')
+  ),
+  mismatch_reason TEXT,
+  memo TEXT,
+  previous_trust_score INT CHECK (previous_trust_score BETWEEN 0 AND 100),
+  updated_trust_score INT CHECK (updated_trust_score BETWEEN 0 AND 100),
+  score_breakdown JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS visit_signal_external_id_created_idx
+  ON visit_signal (external_id, created_at DESC);

@@ -135,6 +135,9 @@ def _item_to_dict(moment: str, it) -> dict:
         "transit": it.transit,
         "note": it.note,
         "region_normalized": getattr(it, "region_normalized", ""),
+        "trust_score": getattr(it, "trust_score", 0),
+        "score_breakdown": getattr(it, "score_breakdown", {}),
+        "check_required": getattr(it, "check_required", []),
     }
 
 

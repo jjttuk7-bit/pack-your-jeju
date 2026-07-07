@@ -38,7 +38,7 @@ import type {
   VisitCheckStatus,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
-import { requestPack } from '../api';
+import { requestPack, requestVisitSignal } from '../api';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 import PlaceDetail from './PlaceDetail';
@@ -64,7 +64,7 @@ interface Props {
   onTogglePlanItem: (item: TravelPlanItem) => void;
   onAddCustomPlanItem: (item: TravelPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
-  onSetVisitCheck: (itemId: string, status: VisitCheckStatus) => void;
+  onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
   onReset: () => void;
 }
 
@@ -526,6 +526,9 @@ function toPlanItem(item: PackItemDto | ItineraryItemDto, day?: ItineraryDayDto)
     note: item.note ?? null,
     day: day?.day ?? null,
     date: day?.date ?? null,
+    trust_score: item.trust_score,
+    score_breakdown: item.score_breakdown,
+    check_required: item.check_required,
   };
 }
 
@@ -540,7 +543,7 @@ function PlanBuilderCard({
   visitChecks: Record<string, VisitCheck>;
   onAddCustomPlanItem: (item: TravelPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
-  onSetVisitCheck: (itemId: string, status: VisitCheckStatus) => void;
+  onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
 }) {
   const [customName, setCustomName] = useState('');
   const [customMemo, setCustomMemo] = useState('');
@@ -642,10 +645,53 @@ function PlanItemRow({
   item: TravelPlanItem;
   visitCheck?: VisitCheck;
   onRemovePlanItem: (itemId: string) => void;
-  onSetVisitCheck: (itemId: string, status: VisitCheckStatus) => void;
+  onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
 }) {
   const moment = MOMENTS.find((m) => m.id === item.moment);
   const visitLabel = visitCheck ? visitStatusLabel(visitCheck.status) : '방문 후 확인 전';
+  const [saving, setSaving] = useState<VisitCheckStatus | null>(null);
+  const previousScore = item.trust_score ?? visitCheck?.previousTrustScore ?? 70;
+  const previewUpdate = simulateVisitTrustUpdate(previousScore, visitCheck?.status ?? 'visited');
+
+  const handleVisit = async (status: VisitCheckStatus) => {
+    const fallback = simulateVisitTrustUpdate(previousScore, status);
+    setSaving(status);
+    if (!item.external_id || item.source !== 'public_data') {
+      onSetVisitCheck(item.id, status, {
+        previousTrustScore: fallback.previous,
+        updatedTrustScore: fallback.updated,
+        trustDelta: fallback.delta,
+        saved: false,
+      });
+      setSaving(null);
+      return;
+    }
+    try {
+      const resp = await requestVisitSignal({
+        external_id: item.external_id,
+        place_name: item.name,
+        status,
+        mismatch_reason: status === 'info_mismatch' ? 'hours_wrong' : status === 'changed' ? 'changed' : undefined,
+        previous_trust_score: previousScore,
+        score_breakdown: item.score_breakdown,
+      });
+      onSetVisitCheck(item.id, status, {
+        previousTrustScore: resp.previous_trust_score,
+        updatedTrustScore: resp.updated_trust_score,
+        trustDelta: resp.trust_delta,
+        saved: resp.saved,
+      });
+    } catch {
+      onSetVisitCheck(item.id, status, {
+        previousTrustScore: fallback.previous,
+        updatedTrustScore: fallback.updated,
+        trustDelta: fallback.delta,
+        saved: false,
+      });
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-earth bg-[#FDFBF7] p-3 space-y-2">
@@ -690,20 +736,62 @@ function PlanItemRow({
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[9.5px] font-semibold text-basalt-2 mr-0.5">{visitLabel}</span>
         <VisitButton
-          label="다녀왔어요"
+          label="방문함"
           active={visitCheck?.status === 'visited'}
-          onClick={() => onSetVisitCheck(item.id, 'visited')}
+          loading={saving === 'visited'}
+          onClick={() => handleVisit('visited')}
         />
         <VisitButton
-          label="정보 맞았어요"
-          active={visitCheck?.status === 'matched'}
-          onClick={() => onSetVisitCheck(item.id, 'matched')}
+          label="방문 안 함"
+          active={visitCheck?.status === 'not_visited'}
+          loading={saving === 'not_visited'}
+          onClick={() => handleVisit('not_visited')}
         />
         <VisitButton
-          label="달랐어요"
+          label="변경함"
           active={visitCheck?.status === 'changed'}
-          onClick={() => onSetVisitCheck(item.id, 'changed')}
+          loading={saving === 'changed'}
+          onClick={() => handleVisit('changed')}
         />
+        <VisitButton
+          label="정보 다름"
+          active={visitCheck?.status === 'info_mismatch'}
+          loading={saving === 'info_mismatch'}
+          onClick={() => handleVisit('info_mismatch')}
+        />
+        <VisitButton
+          label="만족"
+          active={visitCheck?.status === 'satisfied'}
+          loading={saving === 'satisfied'}
+          onClick={() => handleVisit('satisfied')}
+        />
+        <VisitButton
+          label="불만족"
+          active={visitCheck?.status === 'unsatisfied'}
+          loading={saving === 'unsatisfied'}
+          onClick={() => handleVisit('unsatisfied')}
+        />
+      </div>
+
+      <div className="rounded-xl border border-earth bg-white/78 px-3 py-2 text-[10.5px] text-basalt-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-bold text-basalt">신뢰도 업데이트</span>
+          <span className={`font-bold ${visitCheck?.trustDelta && visitCheck.trustDelta < 0 ? 'text-rose-700' : 'text-mint'}`}>
+            {visitCheck?.updatedTrustScore != null
+              ? `${visitCheck.previousTrustScore ?? previousScore} → ${visitCheck.updatedTrustScore}점`
+              : `${previewUpdate.previous} → ${previewUpdate.updated}점 예측`}
+          </span>
+        </div>
+        {visitCheck?.trustDelta != null ? (
+          <p className="mt-1 leading-relaxed">
+            방문 신호가 다음 신뢰도 판단에 반영됩니다.
+            {visitCheck.saved === false && ' 서버 저장은 대기 상태라 로컬에 먼저 보관했습니다.'}
+          </p>
+        ) : (
+          <p className="mt-1 leading-relaxed">
+            버튼을 누르면 기존 점수에서 방문 신호 축이 어떻게 바뀌는지 기록합니다.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -712,31 +800,51 @@ function PlanItemRow({
 function VisitButton({
   label,
   active,
+  loading = false,
   onClick,
 }: {
   label: string;
   active: boolean;
+  loading?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={loading}
       className={`rounded-full border px-2 py-1 text-[9.5px] font-bold transition ${
         active
           ? 'border-mint bg-mint text-white'
           : 'border-earth bg-white text-basalt-2 hover:border-mint/50'
-      }`}
+      } disabled:opacity-60`}
     >
-      {label}
+      {loading ? '저장 중' : label}
     </button>
   );
 }
 
 function visitStatusLabel(status: VisitCheckStatus): string {
-  if (status === 'matched') return '방문 확인 · 정보 일치';
-  if (status === 'changed') return '방문 확인 · 정보 다름';
+  if (status === 'not_visited') return '방문하지 않음';
+  if (status === 'changed') return '방문 확인 · 변경함';
+  if (status === 'info_mismatch') return '방문 확인 · 정보 다름';
+  if (status === 'satisfied') return '방문 확인 · 만족';
+  if (status === 'unsatisfied') return '방문 확인 · 불만족';
   return '방문 확인됨';
+}
+
+function simulateVisitTrustUpdate(previousScore: number, status: VisitCheckStatus) {
+  const deltas: Record<VisitCheckStatus, number> = {
+    visited: 4,
+    not_visited: -2,
+    changed: -12,
+    info_mismatch: -14,
+    satisfied: 8,
+    unsatisfied: -9,
+  };
+  const previous = Math.max(0, Math.min(100, Math.round(previousScore)));
+  const updated = Math.max(0, Math.min(100, previous + deltas[status]));
+  return { previous, updated, delta: updated - previous };
 }
 
 function buildShareText(
@@ -1256,6 +1364,11 @@ function PackItemCard({
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {typeof it.trust_score === 'number' && (
+              <span className="rounded-full border border-earth bg-white px-2 py-0.5 text-[10px] font-bold text-basalt">
+                신뢰 {it.trust_score}
+              </span>
+            )}
             <Badge kind={it.badge} note={it.note} />
             <ChevronDown
               className={`w-4 h-4 text-basalt-2/60 transition-transform ${
@@ -1287,6 +1400,11 @@ function PackItemCard({
             </span>
           )}
         </div>
+        {(it.check_required?.length ?? 0) > 0 && (
+          <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[10.5px] font-semibold text-amber-900">
+            확인 필요: {it.check_required?.join(' · ')}
+          </div>
+        )}
       </button>
 
       {planItem && onTogglePlanItem && (

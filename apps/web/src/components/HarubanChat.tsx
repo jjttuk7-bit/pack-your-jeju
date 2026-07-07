@@ -668,8 +668,12 @@ function buildAgentState(
     publicPlanCount: selectedPlanItems.filter((item) => item.source === 'public_data').length,
     userAddedCount: selectedPlanItems.filter((item) => item.source === 'user_added').length,
     missingMomentLabels,
-    matchedCount: Object.values(visitChecks).filter((check) => check.status === 'matched').length,
-    changedCount: Object.values(visitChecks).filter((check) => check.status === 'changed').length,
+    matchedCount: Object.values(visitChecks).filter((check) =>
+      check.status === 'visited' || check.status === 'satisfied',
+    ).length,
+    changedCount: Object.values(visitChecks).filter((check) =>
+      check.status === 'changed' || check.status === 'info_mismatch' || check.status === 'unsatisfied',
+    ).length,
     recommendedHighlight,
     recommendedAlreadyInPlan: recommendedHighlight
       ? selectedPlanItems.some((item) => item.id === `public-${recommendedHighlight.external_id}-${recommendedHighlight.moment}`)

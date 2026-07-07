@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, Home } from 'lucide-react';
-import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheckStatus } from './types';
+import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus } from './types';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
 import HarubanChat from './components/HarubanChat';
@@ -237,7 +237,11 @@ export default function App() {
     }));
   };
 
-  const handleSetVisitCheck = (itemId: string, status: VisitCheckStatus) => {
+  const handleSetVisitCheck = (
+    itemId: string,
+    status: VisitCheckStatus,
+    patch: Partial<VisitCheck> = {},
+  ) => {
     setState(prev => ({
       ...prev,
       visitChecks: {
@@ -245,6 +249,7 @@ export default function App() {
         [itemId]: {
           status,
           updatedAt: new Date().toISOString(),
+          ...patch,
         },
       },
     }));

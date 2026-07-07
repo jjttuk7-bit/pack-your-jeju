@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
 
+from apps.api.engine import visit_signals
 from apps.api.engine.filters import MomentFilter
 from apps.api.engine.search import (
     PlaceHit,
@@ -47,6 +48,9 @@ class BadgedItem:
     category: str = ""
     amenities: dict = field(default_factory=dict)
     hygiene_grade: str | None = None
+    trust_score: int = 0
+    score_breakdown: dict = field(default_factory=dict)
+    check_required: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -62,6 +66,13 @@ class Section:
     items: list[BadgedItem]
     fallback: Fallback | None
     observed_reasons: list[Reason]  # 관측용 (retrieval_miss가 recovery된 경우 포함)
+
+
+@dataclass(frozen=True)
+class TrustProfile:
+    score: int
+    breakdown: dict
+    check_required: list[str]
 
 
 # ---- 사용자 문구 (TRUST_ENGINE §2) ----
@@ -128,6 +139,13 @@ def badge_item(
         "parking_count": t.parking_count,
         "bus_walkable": t.bus_walkable,
     }
+    profile = compute_trust_profile(
+        hit,
+        mf,
+        transit=t,
+        now=now,
+        visit_signal=visit_signals.latest_visit_signal(hit.external_id),
+    )
 
     display_note = note
     if reason and not display_note:
@@ -148,6 +166,9 @@ def badge_item(
         category=hit.category,
         amenities=hit.amenities if isinstance(hit.amenities, dict) else {},
         hygiene_grade=hit.hygiene_grade,
+        trust_score=profile.score,
+        score_breakdown=profile.breakdown,
+        check_required=profile.check_required,
     )
 
 
@@ -164,6 +185,144 @@ def _to_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def compute_trust_profile(
+    hit: PlaceHit,
+    mf: MomentFilter,
+    *,
+    transit: TransitCheck,
+    now: datetime,
+    visit_signal: dict | None = None,
+) -> TrustProfile:
+    """제안서 100점 루브릭의 규칙 기반 MVP.
+
+    점수는 새 사실을 만들지 않고, DB 필드·교통 검증·방문 신호만 사용한다.
+    날씨는 P1 실시간 연동 전까지 야외 카테고리에 "확인 필요"를 남기는 보수적 점수다.
+    """
+    check_required: list[str] = []
+    trip_end_dt = datetime.combine(mf.trip_end, datetime.min.time(), tzinfo=timezone.utc)
+    valid_until = _to_utc(hit.valid_until)
+
+    if hit.tombstoned:
+        public_points = 0
+        public_status = "contradicted"
+        check_required.append("public_data")
+    elif hit.has_fix_request:
+        public_points = 18
+        public_status = "fix_request"
+        check_required.append("public_data")
+    else:
+        public_points = 30
+        public_status = "matched"
+
+    missing_user_condition = _missing_required_amenity(hit, mf)
+    if missing_user_condition:
+        user_points = 8
+        user_status = "missing_required_amenity"
+        check_required.append("user_condition")
+    else:
+        user_points = 20
+        user_status = "matched"
+
+    outdoor_categories = {"oreum", "beach", "viewpoint", "forest", "experience"}
+    if hit.category in outdoor_categories:
+        weather_points = 10
+        weather_status = "weather_check_required"
+        check_required.append("weather")
+    else:
+        weather_points = 15
+        weather_status = "low_weather_dependency"
+
+    if transit.parking or transit.bus_walkable:
+        movement_points = 10
+        movement_status = "reachable"
+    else:
+        movement_points = 4
+        movement_status = "access_unconfirmed"
+        check_required.append("movement")
+
+    if valid_until <= trip_end_dt:
+        operation_points = 3
+        operation_status = "expired_or_due"
+        check_required.append("operation_info")
+    elif hit.info_type in {"periodic", "seasonal"}:
+        operation_points = 8
+        operation_status = "date_rule_required"
+    else:
+        operation_points = 10
+        operation_status = "valid"
+
+    visit_status = str((visit_signal or {}).get("status") or "no_signal")
+    if visit_status in {"visited", "satisfied"}:
+        visit_points = 10
+    elif visit_status == "not_visited":
+        visit_points = 4
+        check_required.append("visit_feedback")
+    elif visit_status in {"changed", "info_mismatch", "unsatisfied"}:
+        visit_points = 0
+        check_required.append("visit_feedback")
+    else:
+        visit_points = 5
+
+    recency_days = (valid_until - now).days
+    if recency_days >= 30:
+        recency_points = 5
+        recency_status = "fresh"
+    elif recency_days >= 0:
+        recency_points = 2
+        recency_status = "near_expiry"
+        check_required.append("recency")
+    else:
+        recency_points = 0
+        recency_status = "expired"
+        check_required.append("recency")
+
+    breakdown = {
+        "public_data_match": {
+            "points": public_points,
+            "max": 30,
+            "status": public_status,
+        },
+        "user_condition_fit": {
+            "points": user_points,
+            "max": 20,
+            "status": user_status,
+        },
+        "weather_fit": {
+            "points": weather_points,
+            "max": 15,
+            "status": weather_status,
+        },
+        "movement_feasibility": {
+            "points": movement_points,
+            "max": 10,
+            "status": movement_status,
+        },
+        "operation_info": {
+            "points": operation_points,
+            "max": 10,
+            "status": operation_status,
+        },
+        "visit_signal": {
+            "points": visit_points,
+            "max": 10,
+            "status": visit_status,
+        },
+        "recency": {
+            "points": recency_points,
+            "max": 5,
+            "status": recency_status,
+        },
+    }
+    score = sum(int(v["points"]) for v in breakdown.values())
+    if hit.tombstoned:
+        score = min(score, 40)
+    return TrustProfile(
+        score=max(0, min(100, score)),
+        breakdown=breakdown,
+        check_required=list(dict.fromkeys(check_required)),
+    )
 
 
 # ---- 섹션 판정 (fallback 4분기) ----
