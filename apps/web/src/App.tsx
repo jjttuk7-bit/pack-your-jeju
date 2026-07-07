@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, Home } from 'lucide-react';
 import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheckStatus } from './types';
-import TravelForm from './components/TravelForm';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
 import HarubanChat from './components/HarubanChat';
 import LandingPage from './components/LandingPage';
+import TrustMapDashboard from './components/TrustMapDashboard';
 import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import StoneWallPattern from './components/marks/StoneWallPattern';
@@ -275,7 +275,7 @@ export default function App() {
       </div>
 
       {/* Container */}
-      <div className="w-full max-w-3xl flex flex-col flex-1" id="app-container">
+      <div className="w-full max-w-6xl flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
         <header className="pt-2 pb-8" id="app-header">
@@ -388,7 +388,7 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <TravelForm
+                <TrustMapDashboard
                   onSubmit={handleFormSubmit}
                   initialInfo={state.info.regions?.length ? state.info : undefined}
                   initialMoments={state.selectedMomentIds}
