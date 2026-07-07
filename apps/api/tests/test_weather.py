@@ -44,10 +44,10 @@ def test_parse_kma_api_hub_forecast_hides_machine_code_rows():
     parsed = parse_kma_api_hub_forecast(raw)
 
     assert parsed["available"] is False
-    assert parsed["labels"] == ["예보 문장 확인 필요"]
+    assert parsed["labels"] == ["날씨 판단 보류"]
     assert "11000000" not in parsed["summary"]
     assert "210012310000" not in parsed["summary"]
-    assert "여행자가 읽을 수 있는 문장형 예보" in parsed["summary"]
+    assert "비·바람·풍랑 같은 여행 판단 문장" in parsed["summary"]
 
 
 def test_parse_kma_api_hub_forecast_exposes_issued_at_label():

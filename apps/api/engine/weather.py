@@ -89,8 +89,8 @@ def _issued_at_label(raw_text: str) -> str | None:
 def _forecast_summary(text: str) -> str:
     if not text:
         return (
-            "기상청 API허브 응답은 확인했지만 여행자가 읽을 수 있는 문장형 예보가 없어 "
-            "최신 예보 원문 확인이 필요합니다."
+            "기상청 API 연결은 확인됐지만 현재 응답에서 비·바람·풍랑 같은 여행 판단 문장을 "
+            "읽어낼 수 없습니다. 야외 일정은 출발 전 최신 예보를 한 번 더 확인해 주세요."
         )
     sentences = re.split(r"(?<=[.!?。])\s+|(?<=다\.)\s*", text)
     candidates = [s.strip() for s in sentences if s.strip()]
@@ -111,7 +111,7 @@ def parse_kma_api_hub_forecast(raw_text: str) -> dict[str, Any]:
             labels.append(label)
 
     if not labels:
-        labels = ["날씨 특이 신호 없음"] if text else ["예보 문장 확인 필요"]
+        labels = ["날씨 특이 신호 없음"] if text else ["날씨 판단 보류"]
 
     severe = {"heavy_rain", "wind", "wave", "fog", "heat", "snow"}
     risk_level = "caution" if any(signal in severe for signal in signals) else (
@@ -184,5 +184,5 @@ def smoke_kma_nowcast(region: str = "jeju_city") -> dict[str, Any]:
         }
     )
     if not parsed["available"]:
-        parsed["reason"] = "KMA API Hub returned an empty forecast body"
+        parsed["reason"] = "KMA API Hub returned non-narrative forecast rows"
     return parsed

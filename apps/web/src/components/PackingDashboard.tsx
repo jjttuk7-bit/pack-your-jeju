@@ -923,23 +923,24 @@ function PlanItemRow({
 function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
   const labels = weather.labels?.length ? weather.labels : ['날씨 정보 확인 중'];
   const isCaution = weather.risk_level === 'caution' || weather.risk_level === 'watch';
+  const isUnavailable = !weather.available;
   return (
     <div className={`rounded-[24px] border p-5 shadow-pyj-card ${
-      isCaution
+      isCaution || isUnavailable
         ? 'border-amber-100 bg-amber-50/75'
         : 'border-mint/20 bg-[#F4FBF8]'
     }`}>
       <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${
-        isCaution ? 'text-amber-700' : 'text-mint'
+        isCaution || isUnavailable ? 'text-amber-700' : 'text-mint'
       }`}>
         <CloudSun className="h-3 w-3" />
         KMA Weather Signal
       </span>
       <h3 className="mt-2 font-serif-kr text-[16px] font-bold text-basalt">
-        기상청 예보를 여행 판단에 반영합니다.
+        {isUnavailable ? '현재 날씨 판단은 보류합니다.' : '기상청 예보를 여행 판단에 반영합니다.'}
       </h3>
       <p className="mt-1 text-[10.5px] font-semibold text-basalt-2/75">
-        {weather.issued_at_label ?? '기상청 최신 발표 기준'}
+        {weather.issued_at_label ?? (isUnavailable ? '기상청 API 연결 확인 · 예보 문장 미확인' : '기상청 최신 발표 기준')}
       </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {labels.map((label) => (
@@ -958,7 +959,7 @@ function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
       )}
       {!weather.available && (
         <p className="mt-3 text-[10.5px] leading-relaxed text-amber-800">
-          현재 예보를 가져오지 못해 야외 장소는 보수적으로 날씨 확인 필요로 표시합니다.
+          비·바람 여부를 단정하지 않고, 야외 장소는 보수적으로 확인 필요로 표시합니다.
         </p>
       )}
     </div>
@@ -1106,7 +1107,7 @@ function itemWeatherNotice(it: PackItemDto): {
   const needsWeatherCheck = (it.check_required ?? []).some((key) => key.startsWith('weather'));
   if (!hasSignal && !needsWeatherCheck) return null;
   return {
-    labels: labels.length ? labels : ['날씨 확인 필요'],
+    labels: labels.length ? labels : ['날씨 판단 보류'],
     summary: weather.summary,
     issuedAt: weather.issued_at_label,
     status: weather.status,
