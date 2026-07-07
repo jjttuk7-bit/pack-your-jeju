@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Calendar,
-  Check,
   ChevronRight,
   Compass,
   Loader2,
@@ -32,29 +31,89 @@ interface TrustMapDashboardProps {
 
 type RegionTone = 'verified' | 'caution' | 'gap' | 'loading';
 
-interface RegionHotspot {
+interface RegionShape {
   id: RegionId;
-  x: number;
-  y: number;
-  align?: 'left' | 'center' | 'right';
+  path: string;
+  labelX: number;
+  labelY: number;
 }
 
 const DEFAULT_MOMENTS: MomentId[] = ['oreum', 'beach_walk', 'local_food'];
 const NOTES_MAX = 300;
 
-const REGION_HOTSPOTS: RegionHotspot[] = [
-  { id: 'hallim', x: 15, y: 50 },
-  { id: 'aewol', x: 27, y: 41 },
-  { id: 'jeju_city', x: 49, y: 31 },
-  { id: 'jocheon', x: 64, y: 38 },
-  { id: 'gujwa', x: 78, y: 45 },
-  { id: 'udo', x: 94, y: 39 },
-  { id: 'seongsan', x: 89, y: 60 },
-  { id: 'pyoseon', x: 75, y: 69 },
-  { id: 'namwon', x: 61, y: 77 },
-  { id: 'seogwipo', x: 47, y: 79 },
-  { id: 'andeok', x: 28, y: 71 },
-  { id: 'daejeong', x: 13, y: 73 },
+const REGION_SHAPES: RegionShape[] = [
+  {
+    id: 'hallim',
+    path: 'M52 155 L76 128 L118 109 L153 145 L122 195 L77 218 L54 190 Z',
+    labelX: 91,
+    labelY: 164,
+  },
+  {
+    id: 'aewol',
+    path: 'M118 109 L168 88 L228 105 L223 153 L183 174 L153 145 Z',
+    labelX: 172,
+    labelY: 130,
+  },
+  {
+    id: 'jeju_city',
+    path: 'M168 88 L263 62 L318 84 L305 146 L223 153 L228 105 Z',
+    labelX: 265,
+    labelY: 112,
+  },
+  {
+    id: 'jocheon',
+    path: 'M263 62 L351 48 L389 75 L367 141 L305 146 L318 84 Z',
+    labelX: 334,
+    labelY: 96,
+  },
+  {
+    id: 'gujwa',
+    path: 'M351 48 L432 39 L500 75 L462 123 L389 145 L367 141 L389 75 Z',
+    labelX: 435,
+    labelY: 82,
+  },
+  {
+    id: 'udo',
+    path: 'M519 72 C534 66 548 76 548 91 C548 105 536 113 522 107 C511 101 509 82 519 72 Z',
+    labelX: 535,
+    labelY: 91,
+  },
+  {
+    id: 'seongsan',
+    path: 'M462 123 L525 101 L550 146 L527 179 L472 174 Z',
+    labelX: 507,
+    labelY: 146,
+  },
+  {
+    id: 'pyoseon',
+    path: 'M389 145 L462 123 L472 174 L433 222 L356 239 L351 172 Z',
+    labelX: 427,
+    labelY: 184,
+  },
+  {
+    id: 'namwon',
+    path: 'M305 146 L389 145 L351 172 L356 239 L292 253 L266 203 Z',
+    labelX: 342,
+    labelY: 214,
+  },
+  {
+    id: 'seogwipo',
+    path: 'M223 153 L305 146 L266 203 L292 253 L214 266 L187 231 L183 174 Z',
+    labelX: 246,
+    labelY: 226,
+  },
+  {
+    id: 'andeok',
+    path: 'M122 195 L183 174 L187 231 L214 266 L148 257 L106 233 Z',
+    labelX: 158,
+    labelY: 218,
+  },
+  {
+    id: 'daejeong',
+    path: 'M54 190 L77 218 L106 233 L148 257 L112 286 L66 270 L36 236 Z',
+    labelX: 90,
+    labelY: 248,
+  },
 ];
 
 export default function TrustMapDashboard({
@@ -312,51 +371,123 @@ function JejuSilhouetteMap({
   onToggle: (region: RegionId) => void;
 }) {
   return (
-    <div className="relative mx-auto mt-4 aspect-[567/312] w-full max-w-4xl overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F7E6CC]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.85),rgba(255,247,232,0.25)_45%,rgba(222,178,124,0.15))]" />
-      <div className="absolute inset-[4%]">
-        <div className="absolute inset-[3%] rounded-[50%] border border-citrus/10 bg-citrus/5 blur-2xl" />
-        <img
-          src="/jeju_silhouette_refined.svg"
-          alt="제주도 실루엣"
-          className="absolute inset-0 h-full w-full object-contain opacity-[0.34] mix-blend-multiply [filter:sepia(1)_saturate(1.35)_hue-rotate(336deg)]"
+    <div className="relative mx-auto mt-4 aspect-[567/312] w-full max-w-4xl overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F8F2E7]">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,249,240,0.78))]" />
+      <svg
+        viewBox="0 0 567 312"
+        role="img"
+        aria-label="제주 행정구역 선택 지도"
+        className="absolute inset-0 h-full w-full"
+      >
+        <defs>
+          <filter id="jejuRegionShadow" x="-8%" y="-8%" width="116%" height="116%">
+            <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor="#8B6C49" floodOpacity="0.12" />
+          </filter>
+          <linearGradient id="jejuRoad" x1="42" y1="190" x2="519" y2="116" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#FFFFFF" stopOpacity="0.95" />
+            <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.72" />
+            <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.95" />
+          </linearGradient>
+        </defs>
+
+        <g filter="url(#jejuRegionShadow)">
+          {REGION_SHAPES.map((shape) => {
+            const region = REGIONS.find((r) => r.value === shape.id);
+            const active = activeRegion === shape.id;
+            const selected = selectedRegions.includes(shape.id);
+            const tone = getRegionTone(previews[shape.id], selectedMoments, loading);
+            return (
+              <path
+                key={shape.id}
+                d={shape.path}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                aria-label={`${region?.label ?? shape.id} 근거 보기`}
+                onClick={() => onInspect(shape.id)}
+                onDoubleClick={() => onToggle(shape.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onInspect(shape.id);
+                  }
+                }}
+                className={`cursor-pointer stroke-white stroke-[2.5] transition duration-200 outline-none hover:brightness-105 focus:stroke-citrus focus:stroke-[4] ${regionFillClass(
+                  tone,
+                  active,
+                  selected,
+                )}`}
+              />
+            );
+          })}
+        </g>
+
+        <path
+          d="M40 205 C73 187 77 225 114 206 C170 177 198 157 245 162 C296 168 304 141 355 139 C403 137 391 126 435 110 C467 98 492 88 520 82"
+          fill="none"
+          stroke="url(#jejuRoad)"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.92"
+        />
+        <path
+          d="M61 150 C86 178 99 191 123 196 M168 91 C172 120 182 143 220 153 M263 64 C261 97 272 125 304 146 M351 51 C341 83 350 114 367 141 M459 124 C443 144 443 160 471 174 M306 148 C318 182 330 210 292 252 M185 175 C174 205 170 230 148 257"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeDasharray="3 5"
+          strokeLinecap="round"
+          strokeWidth="1.5"
+          opacity="0.72"
         />
 
-        {REGION_HOTSPOTS.map((spot) => {
-          const region = REGIONS.find((r) => r.value === spot.id);
-          const active = activeRegion === spot.id;
-          const selected = selectedRegions.includes(spot.id);
-          const tone = getRegionTone(previews[spot.id], selectedMoments, loading);
+        {REGION_SHAPES.map((shape) => {
+          const region = REGIONS.find((r) => r.value === shape.id);
+          const active = activeRegion === shape.id;
+          const selected = selectedRegions.includes(shape.id);
           return (
-            <button
-              key={spot.id}
-              type="button"
-              onClick={() => onInspect(spot.id)}
-              onDoubleClick={() => onToggle(spot.id)}
-              aria-pressed={selected}
-              aria-label={`${region?.label ?? spot.id} 근거 보기`}
-              className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-[10.5px] font-bold shadow-sm transition hover:-translate-y-[55%] focus:outline-none focus:ring-2 focus:ring-citrus/35 ${
-                selected
-                  ? 'border-citrus bg-citrus text-white shadow-jeju-chip'
-                  : active
-                    ? 'border-citrus bg-white text-citrus-2'
-                    : 'border-white/90 bg-white/88 text-basalt hover:border-citrus/50'
-              }`}
-              style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-            >
-              <span
-                className={`mr-1 inline-block h-2 w-2 rounded-full ${toneDotClass(tone)}`}
-                aria-hidden="true"
-              />
-              {selected && <Check className="mr-0.5 inline h-2.5 w-2.5 stroke-[4]" />}
-              {region?.label}
-            </button>
+            <g key={`${shape.id}-label`} className="pointer-events-none">
+              {selected && (
+                <circle
+                  cx={shape.labelX - 23}
+                  cy={shape.labelY - 4}
+                  r="7"
+                  className="fill-citrus stroke-white stroke-[2]"
+                />
+              )}
+              {selected && (
+                <path
+                  d={`M${shape.labelX - 26} ${shape.labelY - 4} l2.6 2.8 l5.4 -6`}
+                  fill="none"
+                  className="stroke-white stroke-[2] [stroke-linecap:round] [stroke-linejoin:round]"
+                />
+              )}
+              <text
+                x={shape.labelX}
+                y={shape.labelY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className={`select-none text-[13px] font-bold ${
+                  selected ? 'fill-white' : active ? 'fill-citrus-2' : 'fill-basalt'
+                }`}
+              >
+                {region?.label}
+              </text>
+            </g>
           );
         })}
-      </div>
 
-      <div className="absolute left-3 top-3 rounded-full border border-white/80 bg-white/75 px-3 py-1.5 text-[10px] font-semibold text-basalt-2 backdrop-blur">
-        제주 실루엣 기준 위치 보정
+        <g className="fill-[#C8DDF0] text-[12px] font-semibold text-basalt-2">
+          <path d="M20 58 C31 51 43 56 52 66 C40 73 28 70 20 58 Z" />
+          <text x="55" y="68" className="fill-basalt-2 text-[12px]">추자도</text>
+          <path d="M88 287 L100 282 L109 291 L99 299 Z" className="fill-stone-300" />
+          <text x="52" y="296" className="fill-basalt-2 text-[11px]">가파도</text>
+          <path d="M119 301 L129 296 L139 303 L129 309 Z" className="fill-stone-300" />
+          <text x="108" y="309" className="fill-basalt-2 text-[11px]">마라도</text>
+        </g>
+      </svg>
+
+      <div className="absolute bottom-3 right-3 max-w-[240px] rounded-2xl border border-earth bg-white/82 px-3 py-2 text-[10.5px] leading-relaxed text-basalt-2 shadow-sm backdrop-blur">
+        지역 면을 누르면 우측 근거가 바뀝니다. 선택은 우측 버튼으로 플랜 후보에 담습니다.
       </div>
     </div>
   );
@@ -661,11 +792,13 @@ function getRegionTone(
   return 'verified';
 }
 
-function toneDotClass(tone: RegionTone): string {
-  if (tone === 'verified') return 'bg-mint';
-  if (tone === 'caution') return 'bg-amber-400';
-  if (tone === 'gap') return 'bg-stone-300';
-  return 'bg-citrus/40';
+function regionFillClass(tone: RegionTone, active: boolean, selected: boolean): string {
+  if (selected) return 'fill-[#EF6A3B]';
+  if (active) return 'fill-[#B7E2D8]';
+  if (tone === 'verified') return 'fill-[#D8EFE8]';
+  if (tone === 'caution') return 'fill-[#F4E1B8]';
+  if (tone === 'gap') return 'fill-[#E6E3DD]';
+  return 'fill-[#EFE2D0]';
 }
 
 function panelToneClass(tone: RegionTone): string {
