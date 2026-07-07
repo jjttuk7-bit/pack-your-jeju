@@ -348,6 +348,13 @@ export default function PackingDashboard(props: Props) {
         </aside>
 
         <main className="space-y-5">
+      {packResp && !loading && !error && (
+        <CandidateWorkbenchHeader
+          packResp={packResp}
+          planCount={selectedPlanItems.length}
+          viewMode={viewMode}
+        />
+      )}
 
       {/* 로딩 · 에러 */}
       {loading && (
@@ -518,6 +525,67 @@ function collectPackItems(packResp: PackResponse | null): PackItemDto[] {
     seen.add(key);
     return true;
   });
+}
+
+function CandidateWorkbenchHeader({
+  packResp,
+  planCount,
+  viewMode,
+}: {
+  packResp: PackResponse;
+  planCount: number;
+  viewMode: 'moments' | 'itinerary';
+}) {
+  const signals = countPackSignals(packResp);
+  const sourceLabel = viewMode === 'itinerary' ? 'Day별 일정 후보' : '순간별 추천 후보';
+  return (
+    <section
+      className="rounded-[26px] border border-orange-100/70 bg-white/88 p-4 shadow-pyj-card backdrop-blur-sm"
+      id="candidate-workbench-header"
+    >
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.18em] text-citrus-2">
+            <BookOpenCheck className="h-3 w-3" />
+            Evidence Workbench
+          </span>
+          <h2 className="mt-1 font-serif-kr text-[23px] font-bold leading-tight text-basalt">
+            후보를 고르고, 근거를 확인하고, 플랜에 담습니다.
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-[11.5px] leading-relaxed text-basalt-2">
+            장소명과 주소는 조회된 데이터만 사용하고, 날씨·이동·수정요청 신호는 카드 안에서 확인 필요 항목으로 분리합니다.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+          <WorkbenchMetric label={sourceLabel} value={`${signals.total}곳`} tone="base" />
+          <WorkbenchMetric label="확인 후보" value={`${signals.verified}곳`} tone="mint" />
+          <WorkbenchMetric label="내 플랜" value={`${planCount}곳`} tone="citrus" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkbenchMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'base' | 'mint' | 'citrus';
+}) {
+  const toneClass = {
+    base: 'border-earth bg-[#FDF6EA] text-basalt',
+    mint: 'border-mint/25 bg-mint/10 text-mint',
+    citrus: 'border-citrus/25 bg-citrus/10 text-citrus-2',
+  }[tone];
+  return (
+    <div className={`rounded-2xl border px-3 py-2.5 ${toneClass}`}>
+      <div className="text-[9.5px] font-bold uppercase tracking-wider opacity-70">{label}</div>
+      <div className="mt-0.5 font-serif-kr text-[18px] font-bold leading-none">{value}</div>
+    </div>
+  );
 }
 
 function buildPlanPackingItems(planItems: TravelPlanItem[]): string[] {
@@ -986,6 +1054,19 @@ function publicDataStatusLabel(status: string): string {
   if (status === 'save_failed') return '서버 저장 실패';
   if (status === 'request_failed') return '전송 실패';
   return status;
+}
+
+function infoTypeLabel(infoType: string): string {
+  const labels: Record<string, string> = {
+    static: '기본 공공데이터',
+    public_data: '공공데이터 근거',
+    weather: '기상청 예보 반영',
+    movement: '이동 접근성 확인',
+    visit_signal: '방문 신호 반영',
+    correction_request: '수정요청 이력',
+    user_feedback: '사용자 피드백',
+  };
+  return labels[infoType] ?? infoType.replace(/_/g, ' ');
 }
 
 function checkRequiredLabel(key: string): string {
@@ -1613,7 +1694,9 @@ function PackItemCard({
             </span>
           )}
           {it.freshness?.info_type && (
-            <span className="text-stone-400">· {it.freshness.info_type}</span>
+            <span className="rounded-full bg-[#F8F1E4] px-2 py-0.5 font-medium text-basalt-2/70">
+              {infoTypeLabel(it.freshness.info_type)}
+            </span>
           )}
           {!open && (
             <span className="ml-auto text-[10px] text-citrus-2/80 font-semibold">
@@ -1752,7 +1835,7 @@ function SectionCard({
       ) : section.items.length === 0 ? (
         <p className="text-xs text-stone-400">결과가 없습니다.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="grid gap-3 xl:grid-cols-2">
           {section.items.map((it) => {
             const planItem = toPlanItem({ ...it, moment: section.moment } as ItineraryItemDto);
             return (
