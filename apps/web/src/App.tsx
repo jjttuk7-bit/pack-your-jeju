@@ -280,7 +280,7 @@ export default function App() {
       </div>
 
       {/* Container */}
-      <div className="w-full max-w-6xl flex flex-col flex-1" id="app-container">
+      <div className="w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
         <header className="pt-2 pb-8" id="app-header">

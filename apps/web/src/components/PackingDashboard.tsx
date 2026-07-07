@@ -218,8 +218,8 @@ export default function PackingDashboard(props: Props) {
   ]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto" id="packing-dashboard">
-      <div className="grid gap-5 lg:grid-cols-[430px_minmax(0,1fr)] lg:items-start">
+    <div className="w-full max-w-[1500px] mx-auto" id="packing-dashboard">
+      <div className="grid gap-5 xl:gap-7 lg:grid-cols-[460px_minmax(0,1fr)] lg:items-start">
         <aside className="space-y-5 lg:sticky lg:top-6">
       {/* 요약 카드 */}
       <div
@@ -540,7 +540,7 @@ function CandidateWorkbenchHeader({
   const sourceLabel = viewMode === 'itinerary' ? 'Day별 일정 후보' : '순간별 추천 후보';
   return (
     <section
-      className="rounded-[26px] border border-orange-100/70 bg-white/88 p-4 shadow-pyj-card backdrop-blur-sm"
+      className="rounded-[28px] border border-orange-100/70 bg-white/88 p-5 shadow-pyj-card backdrop-blur-sm"
       id="candidate-workbench-header"
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -549,14 +549,14 @@ function CandidateWorkbenchHeader({
             <BookOpenCheck className="h-3 w-3" />
             Evidence Workbench
           </span>
-          <h2 className="mt-1 font-serif-kr text-[23px] font-bold leading-tight text-basalt">
+          <h2 className="mt-1 font-serif-kr text-[25px] font-bold leading-tight text-basalt">
             후보를 고르고, 근거를 확인하고, 플랜에 담습니다.
           </h2>
           <p className="mt-1.5 max-w-2xl text-[11.5px] leading-relaxed text-basalt-2">
             장소명과 주소는 조회된 데이터만 사용하고, 날씨·이동·수정요청 신호는 카드 안에서 확인 필요 항목으로 분리합니다.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+        <div className="grid grid-cols-3 gap-2 sm:min-w-[390px]">
           <WorkbenchMetric label={sourceLabel} value={`${signals.total}곳`} tone="base" />
           <WorkbenchMetric label="확인 후보" value={`${signals.verified}곳`} tone="mint" />
           <WorkbenchMetric label="내 플랜" value={`${planCount}곳`} tone="citrus" />
@@ -581,7 +581,7 @@ function WorkbenchMetric({
     citrus: 'border-citrus/25 bg-citrus/10 text-citrus-2',
   }[tone];
   return (
-    <div className={`rounded-2xl border px-3 py-2.5 ${toneClass}`}>
+    <div className={`rounded-2xl border px-3.5 py-3 ${toneClass}`}>
       <div className="text-[9.5px] font-bold uppercase tracking-wider opacity-70">{label}</div>
       <div className="mt-0.5 font-serif-kr text-[18px] font-bold leading-none">{value}</div>
     </div>
