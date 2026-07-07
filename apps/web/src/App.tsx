@@ -283,8 +283,9 @@ export default function App() {
       <div className="w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
-        <header className="pt-2 pb-8" id="app-header">
-          <div className="flex items-start gap-4 mb-2">
+        <header className="relative overflow-hidden pt-2 pb-8" id="app-header">
+          <HeaderHallasanScene />
+          <div className="relative z-10 flex items-start gap-4 mb-2">
             {/* 마스코트 클릭 = 처음 화면 (관례상 로고=홈). */}
             <motion.button
               type="button"
@@ -341,7 +342,7 @@ export default function App() {
             </motion.button>
           </div>
 
-          <WaveLine className="w-full h-5 mt-3" />
+          <WaveLine className="relative z-20 w-full h-5 mt-3" />
 
           <motion.p
             initial={{ opacity: 0 }}
@@ -520,6 +521,68 @@ export default function App() {
         />
       )}
 
+    </div>
+  );
+}
+
+function HeaderHallasanScene() {
+  return (
+    <div
+      className="pointer-events-none absolute right-0 top-4 z-0 hidden h-[90px] w-[63%] max-w-[830px] overflow-hidden lg:block"
+      aria-hidden="true"
+    >
+      <svg
+        viewBox="0 0 836 200"
+        preserveAspectRatio="xMidYMid slice"
+        className="h-full w-full"
+        role="img"
+        aria-label="한라산 초록 능선"
+      >
+        <path
+          d="M0 100 C42 111 91 118 146 116 C207 114 254 94 313 111 C361 125 420 126 478 112 C550 94 604 65 671 62 C742 60 789 78 836 78 L836 200 L0 200 Z"
+          fill="#426C43"
+        />
+        <path
+          d="M0 129 C84 138 177 140 263 124 C355 108 428 100 514 94 C602 88 690 90 836 107 L836 200 L0 200 Z"
+          fill="#7A9E58"
+        />
+        <path
+          d="M415 100 C457 72 491 35 541 10 C570 -5 599 7 619 23 C643 41 661 63 688 82 C718 103 778 104 836 100 L836 200 L397 200 Z"
+          fill="#355F3C"
+        />
+        <path
+          d="M483 51 C506 31 528 17 558 5 C575 0 589 5 602 14 C582 16 563 25 546 39 C524 57 507 76 479 91 C454 104 424 111 397 121 C415 97 448 80 483 51 Z"
+          fill="#7F8E3B"
+        />
+        <path
+          d="M554 19 C585 9 610 14 631 33"
+          fill="none"
+          stroke="#6E7933"
+          strokeWidth="6"
+          strokeLinecap="round"
+          opacity="0.62"
+        />
+        <path
+          d="M640 45 C663 63 669 81 684 98"
+          fill="none"
+          stroke="#264D35"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.46"
+        />
+        <path
+          d="M697 64 C724 82 758 92 812 96"
+          fill="none"
+          stroke="#264D35"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.38"
+        />
+        <path
+          d="M0 155 C106 163 205 150 311 144 C436 137 551 133 664 120 C734 112 784 109 836 111 L836 200 L0 200 Z"
+          fill="#AFC75E"
+        />
+      </svg>
     </div>
   );
 }
