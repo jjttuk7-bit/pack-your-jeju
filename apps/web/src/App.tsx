@@ -582,37 +582,57 @@ function HeaderJourneyScene() {
           opacity="0.28"
         />
 
-        <JourneyWalker x={162} y={112} scale={0.9} coat="#58432F" pack="#E7683A" />
-        <JourneyWalker x={218} y={116} scale={0.76} coat="#4A8779" pack="#C9A97F" />
-        <JourneyWalker x={276} y={110} scale={0.98} coat="#2E3235" pack="#6F8550" />
+        <JourneyCompanion x={172} y={118} scale={0.94} body="#7B715F" accent="#E7683A" />
+        <JourneyCompanion x={224} y={121} scale={0.78} body="#5F9B8C" accent="#F0B36A" />
+        <JourneyCompanion x={276} y={116} scale={1} body="#6F7F5B" accent="#4A8779" />
       </svg>
     </div>
   );
 }
 
-function JourneyWalker({
+function JourneyCompanion({
   x,
   y,
   scale,
-  coat,
-  pack,
+  body,
+  accent,
 }: {
   x: number;
   y: number;
   scale: number;
-  coat: string;
-  pack: string;
+  body: string;
+  accent: string;
 }) {
   return (
-    <g transform={`translate(${x} ${y}) scale(${scale})`} opacity="0.74">
-      <circle cx="0" cy="-43" r="7" fill="#2E3235" />
-      <path d="M-8 -35 L8 -35 L13 -8 L-7 -8 Z" fill={coat} />
-      <path d="M-11 -31 C-22 -25 -24 -12 -17 -4" fill="none" stroke={pack} strokeWidth="5" strokeLinecap="round" />
-      <path d="M5 -31 C16 -24 20 -16 24 -6" fill="none" stroke={coat} strokeWidth="4" strokeLinecap="round" />
-      <path d="M-2 -8 L-13 20" fill="none" stroke="#2E3235" strokeWidth="5" strokeLinecap="round" />
-      <path d="M8 -8 L20 18" fill="none" stroke="#2E3235" strokeWidth="5" strokeLinecap="round" />
-      <path d="M20 -2 L28 -28" fill="none" stroke="#6F5A42" strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="-3" cy="22" rx="12" ry="2.4" fill="#2E3235" opacity="0.16" />
+    <g transform={`translate(${x} ${y}) scale(${scale})`} opacity="0.68">
+      <ellipse cx="0" cy="19" rx="17" ry="3" fill="#2E3235" opacity="0.12" />
+      <circle cx="0" cy="-39" r="7" fill="#6E6F68" />
+      <path
+        d="M-10 -31 C-13 -21 -12 -9 -7 0 C-3 6 6 6 10 0 C15 -9 13 -22 9 -31 C4 -34 -5 -34 -10 -31 Z"
+        fill={body}
+      />
+      <path
+        d="M-13 -24 C-21 -18 -23 -8 -17 -1"
+        fill="none"
+        stroke={accent}
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9 -23 C17 -18 19 -10 14 -3"
+        fill="none"
+        stroke={body}
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path d="M-5 1 C-10 7 -12 13 -13 18" fill="none" stroke="#67635A" strokeWidth="4" strokeLinecap="round" />
+      <path d="M6 1 C10 7 12 13 16 17" fill="none" stroke="#67635A" strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M-11 -27 C-21 -24 -24 -13 -18 -5 C-15 -1 -10 -2 -9 -7 L-7 -24 Z"
+        fill={accent}
+        opacity="0.68"
+      />
+      <path d="M-6 -42 C-2 -46 5 -45 9 -41" fill="none" stroke="#6E6F68" strokeWidth="2" strokeLinecap="round" />
     </g>
   );
 }
