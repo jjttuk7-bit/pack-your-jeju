@@ -72,3 +72,13 @@ def test_verify_flagged_place_returns_outdated():
     assert r.status_code == 200
     claims = r.json()["claims"]
     assert any(c["verdict"] == "outdated" and "수정요청" in c["reason"] for c in claims)
+
+
+def test_verify_aewol_onui_is_not_marked_contradicted():
+    r = client.post("/verify", json={"text": "애월오누이 제주 정말 맛있어요, 강추합니다."})
+    assert r.status_code == 200
+    claims = r.json()["claims"]
+    matched = [c for c in claims if c["matched_name"] == "애월오누이 제주"]
+    if not matched:
+        pytest.skip("애월오누이 제주 데이터 없음")
+    assert all(c["verdict"] != "contradicted" for c in matched)

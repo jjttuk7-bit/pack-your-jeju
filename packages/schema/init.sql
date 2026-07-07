@@ -101,3 +101,15 @@ CREATE TABLE IF NOT EXISTS public_data_feedback_queue (
 );
 CREATE INDEX IF NOT EXISTS public_data_feedback_queue_status_idx
   ON public_data_feedback_queue (delivery_status, created_at DESC);
+
+-- Corrective migration (2026-07-07):
+-- `애월오누이 제주` was used as an early G14 demo tombstone seed, but it is a real
+-- operating place in the VisitJeju dataset. Do not label real businesses as closed
+-- unless the source data itself provides a current tombstone signal.
+UPDATE place
+   SET tombstoned = false,
+       has_fix_request = false,
+       updated_at = now()
+ WHERE external_id = 'CNTS_200000000014203'
+   AND name = '애월오누이 제주'
+   AND tombstoned = true;

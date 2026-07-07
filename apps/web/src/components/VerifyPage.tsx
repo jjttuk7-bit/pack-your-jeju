@@ -18,7 +18,7 @@ import { requestVerify } from '../api';
  */
 export default function VerifyPage() {
   const [text, setText] = useState<string>(
-    '어제 애월오누이 제주에서 저녁 먹었는데 진짜 맛있어요, 강추합니다. 그리고 새별오름 다녀왔는데 초보자도 오르기 좋아요. 우도 등대에서 노을 보면 인생샷 건집니다.'
+    '어제 새별오름 다녀왔는데 초보자도 오르기 좋아요. 우도 등대에서 노을 보면 인생샷 건집니다. 제주시 가상특이한이름카페12345에서 커피도 마셨어요.'
   );
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<VerifyResponse | null>(null);

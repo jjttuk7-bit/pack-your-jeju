@@ -8,5 +8,5 @@
 {"id":"G11","endpoint":"pack","desc":"★ 우도 × oreum → strict 실패, gujwa로 완화. 사용자엔 '인근 지역 결과'","request":{"region":"udo","start_date":"2026-07-04","days":2,"companion":"solo","purpose":"healing","moments":["oreum"]},"expect":{"moment":"oreum","min_items":1,"any_item_note_contains":"인근","observed_reason":"retrieval_miss"}}
 {"id":"G12","endpoint":"verify","desc":"실존 장소 리뷰 → verified","request":{"text":"어제 새별오름 다녀왔는데 정말 좋았어요."},"expect":{"any_verdict_in":["verified","outdated"]}}
 {"id":"G13","endpoint":"verify","desc":"★ 존재하지 않는 가게 → coverage_gap ('없다' 단언 금지)","request":{"text":"제주시 '가상특이한이름카페12345'에서 커피 마셨어요."},"expect":{"any_verdict":"coverage_gap","message_no_denial":true}}
-{"id":"G14","endpoint":"verify","desc":"★ 폐업(tombstoned) 가게 리뷰 → contradicted","request":{"text":"애월오누이 제주 정말 맛있어요, 강추합니다."},"expect":{"any_verdict":"contradicted"}}
+{"id":"G14","endpoint":"verify","desc":"★ 영업 중인 실존 업체는 폐업으로 단언하지 않음","request":{"text":"애월오누이 제주 정말 맛있어요, 강추합니다."},"expect":{"any_verdict_in":["verified","outdated"]}}
 {"id":"G15","endpoint":"pack","desc":"kids 동행자 + 결측 amenity → 항목 유지 + note 명시","request":{"region":"aewol","start_date":"2026-07-04","days":2,"companion":"kids","purpose":"healing","moments":["oreum"]},"expect":{"moment":"oreum","min_items":1,"any_item_note_contains":"아이 동반"}}
