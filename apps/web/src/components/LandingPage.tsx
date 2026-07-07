@@ -224,9 +224,13 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     Arrival Mood
                   </p>
                   <h2 className="mt-3 font-serif-kr text-[36px] font-bold leading-tight text-basalt sm:text-[44px]">
-                    비행기가 제주 위를 지날 때,
+                    비행기가 제주 위를
                     <br />
-                    여행은 이미 시작됩니다.
+                    지날 때,
+                    <br />
+                    여행의 설렘이
+                    <br />
+                    시작됩니다.
                   </h2>
                   <p className="mt-4 text-[14px] leading-7 text-basalt-2 sm:text-[15px]">
                     한라산의 능선, 해변의 곡선, 바람에 흔들리는 감귤나무까지.
@@ -234,7 +238,16 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     여행플랜으로 이어갑니다.
                   </p>
                   <div className="mt-5 flex flex-wrap gap-2">
-                    {['지역 선택', '하루방 에이전트', '내 여행플랜', '짐싸기', '방문 확인'].map((label) => (
+                    {['지역 선택', '하루방 에이전트', '내 여행플랜'].map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-earth bg-[#FDF6EA]/80 px-3 py-1.5 text-[11px] font-bold text-basalt-2"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                    <span className="basis-full" aria-hidden="true" />
+                    {['짐싸기', '방문 확인'].map((label) => (
                       <span
                         key={label}
                         className="rounded-full border border-earth bg-[#FDF6EA]/80 px-3 py-1.5 text-[11px] font-bold text-basalt-2"
