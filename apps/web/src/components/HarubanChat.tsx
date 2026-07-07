@@ -278,17 +278,19 @@ export default function HarubanChat({
 
   return (
     <>
-      {/* 플로팅 버튼 */}
-      <button
-        type="button"
-        id="haruban-fab"
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-40 h-[82px] w-[82px] rounded-full border-2 border-citrus/25 bg-white/95 shadow-[0_18px_42px_rgba(88,67,47,0.22)] backdrop-blur-sm flex items-center justify-center transition hover:-translate-y-1 hover:scale-[1.03] hover:border-citrus/45"
-        aria-label="하루방 에이전트 열기"
-      >
-        <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full border-2 border-white bg-citrus shadow-sm" />
-        <HarubangMark className="h-[66px] w-[66px]" />
-      </button>
+      {/* 플로팅 버튼: 패널이 열렸을 때는 헤더의 하루방만 남겨 화면 겹침을 줄인다. */}
+      {!open && (
+        <button
+          type="button"
+          id="haruban-fab"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-5 right-5 z-40 h-[82px] w-[82px] rounded-full border-2 border-citrus/25 bg-white/95 shadow-[0_18px_42px_rgba(88,67,47,0.22)] backdrop-blur-sm flex items-center justify-center transition hover:-translate-y-1 hover:scale-[1.03] hover:border-citrus/45"
+          aria-label="하루방 에이전트 열기"
+        >
+          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full border-2 border-white bg-citrus shadow-sm" />
+          <HarubangMark className="h-[66px] w-[66px]" />
+        </button>
+      )}
 
       <AnimatePresence>
         {open && (
