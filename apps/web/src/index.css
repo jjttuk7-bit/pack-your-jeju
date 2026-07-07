@@ -346,6 +346,28 @@
     animation: pyj-sea-breathe 7.5s ease-in-out infinite;
   }
 
+  .pyj-arrival-sun {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    animation: pyj-sun-glow 9s ease-in-out infinite;
+  }
+
+  .pyj-arrival-hallasan {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: pyj-hallasan-breathe 11s ease-in-out infinite;
+  }
+
+  .pyj-arrival-haze {
+    stroke-dasharray: 46 26;
+    animation: pyj-haze-drift 13s ease-in-out infinite;
+  }
+
+  .pyj-arrival-haze-b {
+    animation-duration: 16s;
+    animation-delay: -4s;
+  }
+  
   .pyj-arrival-tree {
     transform-box: fill-box;
     transform-origin: 50% 100%;
@@ -370,6 +392,9 @@
     .pyj-arrival-plane,
     .pyj-arrival-wave,
     .pyj-arrival-sea,
+    .pyj-arrival-sun,
+    .pyj-arrival-hallasan,
+    .pyj-arrival-haze,
     .pyj-arrival-tree {
       animation: none;
     }
@@ -439,6 +464,21 @@
   50% { transform: translateY(8px); }
 }
 
+@keyframes pyj-sun-glow {
+  0%, 100% { transform: scale(0.98); opacity: 0.78; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
+@keyframes pyj-hallasan-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.004); }
+}
+
+@keyframes pyj-haze-drift {
+  0%, 100% { stroke-dashoffset: 0; transform: translateX(0); }
+  50% { stroke-dashoffset: -42; transform: translateX(12px); }
+}
+  
 @keyframes pyj-tree-sway {
   0%, 100% { transform: rotate(0deg); }
   45% { transform: rotate(-1.8deg); }

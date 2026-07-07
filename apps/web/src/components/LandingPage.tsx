@@ -230,7 +230,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     여행은 이미 시작됩니다.
                   </h2>
                   <p className="mt-4 text-[14px] leading-7 text-basalt-2 sm:text-[15px]">
-                    해변의 곡선, 낮은 오름, 바람에 흔들리는 감귤나무까지.
+                    한라산의 능선, 해변의 곡선, 바람에 흔들리는 감귤나무까지.
                     Pack Your Jeju는 설렘을 누르지 않고, 필요한 확인만 조용히 더해
                     여행플랜으로 이어갑니다.
                   </p>
@@ -532,7 +532,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
 
 function JejuArrivalScene() {
   return (
-    <div className="pyj-arrival-scene" aria-label="비행기와 제주 해변, 오름, 감귤나무가 있는 애니메이션 장면">
+    <div className="pyj-arrival-scene" aria-label="비행기와 한라산, 제주 해변, 감귤나무가 있는 애니메이션 장면">
       <div className="pyj-arrival-sky">
         <span className="pyj-arrival-cloud pyj-arrival-cloud-a" />
         <span className="pyj-arrival-cloud pyj-arrival-cloud-b" />
@@ -566,29 +566,99 @@ function JejuArrivalScene() {
 
       <svg className="pyj-arrival-island" viewBox="0 0 720 410" aria-hidden="true">
         <defs>
+          <radialGradient id="pyjArrivalGlow" cx="50%" cy="33%" r="54%">
+            <stop offset="0%" stopColor="#FFF0C7" stopOpacity="0.95" />
+            <stop offset="58%" stopColor="#FCE1AF" stopOpacity="0.36" />
+            <stop offset="100%" stopColor="#FDF6EA" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="pyjArrivalSky" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#D9F1F1" />
+            <stop offset="46%" stopColor="#FDF4E7" />
+            <stop offset="100%" stopColor="#F8DFC0" />
+          </linearGradient>
           <linearGradient id="pyjSea" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stopColor="#BEE3DF" />
-            <stop offset="100%" stopColor="#4A8779" />
+            <stop offset="0%" stopColor="#A7D6D7" />
+            <stop offset="56%" stopColor="#6AA99C" />
+            <stop offset="100%" stopColor="#3D756D" />
           </linearGradient>
           <linearGradient id="pyjSand" x1="0" x2="1">
-            <stop offset="0%" stopColor="#F9E4BE" />
-            <stop offset="100%" stopColor="#F4C985" />
+            <stop offset="0%" stopColor="#FAE7C1" />
+            <stop offset="100%" stopColor="#EFC27B" />
           </linearGradient>
-          <linearGradient id="pyjOreum" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stopColor="#7FAE89" />
-            <stop offset="100%" stopColor="#4A8779" />
+          <linearGradient id="pyjHallasan" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#7EAA91" />
+            <stop offset="52%" stopColor="#5B917D" />
+            <stop offset="100%" stopColor="#356D61" />
+          </linearGradient>
+          <linearGradient id="pyjHallasanShadow" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#96C2AE" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#4A8779" stopOpacity="0.18" />
           </linearGradient>
         </defs>
 
-        <rect x="0" y="0" width="720" height="410" rx="34" fill="#FDF6EA" />
+        <rect x="0" y="0" width="720" height="410" rx="34" fill="url(#pyjArrivalSky)" />
+        <circle className="pyj-arrival-sun" cx="388" cy="126" r="164" fill="url(#pyjArrivalGlow)" />
+        <circle cx="428" cy="132" r="25" fill="#F4A24F" opacity="0.76" />
+        <path
+          className="pyj-arrival-haze pyj-arrival-haze-a"
+          d="M88 160c76-24 154-22 231-4 72 17 142 17 218-5 36-11 68-13 99-8"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.35"
+        />
+        <path
+          className="pyj-arrival-haze pyj-arrival-haze-b"
+          d="M24 206c86-20 155-13 221 6 78 22 161 20 253-6 69-20 126-21 180-4"
+          fill="none"
+          stroke="#E8F4EF"
+          strokeWidth="7"
+          strokeLinecap="round"
+          opacity="0.38"
+        />
+        <path
+          className="pyj-arrival-hallasan"
+          d="M0 262c59-21 120-35 179-47 61-12 99-35 136-72 35-35 69-62 107-67 46-6 84 28 125 69 39 39 81 66 139 79 12 3 23 5 34 8v178H0Z"
+          fill="url(#pyjHallasan)"
+        />
+        <path
+          d="M230 217c43-25 81-61 114-91 33-30 68-41 100-29 22 8 39 28 59 49-28-11-63-7-93 9-48 26-87 63-180 62Z"
+          fill="url(#pyjHallasanShadow)"
+          opacity="0.64"
+        />
+        <path
+          d="M333 137c31-22 60-28 88-20 21 6 39 21 57 40"
+          fill="none"
+          stroke="#DDEDE4"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.54"
+        />
+        <path
+          d="M365 123c18 6 38 6 59-1"
+          fill="none"
+          stroke="#F8F6EA"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.78"
+        />
+        <path
+          d="M79 265c87-39 177-39 270-18 93 20 183 15 273-23"
+          fill="none"
+          stroke="#BBD8C9"
+          strokeWidth="5"
+          strokeLinecap="round"
+          opacity="0.42"
+        />
         <path
           className="pyj-arrival-sea"
-          d="M0 250C96 214 175 246 270 223c116-28 177-88 290-67 74 14 115 64 160 80v174H0Z"
+          d="M0 275c96-33 174-11 268-28 126-23 219-72 338-36 47 14 80 32 114 40v159H0Z"
           fill="url(#pyjSea)"
         />
         <path
           className="pyj-arrival-wave pyj-arrival-wave-a"
-          d="M39 276c60-18 108 9 168-5 64-15 111-51 175-43 44 5 71 29 109 30"
+          d="M42 298c64-18 112 8 180-6 66-14 113-45 181-37 42 5 72 24 112 25"
           fill="none"
           stroke="#FFF8EC"
           strokeWidth="5"
@@ -597,7 +667,7 @@ function JejuArrivalScene() {
         />
         <path
           className="pyj-arrival-wave pyj-arrival-wave-b"
-          d="M16 326c72-14 120 19 196-1 59-15 91-42 159-33 50 7 84 32 132 31"
+          d="M19 337c75-13 126 18 204-1 63-15 99-39 168-30 50 6 84 28 134 27"
           fill="none"
           stroke="#FFF8EC"
           strokeWidth="4"
@@ -605,45 +675,47 @@ function JejuArrivalScene() {
           opacity="0.48"
         />
         <path
-          d="M0 337c116-40 217-50 338-30 134 22 229-7 382-76v179H0Z"
+          d="M0 349c119-33 218-43 340-25 136 21 234-3 380-63v149H0Z"
           fill="url(#pyjSand)"
         />
         <path
-          d="M119 207c42-82 124-92 174-16 47 72 101 61 144 6 43-56 111-53 150 6 26 39 60 44 133 25v55H0v-43c43 2 79-5 119-33Z"
-          fill="url(#pyjOreum)"
-          opacity="0.92"
-        />
-        <path
-          d="M84 231c53-25 91-28 133-7M456 232c45-18 93-16 136 3"
+          d="M62 357c38-16 76-22 119-19 37 2 72 13 113 11"
           fill="none"
-          stroke="#D5E9E1"
-          strokeWidth="5"
+          stroke="#C49B68"
+          strokeWidth="4"
           strokeLinecap="round"
-          opacity="0.38"
+          opacity="0.5"
         />
 
         <g className="pyj-arrival-tree pyj-arrival-tree-a">
-          <path d="M584 264c12 33 7 69-3 105" stroke="#6F5136" strokeWidth="10" strokeLinecap="round" />
-          <path d="M539 257c9-46 54-75 98-55 46 20 52 83 8 106-42 23-95-3-106-51Z" fill="#4A8779" />
-          <circle cx="571" cy="241" r="12" fill="#E7683A" />
-          <circle cx="621" cy="250" r="11" fill="#E7683A" />
-          <circle cx="599" cy="283" r="10" fill="#C24B26" />
+          <path d="M616 304c5 22 4 45-3 67" stroke="#6F5136" strokeWidth="8" strokeLinecap="round" />
+          <path d="M574 296c13-35 51-51 86-35 34 16 41 58 11 80-34 25-84 4-97-45Z" fill="#477B68" />
+          <path d="M589 288c22-19 49-23 76-9" fill="none" stroke="#77A98E" strokeWidth="5" strokeLinecap="round" opacity="0.58" />
+          <circle cx="604" cy="296" r="8" fill="#E7683A" />
+          <circle cx="638" cy="303" r="8" fill="#F07A3C" />
+          <circle cx="622" cy="326" r="7" fill="#C24B26" />
         </g>
         <g className="pyj-arrival-tree pyj-arrival-tree-b">
-          <path d="M91 294c9 24 7 49 0 76" stroke="#6F5136" strokeWidth="8" strokeLinecap="round" />
-          <path d="M55 283c10-37 47-55 80-39 34 17 38 66 2 84-35 18-74-5-82-45Z" fill="#5C9B7F" />
-          <circle cx="83" cy="270" r="9" fill="#E7683A" />
-          <circle cx="113" cy="288" r="8" fill="#C24B26" />
+          <path d="M94 324c5 16 4 32-1 49" stroke="#6F5136" strokeWidth="7" strokeLinecap="round" />
+          <path d="M62 317c9-29 39-43 66-31 27 13 31 50 4 65-28 16-61-2-70-34Z" fill="#5C9B7F" />
+          <circle cx="86" cy="308" r="7" fill="#E7683A" />
+          <circle cx="111" cy="323" r="6" fill="#C24B26" />
         </g>
 
         <path
-          d="M274 363c62 16 138 16 210-1"
+          d="M492 354c14-9 34-13 55-10 24 3 44 12 63 11"
           fill="none"
-          stroke="#C9A97F"
-          strokeWidth="4"
+          stroke="#6F5136"
+          strokeWidth="5"
           strokeLinecap="round"
-          opacity="0.7"
+          opacity="0.22"
         />
+        <g opacity="0.34" fill="#3E3A33">
+          <circle cx="517" cy="347" r="7" />
+          <circle cx="536" cy="342" r="5" />
+          <circle cx="556" cy="348" r="6" />
+          <circle cx="577" cy="346" r="4" />
+        </g>
       </svg>
     </div>
   );
