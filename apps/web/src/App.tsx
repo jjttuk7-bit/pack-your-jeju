@@ -69,7 +69,9 @@ export default function App() {
       return false;
     }
   });
-  const [showLanding, setShowLanding] = useState(false);
+  // 주소로 새로 들어오면 인증 상태와 관계없이 랜딩을 먼저 보여준다.
+  // 인증이 남아 있으면 랜딩 CTA가 곧바로 대시보드 진입 버튼으로 동작한다.
+  const [showLanding, setShowLanding] = useState(true);
 
   const handleEnter = () => {
     try {
