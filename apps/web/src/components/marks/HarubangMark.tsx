@@ -1,6 +1,7 @@
 /**
  * 하루방(돌하르방) SVG 마스코트 — 신뢰 기반 에이전트 캐릭터.
- * 제주 상징은 유지하되, 안내자답게 둥근 표정과 따뜻한 색을 더했다.
+ * 큰 얼굴과 반짝이는 눈의 친근함만 벤치마킹하고,
+ * 감귤색 목도리와 데이터 배지로 제주를 담다만의 안내자 톤을 만든다.
  */
 export default function HarubangMark({
   className = 'w-12 h-12',
@@ -9,13 +10,14 @@ export default function HarubangMark({
   className?: string;
   color?: string;
 }) {
-  const stone = color ?? '#75685B';
-  const stoneLight = '#A49483';
-  const stoneWarm = '#C4B4A0';
-  const stoneShadow = '#4E4338';
-  const eye = '#2C2119';
+  const stone = color ?? '#8F9298';
+  const stoneLight = '#C6C8CD';
+  const stoneMid = '#A5A8AE';
+  const stoneShadow = '#676B72';
+  const eye = '#171515';
   const citrus = '#EF5B2A';
-  const leaf = '#4B8A78';
+  const citrusLight = '#FFB36C';
+  const mint = '#4B8A78';
 
   return (
     <svg
@@ -25,82 +27,95 @@ export default function HarubangMark({
       aria-label="하루방 (제주를 담다 에이전트)"
     >
       <defs>
-        <radialGradient id="haruban-body" cx="0.42" cy="0.26" r="0.82">
+        <radialGradient id="haruban-face" cx="0.38" cy="0.24" r="0.82">
           <stop offset="0" stopColor={stoneLight} />
-          <stop offset="0.62" stopColor={stone} />
+          <stop offset="0.58" stopColor={stone} />
           <stop offset="1" stopColor={stoneShadow} />
         </radialGradient>
-        <linearGradient id="haruban-hat" x1="18" x2="46" y1="9" y2="25">
+        <linearGradient id="haruban-hat" x1="14" x2="50" y1="6" y2="25">
           <stop offset="0" stopColor={stoneLight} />
+          <stop offset="0.58" stopColor={stone} />
           <stop offset="1" stopColor={stoneShadow} />
         </linearGradient>
       </defs>
 
-      <ellipse cx="32" cy="58" rx="18" ry="3.2" fill="#2A1F16" opacity="0.12" />
+      <ellipse cx="32" cy="60" rx="18" ry="2.4" fill="#2A1F16" opacity="0.12" />
+
+      {/* 한 손 인사, 한 손은 가이드 배지 쪽으로 */}
+      <path d="M 15.2 40 Q 8.2 36.2, 7.5 29.5" stroke={stoneShadow} strokeWidth="6.4" strokeLinecap="round" fill="none" />
+      <g stroke={stoneShadow} strokeWidth="2" strokeLinecap="round" fill="none">
+        <path d="M 7.1 29.5 L 3.8 26.8" />
+        <path d="M 8.1 28.8 L 7 24.7" />
+        <path d="M 9.7 28.9 L 11.5 25.2" />
+      </g>
+      <path d="M 48.5 41 Q 52.5 44.5, 55.5 49" stroke={stoneShadow} strokeWidth="6.2" strokeLinecap="round" fill="none" />
 
       {/* 몸통 */}
-      <path
-        d="M 15.5 43.5 Q 15.5 58, 32 60 Q 48.5 58, 48.5 43.5 L 46.8 33 Q 45.8 22.5, 32 22.5 Q 18.2 22.5, 17.2 33 Z"
-        fill="url(#haruban-body)"
-      />
+      <path d="M 20.5 42.5 Q 32 38.8, 43.5 42.5 L 47 59 L 17 59 Z" fill={stoneShadow} />
+      <path d="M 18.7 47.2 Q 32 42.8, 45.3 47.2 L 45.8 59 L 18.2 59 Z" fill={stoneMid} />
 
-      {/* 모자 */}
-      <path
-        d="M 12.5 23 Q 20 12.5, 32 9.5 Q 44 12.5, 51.5 23 Q 45 26.5, 32 26.5 Q 19 26.5, 12.5 23 Z"
-        fill="url(#haruban-hat)"
-      />
-      <ellipse cx="32" cy="14.5" rx="9.8" ry="6.8" fill={stoneShadow} opacity="0.92" />
-      <path
-        d="M 15 22.5 Q 32 12, 49 22.5"
-        stroke={stoneWarm}
-        strokeWidth="1.2"
-        fill="none"
-        opacity="0.55"
-      />
+      {/* 감귤색 목도리 */}
+      <path d="M 19 43.6 Q 32 48.8, 45 43.6 L 43.7 49.5 Q 32 53.2, 20.3 49.5 Z" fill={citrus} />
+      <path d="M 32.2 47.8 L 38.2 58.5 L 32.9 56.7 L 29.8 59 L 27.6 48.8 Z" fill={citrusLight} />
+
+      {/* 제주를 담다 데이터 배지 */}
+      <g transform="translate(42 48)">
+        <circle cx="0" cy="0" r="6.2" fill="#FFFFFF" opacity="0.96" />
+        <circle cx="0" cy="0" r="5.4" fill="none" stroke={mint} strokeWidth="1" />
+        <path d="M -2.5 0.2 L -0.7 2.1 L 2.9 -2" stroke={mint} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+
+      {/* 귀 */}
+      <ellipse cx="11.9" cy="31.2" rx="4.1" ry="6.8" fill={stoneShadow} />
+      <ellipse cx="52.1" cy="31.2" rx="4.1" ry="6.8" fill={stoneShadow} />
+      <ellipse cx="12.8" cy="31.4" rx="2" ry="4" fill={stoneMid} opacity="0.8" />
+      <ellipse cx="51.2" cy="31.4" rx="2" ry="4" fill={stoneMid} opacity="0.8" />
 
       {/* 얼굴 */}
-      <ellipse cx="32" cy="31.5" rx="13" ry="10.2" fill={stone} />
-      <ellipse cx="23.7" cy="35.3" rx="2.3" ry="1.4" fill="#EAB7A1" opacity="0.55" />
-      <ellipse cx="40.3" cy="35.3" rx="2.3" ry="1.4" fill="#EAB7A1" opacity="0.55" />
-
-      {/* 부드러운 눈 */}
-      <path d="M 23.8 30.4 Q 26.2 28.7, 28.6 30.4" stroke={eye} strokeWidth="1.9" strokeLinecap="round" fill="none" />
-      <path d="M 35.4 30.4 Q 37.8 28.7, 40.2 30.4" stroke={eye} strokeWidth="1.9" strokeLinecap="round" fill="none" />
-
-      {/* 코와 웃는 입 */}
       <path
-        d="M 32 31 L 29.8 39.2 Q 32 41.2, 34.2 39.2 Z"
-        fill={stoneWarm}
-      />
-      <path
-        d="M 27.7 42 Q 32 45.4, 36.3 42"
-        stroke={stoneShadow}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
+        d="M 12.7 26.5 Q 13.1 13.5, 32 13.3 Q 50.9 13.5, 51.3 26.5 Q 51.5 44.5, 32 47.8 Q 12.5 44.5, 12.7 26.5 Z"
+        fill="url(#haruban-face)"
       />
 
-      {/* 손과 감귤 배지 */}
-      <ellipse cx="23.6" cy="51.3" rx="3.8" ry="3" fill={stoneLight} />
-      <ellipse cx="40.4" cy="51.3" rx="3.8" ry="3" fill={stoneLight} />
+      {/* 둥근 돌하르방 모자 */}
       <path
-        d="M 24 51.5 Q 32 55, 40 51.5"
-        stroke={stoneShadow}
-        strokeWidth="0.8"
-        fill="none"
-        opacity="0.5"
+        d="M 13 18 Q 16 6.5, 32 5 Q 48 6.5, 51 18 Q 45.5 20.6, 32 20.6 Q 18.5 20.6, 13 18 Z"
+        fill="url(#haruban-hat)"
       />
-      <circle cx="32" cy="50.2" r="4.2" fill={citrus} />
-      <path d="M 32 46.4 Q 34.5 43.7, 37.1 46.2 Q 34.5 47, 32.5 46.8" fill={leaf} />
-      <path d="M 29.9 48.7 Q 32 47.2, 34.1 48.7" stroke="#FFB079" strokeWidth="0.8" strokeLinecap="round" fill="none" opacity="0.75" />
+      <path
+        d="M 9.8 19.4 Q 12 15, 17.8 14.8 L 46.2 14.8 Q 52 15, 54.2 19.4 Q 51.6 25.5, 32 25.5 Q 12.4 25.5, 9.8 19.4 Z"
+        fill={stoneMid}
+      />
+      <path d="M 13 20.2 Q 32 25.5, 51 20.2" stroke={stoneShadow} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.32" />
+      <g fill={stoneShadow} opacity="0.26">
+        <circle cx="44.6" cy="16.7" r="1" />
+        <circle cx="47.7" cy="17.9" r="1.1" />
+        <circle cx="45.7" cy="20.3" r="0.9" />
+      </g>
+
+      {/* 눈썹과 반짝이는 눈 */}
+      <path d="M 21.5 27.3 Q 24.1 25.9, 26.9 27" stroke={eye} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      <path d="M 37.1 27 Q 39.9 25.9, 42.5 27.3" stroke={eye} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      <ellipse cx="24.5" cy="33" rx="3.25" ry="5" fill={eye} />
+      <ellipse cx="39.5" cy="33" rx="3.25" ry="5" fill={eye} />
+      <circle cx="23.4" cy="30.7" r="0.95" fill="#FFFFFF" />
+      <circle cx="38.4" cy="30.7" r="0.95" fill="#FFFFFF" />
+      <circle cx="25.6" cy="35.4" r="0.45" fill="#FFFFFF" opacity="0.6" />
+      <circle cx="40.6" cy="35.4" r="0.45" fill="#FFFFFF" opacity="0.6" />
+
+      {/* 활짝 웃는 입 */}
+      <path d="M 25.5 38.7 Q 32 47.3, 38.5 38.7 Q 32 35.6, 25.5 38.7 Z" fill="#6B3324" />
+      <path d="M 29.2 43.5 Q 32 45.1, 34.8 43.5" stroke="#E9865C" strokeWidth="2" strokeLinecap="round" fill="none" />
+      <ellipse cx="21" cy="38.5" rx="2.3" ry="1.2" fill="#F0B7A8" opacity="0.45" />
+      <ellipse cx="43" cy="38.5" rx="2.3" ry="1.2" fill="#F0B7A8" opacity="0.45" />
 
       {/* 현무암 표면 텍스처 */}
-      <g fill={stoneShadow} opacity="0.35">
-        <circle cx="20.2" cy="40.5" r="0.7" />
-        <circle cx="44.2" cy="38.2" r="0.65" />
-        <circle cx="22.4" cy="47.4" r="0.55" />
-        <circle cx="42.7" cy="45.8" r="0.55" />
-        <circle cx="31.2" cy="55.4" r="0.5" />
+      <g fill={stoneShadow} opacity="0.16">
+        <circle cx="18.4" cy="30" r="0.45" />
+        <circle cx="30" cy="26.5" r="0.38" />
+        <circle cx="45.2" cy="34.5" r="0.45" />
+        <circle cx="34.8" cy="39.4" r="0.35" />
+        <circle cx="20.6" cy="42.4" r="0.4" />
       </g>
     </svg>
   );
