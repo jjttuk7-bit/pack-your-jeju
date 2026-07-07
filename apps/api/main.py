@@ -98,6 +98,7 @@ class VisitSignalBody(BaseModel):
     status: VisitSignalStatus
     mismatch_reason: str | None = Field(default=None, max_length=80)
     memo: str | None = Field(default=None, max_length=500)
+    feedback_text: str | None = Field(default=None, max_length=1000)
     previous_trust_score: int | None = Field(default=None, ge=0, le=100)
     score_breakdown: dict[str, Any] | None = None
 
@@ -218,6 +219,7 @@ def visit_signals(body: VisitSignalBody) -> dict[str, Any]:
         "previous_trust_score": result.previous_trust_score,
         "updated_trust_score": result.updated_trust_score,
         "trust_delta": result.trust_delta,
+        "public_data_report": result.public_data_report,
         "message": result.message,
     }
 

@@ -82,3 +82,22 @@ CREATE TABLE IF NOT EXISTS visit_signal (
 );
 CREATE INDEX IF NOT EXISTS visit_signal_external_id_created_idx
   ON visit_signal (external_id, created_at DESC);
+
+-- public_data_feedback_queue: 방문 후 사용자가 남긴 수정 의견을 공공데이터 수정요청으로
+-- 넘길 수 있는 내부 큐. 실제 외부 제출은 운영자 확인 후 별도 배치/관리 화면에서 처리한다.
+CREATE TABLE IF NOT EXISTS public_data_feedback_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  visit_signal_id UUID REFERENCES visit_signal(id) ON DELETE SET NULL,
+  external_id TEXT NOT NULL,
+  place_name TEXT,
+  status TEXT NOT NULL,
+  mismatch_reason TEXT,
+  feedback_text TEXT NOT NULL,
+  target_source TEXT NOT NULL DEFAULT 'public_data_correction_queue',
+  delivery_status TEXT NOT NULL DEFAULT 'queued',
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  delivered_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS public_data_feedback_queue_status_idx
+  ON public_data_feedback_queue (delivery_status, created_at DESC);

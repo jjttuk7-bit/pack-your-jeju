@@ -93,6 +93,8 @@ export interface VisitCheck {
   updatedTrustScore?: number;
   trustDelta?: number;
   saved?: boolean;
+  publicDataQueued?: boolean;
+  publicDataStatus?: string;
   memo?: string;
   updatedAt: string;
 }
@@ -152,6 +154,12 @@ export interface VisitSignalResponse {
   previous_trust_score: number;
   updated_trust_score: number;
   trust_delta: number;
+  public_data_report: {
+    queued: boolean;
+    delivery_status: string;
+    report_id?: string;
+    payload?: Record<string, unknown>;
+  };
   message: string;
 }
 

@@ -119,6 +119,7 @@ export function requestVisitSignal(body: {
   status: VisitCheckStatus;
   mismatch_reason?: string;
   memo?: string;
+  feedback_text?: string;
   previous_trust_score?: number;
   score_breakdown?: Record<string, unknown>;
 }): Promise<VisitSignalResponse> {

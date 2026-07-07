@@ -42,6 +42,7 @@ class VisitSignalSaveResult:
     previous_trust_score: int
     updated_trust_score: int
     trust_delta: int
+    public_data_report: dict[str, Any]
     message: str
 
 
@@ -56,6 +57,24 @@ def simulate_trust_update(previous_score: int | None, status: str) -> tuple[int,
     return previous, updated, updated - previous
 
 
+def build_public_data_feedback_payload(
+    payload: dict[str, Any],
+    *,
+    previous: int,
+    updated: int,
+) -> dict[str, Any]:
+    return {
+        "target_source": "public_data_correction_queue",
+        "external_id": payload["external_id"],
+        "place_name": payload.get("place_name"),
+        "status": payload["status"],
+        "mismatch_reason": payload.get("mismatch_reason"),
+        "feedback_text": (payload.get("feedback_text") or payload.get("memo") or "").strip(),
+        "trust_score_before": previous,
+        "trust_score_after": updated,
+    }
+
+
 def save_visit_signal(payload: dict[str, Any]) -> VisitSignalSaveResult:
     previous, updated, delta = simulate_trust_update(
         payload.get("previous_trust_score"),
@@ -64,6 +83,7 @@ def save_visit_signal(payload: dict[str, Any]) -> VisitSignalSaveResult:
     try:
         engine = db.get_engine()
     except Exception as e:
+        report_payload = build_public_data_feedback_payload(payload, previous=previous, updated=updated)
         return VisitSignalSaveResult(
             saved=False,
             db_available=False,
@@ -71,6 +91,11 @@ def save_visit_signal(payload: dict[str, Any]) -> VisitSignalSaveResult:
             previous_trust_score=previous,
             updated_trust_score=updated,
             trust_delta=delta,
+            public_data_report={
+                "queued": False,
+                "delivery_status": "local_only",
+                "payload": report_payload,
+            },
             message=f"db unavailable: {type(e).__name__}",
         )
 
@@ -102,7 +127,15 @@ def save_visit_signal(payload: dict[str, Any]) -> VisitSignalSaveResult:
                     "score_breakdown": json.dumps(payload.get("score_breakdown") or {}),
                 },
             ).scalar_one()
+            report = _enqueue_public_data_feedback(
+                conn,
+                signal_id=signal_id,
+                payload=payload,
+                previous=previous,
+                updated=updated,
+            )
     except Exception as e:
+        report_payload = build_public_data_feedback_payload(payload, previous=previous, updated=updated)
         return VisitSignalSaveResult(
             saved=False,
             db_available=True,
@@ -110,6 +143,11 @@ def save_visit_signal(payload: dict[str, Any]) -> VisitSignalSaveResult:
             previous_trust_score=previous,
             updated_trust_score=updated,
             trust_delta=delta,
+            public_data_report={
+                "queued": False,
+                "delivery_status": "save_failed",
+                "payload": report_payload,
+            },
             message=f"save failed: {type(e).__name__}",
         )
 
@@ -120,8 +158,58 @@ def save_visit_signal(payload: dict[str, Any]) -> VisitSignalSaveResult:
         previous_trust_score=previous,
         updated_trust_score=updated,
         trust_delta=delta,
+        public_data_report=report,
         message="visit signal saved",
     )
+
+
+def _enqueue_public_data_feedback(
+    conn,
+    *,
+    signal_id: str,
+    payload: dict[str, Any],
+    previous: int,
+    updated: int,
+) -> dict[str, Any]:
+    report_payload = build_public_data_feedback_payload(payload, previous=previous, updated=updated)
+    feedback_text = report_payload["feedback_text"]
+    if not feedback_text:
+        return {
+            "queued": False,
+            "delivery_status": "no_feedback_text",
+            "payload": report_payload,
+        }
+    report_id = conn.execute(
+        text(
+            """
+            INSERT INTO public_data_feedback_queue (
+              visit_signal_id, external_id, place_name, status, mismatch_reason,
+              feedback_text, target_source, delivery_status, payload
+            )
+            VALUES (
+              CAST(:visit_signal_id AS uuid), :external_id, :place_name, :status, :mismatch_reason,
+              :feedback_text, :target_source, 'queued', CAST(:payload AS jsonb)
+            )
+            RETURNING id::text
+            """
+        ),
+        {
+            "visit_signal_id": signal_id,
+            "external_id": report_payload["external_id"],
+            "place_name": report_payload["place_name"],
+            "status": report_payload["status"],
+            "mismatch_reason": report_payload["mismatch_reason"],
+            "feedback_text": feedback_text,
+            "target_source": report_payload["target_source"],
+            "payload": json.dumps(report_payload, ensure_ascii=False),
+        },
+    ).scalar_one()
+    return {
+        "queued": True,
+        "delivery_status": "queued",
+        "report_id": report_id,
+        "payload": report_payload,
+    }
 
 
 def latest_visit_signal(external_id: str) -> dict[str, Any] | None:

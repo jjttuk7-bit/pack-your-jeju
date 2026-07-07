@@ -650,11 +650,13 @@ function PlanItemRow({
   const moment = MOMENTS.find((m) => m.id === item.moment);
   const visitLabel = visitCheck ? visitStatusLabel(visitCheck.status) : '방문 후 확인 전';
   const [saving, setSaving] = useState<VisitCheckStatus | null>(null);
+  const [feedbackText, setFeedbackText] = useState(visitCheck?.memo ?? '');
   const previousScore = item.trust_score ?? visitCheck?.previousTrustScore ?? 70;
   const previewUpdate = simulateVisitTrustUpdate(previousScore, visitCheck?.status ?? 'visited');
 
   const handleVisit = async (status: VisitCheckStatus) => {
     const fallback = simulateVisitTrustUpdate(previousScore, status);
+    const feedback = feedbackText.trim();
     setSaving(status);
     if (!item.external_id || item.source !== 'public_data') {
       onSetVisitCheck(item.id, status, {
@@ -662,6 +664,9 @@ function PlanItemRow({
         updatedTrustScore: fallback.updated,
         trustDelta: fallback.delta,
         saved: false,
+        memo: feedback || undefined,
+        publicDataQueued: false,
+        publicDataStatus: 'local_only',
       });
       setSaving(null);
       return;
@@ -672,6 +677,8 @@ function PlanItemRow({
         place_name: item.name,
         status,
         mismatch_reason: status === 'info_mismatch' ? 'hours_wrong' : status === 'changed' ? 'changed' : undefined,
+        memo: feedback || undefined,
+        feedback_text: feedback || undefined,
         previous_trust_score: previousScore,
         score_breakdown: item.score_breakdown,
       });
@@ -680,6 +687,9 @@ function PlanItemRow({
         updatedTrustScore: resp.updated_trust_score,
         trustDelta: resp.trust_delta,
         saved: resp.saved,
+        memo: feedback || undefined,
+        publicDataQueued: resp.public_data_report.queued,
+        publicDataStatus: resp.public_data_report.delivery_status,
       });
     } catch {
       onSetVisitCheck(item.id, status, {
@@ -687,6 +697,9 @@ function PlanItemRow({
         updatedTrustScore: fallback.updated,
         trustDelta: fallback.delta,
         saved: false,
+        memo: feedback || undefined,
+        publicDataQueued: false,
+        publicDataStatus: 'request_failed',
       });
     } finally {
       setSaving(null);
@@ -773,6 +786,22 @@ function PlanItemRow({
         />
       </div>
 
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-bold text-basalt-2">
+          방문 후 피드백
+        </label>
+        <textarea
+          value={feedbackText}
+          onChange={(e) => setFeedbackText(e.target.value.slice(0, 500))}
+          rows={2}
+          placeholder="예: 운영시간이 달랐어요, 주차장이 공사 중이었어요, 부모님 동선에는 계단이 많았어요."
+          className="w-full resize-none rounded-xl border border-earth bg-white/82 px-3 py-2 text-[11.5px] leading-relaxed text-basalt outline-none placeholder:text-basalt-2/45 focus:ring-2 focus:ring-citrus/25"
+        />
+        <p className="text-[9.5px] leading-relaxed text-basalt-2/70">
+          이 메모는 신뢰도 업데이트와 별도로 `공공데이터 수정요청 큐`에 전달 대기 상태로 저장됩니다.
+        </p>
+      </div>
+
       <div className="rounded-xl border border-earth bg-white/78 px-3 py-2 text-[10.5px] text-basalt-2">
         <div className="flex items-center justify-between gap-2">
           <span className="font-bold text-basalt">신뢰도 업데이트</span>
@@ -791,6 +820,15 @@ function PlanItemRow({
           <p className="mt-1 leading-relaxed">
             버튼을 누르면 기존 점수에서 방문 신호 축이 어떻게 바뀌는지 기록합니다.
           </p>
+        )}
+        {visitCheck?.publicDataStatus && (
+          <div className={`mt-2 rounded-lg px-2 py-1 font-semibold ${
+            visitCheck.publicDataQueued
+              ? 'bg-mint/10 text-mint'
+              : 'bg-amber-50 text-amber-800'
+          }`}>
+            공공데이터 전달 상태: {publicDataStatusLabel(visitCheck.publicDataStatus)}
+          </div>
         )}
       </div>
     </div>
@@ -845,6 +883,15 @@ function simulateVisitTrustUpdate(previousScore: number, status: VisitCheckStatu
   const previous = Math.max(0, Math.min(100, Math.round(previousScore)));
   const updated = Math.max(0, Math.min(100, previous + deltas[status]));
   return { previous, updated, delta: updated - previous };
+}
+
+function publicDataStatusLabel(status: string): string {
+  if (status === 'queued') return '수정요청 큐에 저장됨';
+  if (status === 'no_feedback_text') return '피드백 메모 없음';
+  if (status === 'local_only') return '로컬 보관';
+  if (status === 'save_failed') return '서버 저장 실패';
+  if (status === 'request_failed') return '전송 실패';
+  return status;
 }
 
 function buildShareText(

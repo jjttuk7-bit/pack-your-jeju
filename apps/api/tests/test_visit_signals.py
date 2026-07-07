@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from apps.api.engine.visit_signals import build_public_data_feedback_payload
 from apps.api.main import app
 
 client = TestClient(app)
@@ -36,6 +37,7 @@ def test_visit_signal_endpoint_survives_unavailable_db(monkeypatch):
             "status": "info_mismatch",
             "mismatch_reason": "hours_wrong",
             "memo": "운영시간이 달랐음",
+            "feedback_text": "오후 5시에 갔는데 이미 닫혀 있었습니다.",
             "previous_trust_score": 82,
         },
     )
@@ -47,3 +49,28 @@ def test_visit_signal_endpoint_survives_unavailable_db(monkeypatch):
     assert data["previous_trust_score"] == 82
     assert data["updated_trust_score"] < 82
     assert data["trust_delta"] < 0
+    assert data["public_data_report"]["queued"] is False
+    assert data["public_data_report"]["delivery_status"] == "local_only"
+
+
+def test_build_public_data_feedback_payload_keeps_user_feedback_separate():
+    payload = build_public_data_feedback_payload(
+        {
+            "external_id": "p1",
+            "place_name": "테스트오름",
+            "status": "info_mismatch",
+            "mismatch_reason": "hours_wrong",
+            "feedback_text": "운영시간이 달랐습니다.",
+        },
+        previous=82,
+        updated=68,
+    )
+
+    assert payload["target_source"] == "public_data_correction_queue"
+    assert payload["external_id"] == "p1"
+    assert payload["place_name"] == "테스트오름"
+    assert payload["feedback_text"] == "운영시간이 달랐습니다."
+    assert payload["status"] == "info_mismatch"
+    assert payload["mismatch_reason"] == "hours_wrong"
+    assert payload["trust_score_before"] == 82
+    assert payload["trust_score_after"] == 68
