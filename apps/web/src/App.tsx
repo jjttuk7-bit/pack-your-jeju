@@ -528,111 +528,141 @@ export default function App() {
 function HeaderJourneyScene() {
   return (
     <div
-      className="pointer-events-none absolute right-2 top-2 z-0 hidden h-[148px] w-[58%] max-w-[820px] opacity-80 lg:block"
+      className="pointer-events-none absolute right-0 top-0 z-0 hidden h-[168px] w-[64%] max-w-[940px] opacity-90 lg:block"
       aria-hidden="true"
     >
       <svg
-        viewBox="0 0 820 150"
+        viewBox="0 0 940 168"
         className="h-full w-full"
         role="img"
-        aria-label="한라산을 바라보며 걷는 여행자 실루엣"
+        aria-label="한라산 능선과 산책하는 여행자들"
       >
         <defs>
-          <linearGradient id="headerHillSoft" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stopColor="#DCEAD6" stopOpacity="0.18" />
-            <stop offset="58%" stopColor="#7FA36A" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#4A8779" stopOpacity="0.14" />
-          </linearGradient>
-          <linearGradient id="headerHallasan" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#6F8550" stopOpacity="0.34" />
-            <stop offset="100%" stopColor="#315F52" stopOpacity="0.22" />
+          <linearGradient id="headerSkyFade" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#FBF6EA" stopOpacity="0" />
+            <stop offset="58%" stopColor="#FBF6EA" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#FBF6EA" stopOpacity="0.64" />
           </linearGradient>
         </defs>
 
+        <rect width="940" height="168" fill="url(#headerSkyFade)" />
         <path
-          d="M22 112 C132 88 205 118 312 91 C390 70 454 27 528 20 C596 14 640 58 712 67 C756 72 788 66 818 58 L818 150 L22 150 Z"
-          fill="url(#headerHillSoft)"
-        />
-        <path
-          d="M370 102 C420 73 447 34 501 14 C537 1 585 28 616 65 C642 96 706 93 785 82 L820 78 L820 150 L352 150 Z"
-          fill="url(#headerHallasan)"
-        />
-        <path
-          d="M466 42 C498 31 536 30 574 47"
-          fill="none"
-          stroke="#F7F0DF"
-          strokeWidth="4"
-          strokeLinecap="round"
-          opacity="0.42"
-        />
-        <path
-          d="M0 128 C108 119 186 132 278 122 C368 111 431 116 520 124 C616 132 700 115 820 123"
-          fill="none"
-          stroke="#4A8779"
-          strokeWidth="2"
-          strokeLinecap="round"
+          d="M0 97 C82 79 151 72 222 88 C302 106 367 83 452 68 C556 49 654 66 735 78 C814 89 880 72 940 58 L940 168 L0 168 Z"
+          fill="#416F43"
           opacity="0.34"
         />
         <path
-          d="M0 139 C96 132 174 141 268 134 C380 126 472 138 564 135 C655 132 730 124 820 132"
+          d="M222 112 C342 83 443 91 548 74 C642 58 724 84 826 90 C870 93 907 83 940 74 L940 168 L222 168 Z"
+          fill="#78A357"
+          opacity="0.42"
+        />
+        <path
+          d="M520 83 C570 49 606 17 662 8 C704 2 733 25 760 58 C783 86 852 91 940 78 L940 168 L487 168 Z"
+          fill="#315F52"
+          opacity="0.44"
+        />
+        <path
+          d="M566 45 C604 27 658 21 716 37"
           fill="none"
-          stroke="#C9A97F"
-          strokeWidth="2"
+          stroke="#8EA77A"
+          strokeWidth="6"
+          strokeLinecap="round"
+          opacity="0.45"
+        />
+        <path
+          d="M704 42 C728 50 742 64 762 82"
+          fill="none"
+          stroke="#254C43"
+          strokeWidth="4"
           strokeLinecap="round"
           opacity="0.28"
         />
+        <path
+          d="M0 129 C118 112 195 123 298 111 C424 96 524 111 630 118 C748 125 839 109 940 113 L940 168 L0 168 Z"
+          fill="#B8CD63"
+          opacity="0.5"
+        />
+        <path
+          d="M0 145 C122 132 218 143 333 133 C476 120 585 139 704 134 C802 130 870 118 940 123 L940 168 L0 168 Z"
+          fill="#557E34"
+          opacity="0.48"
+        />
+        <path
+          d="M0 157 C98 147 194 153 296 147 C414 139 536 152 650 150 C762 148 842 138 940 143"
+          fill="none"
+          stroke="#2E5F2C"
+          strokeWidth="8"
+          strokeLinecap="round"
+          opacity="0.24"
+        />
 
-        <JourneyCompanion x={172} y={118} scale={0.94} body="#7B715F" accent="#E7683A" />
-        <JourneyCompanion x={224} y={121} scale={0.78} body="#5F9B8C" accent="#F0B36A" />
-        <JourneyCompanion x={276} y={116} scale={1} body="#6F7F5B" accent="#4A8779" />
+        <HikerFigure x={150} y={133} scale={0.88} shirt="#D7B08B" pants="#4A8779" pack="#B86E22" hair="#DDD4C2" pole />
+        <HikerFigure x={223} y={134} scale={0.74} shirt="#E7683A" pants="#6B4E8D" pack="#7FA36A" hair="#C76B47" />
+        <HikerFigure x={292} y={130} scale={0.94} shirt="#315F52" pants="#2E3235" pack="#6F8550" hair="#2E3235" pole />
+        <HikerFigure x={386} y={135} scale={0.7} shirt="#4A8779" pants="#66715D" pack="#F0B36A" hair="#9A5F45" />
       </svg>
     </div>
   );
 }
 
-function JourneyCompanion({
+function HikerFigure({
   x,
   y,
   scale,
-  body,
-  accent,
+  shirt,
+  pants,
+  pack,
+  hair,
+  pole = false,
 }: {
   x: number;
   y: number;
   scale: number;
-  body: string;
-  accent: string;
+  shirt: string;
+  pants: string;
+  pack: string;
+  hair: string;
+  pole?: boolean;
 }) {
   return (
-    <g transform={`translate(${x} ${y}) scale(${scale})`} opacity="0.68">
-      <ellipse cx="0" cy="19" rx="17" ry="3" fill="#2E3235" opacity="0.12" />
-      <circle cx="0" cy="-39" r="7" fill="#6E6F68" />
+    <g transform={`translate(${x} ${y}) scale(${scale})`} opacity="0.9">
+      <ellipse cx="2" cy="24" rx="29" ry="4" fill="#1E2E22" opacity="0.14" />
+      {pole && (
+        <path
+          d="M20 -15 L29 25"
+          fill="none"
+          stroke="#6F5A42"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          opacity="0.68"
+        />
+      )}
+      <path d="M-17 -48 C-6 -58 8 -56 17 -46 C9 -42 -5 -42 -17 -48 Z" fill={hair} />
+      <circle cx="0" cy="-41" r="8.5" fill="#E9C6A3" />
+      <path d="M-10 -45 C-4 -55 7 -53 13 -45 C8 -43 -3 -43 -10 -45 Z" fill={hair} />
+      <path d="M-10 -32 C-14 -18 -11 -3 -4 5 C0 9 10 6 13 -1 C18 -13 14 -25 8 -34 Z" fill={shirt} />
       <path
-        d="M-10 -31 C-13 -21 -12 -9 -7 0 C-3 6 6 6 10 0 C15 -9 13 -22 9 -31 C4 -34 -5 -34 -10 -31 Z"
-        fill={body}
+        d="M-15 -31 C-31 -28 -34 -9 -23 1 C-17 6 -11 2 -11 -6 L-9 -30 Z"
+        fill={pack}
       />
       <path
-        d="M-13 -24 C-21 -18 -23 -8 -17 -1"
+        d="M9 -27 C22 -19 25 -14 22 -6"
         fill="none"
-        stroke={accent}
-        strokeWidth="4"
+        stroke={shirt}
+        strokeWidth="5"
         strokeLinecap="round"
       />
       <path
-        d="M9 -23 C17 -18 19 -10 14 -3"
+        d="M-8 -27 C-22 -19 -24 -9 -18 -1"
         fill="none"
-        stroke={body}
-        strokeWidth="4"
+        stroke={shirt}
+        strokeWidth="5"
         strokeLinecap="round"
       />
-      <path d="M-5 1 C-10 7 -12 13 -13 18" fill="none" stroke="#67635A" strokeWidth="4" strokeLinecap="round" />
-      <path d="M6 1 C10 7 12 13 16 17" fill="none" stroke="#67635A" strokeWidth="4" strokeLinecap="round" />
-      <path
-        d="M-11 -27 C-21 -24 -24 -13 -18 -5 C-15 -1 -10 -2 -9 -7 L-7 -24 Z"
-        fill={accent}
-        opacity="0.68"
-      />
-      <path d="M-6 -42 C-2 -46 5 -45 9 -41" fill="none" stroke="#6E6F68" strokeWidth="2" strokeLinecap="round" />
+      <path d="M-4 4 C-13 12 -17 19 -21 25" fill="none" stroke={pants} strokeWidth="6" strokeLinecap="round" />
+      <path d="M8 3 C15 12 20 18 28 21" fill="none" stroke={pants} strokeWidth="6" strokeLinecap="round" />
+      <path d="M-23 25 L-33 25" fill="none" stroke="#2E3235" strokeWidth="3" strokeLinecap="round" />
+      <path d="M29 21 L39 19" fill="none" stroke="#2E3235" strokeWidth="3" strokeLinecap="round" />
     </g>
   );
 }
