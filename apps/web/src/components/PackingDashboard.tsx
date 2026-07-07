@@ -220,7 +220,7 @@ export default function PackingDashboard(props: Props) {
   return (
     <div className="w-full max-w-[1500px] mx-auto" id="packing-dashboard">
       <div className="grid gap-5 xl:gap-7 lg:grid-cols-[460px_minmax(0,1fr)] lg:items-start">
-        <aside className="space-y-5 lg:sticky lg:top-6">
+        <aside className="space-y-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-2 pyj-side-scroll">
       {/* 요약 카드 */}
       <div
         className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
