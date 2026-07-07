@@ -417,19 +417,19 @@ function JejuRegionMap({
             </filter>
           </defs>
           <path
-            d="M31 124C43 83 83 54 139 41c55-13 117-5 160 18 39 21 59 51 51 80-8 28-45 51-96 61-56 12-126 7-174-12-40-16-62-39-61-63 0-5 4-6 12-1Z"
+            d="M21 132C29 109 51 91 82 75c37-19 84-30 132-33 53-4 105 3 143 20 34 15 52 36 50 60-2 22-24 42-61 57-40 16-92 24-148 23-54-1-103-10-138-27-28-14-43-31-42-49 0-3 1-5 3-6Z"
             fill="url(#jeju-map-sea)"
             opacity="0.78"
           />
           <path
-            d="M43 119C47 100 68 84 94 71c31-16 68-26 104-27 37-1 79 6 111 22 31 16 49 37 47 59-2 23-26 43-61 55-39 14-91 18-141 12-49-6-91-21-111-43-8-9-7-20 0-30Z"
+            d="M29 126C35 104 58 86 91 72c34-15 77-24 124-26 52-2 103 5 139 21 31 14 48 33 48 54 0 18-17 34-47 47-27 12-64 20-106 24-43 4-91 1-131-7-38-8-69-21-84-38-6-7-7-14-5-21Z"
             fill="url(#jeju-map-land)"
             stroke="#C9A97F"
             strokeWidth="2.4"
             filter="url(#jeju-map-soft-shadow)"
           />
           <path
-            d="M57 122C74 96 111 77 156 69c52-10 107 0 143 22"
+            d="M48 123C70 97 112 78 162 70c62-10 128 1 178 23"
             fill="none"
             stroke="#8E6B3F"
             strokeOpacity="0.14"
@@ -437,7 +437,7 @@ function JejuRegionMap({
             strokeLinecap="round"
           />
           <path
-            d="M65 151C105 173 196 184 298 151"
+            d="M54 151C88 171 142 181 206 181c55 0 106-8 146-26"
             fill="none"
             stroke="#4A8779"
             strokeOpacity="0.16"
@@ -457,7 +457,7 @@ function JejuRegionMap({
             strokeLinecap="round"
           />
           <path
-            d="M36 91c14-5 28-8 42-8M291 69c15 6 27 14 36 24M82 183c27 9 57 14 89 15M226 199c29-3 57-10 80-20"
+            d="M36 96c16-7 34-12 53-15M308 69c18 8 33 18 44 31M72 176c29 11 65 18 105 20M232 198c35-3 67-12 94-25"
             fill="none"
             stroke="#6EA99D"
             strokeOpacity="0.24"
@@ -467,7 +467,7 @@ function JejuRegionMap({
           <circle cx="338" cy="75" r="10" fill="#F6E0BE" stroke="#C9A97F" strokeWidth="1.5" />
           <circle cx="338" cy="75" r="15" fill="none" stroke="#7FB7AA" strokeOpacity="0.22" strokeWidth="3" />
           <path
-            d="M28 147c9 7 24 14 41 18M314 164c13-5 24-12 32-21"
+            d="M23 145c11 9 29 17 51 23M318 164c17-7 31-17 40-30"
             fill="none"
             stroke="#F07A3B"
             strokeOpacity="0.16"
