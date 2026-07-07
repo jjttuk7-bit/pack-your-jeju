@@ -283,10 +283,11 @@ export default function HarubanChat({
         type="button"
         id="haruban-fab"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-40 w-16 h-16 rounded-full bg-white/95 backdrop-blur-sm shadow-jeju-chip border-2 border-earth flex items-center justify-center hover:-translate-y-0.5 transition"
+        className="fixed bottom-5 right-5 z-40 h-[82px] w-[82px] rounded-full border-2 border-citrus/25 bg-white/95 shadow-[0_18px_42px_rgba(88,67,47,0.22)] backdrop-blur-sm flex items-center justify-center transition hover:-translate-y-1 hover:scale-[1.03] hover:border-citrus/45"
         aria-label="하루방 에이전트 열기"
       >
-        <HarubangMark className="w-12 h-12" />
+        <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full border-2 border-white bg-citrus shadow-sm" />
+        <HarubangMark className="h-[66px] w-[66px]" />
       </button>
 
       <AnimatePresence>
@@ -297,15 +298,17 @@ export default function HarubanChat({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-5 z-40 w-[380px] max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-8rem)] rounded-2xl bg-white shadow-2xl border-2 border-earth flex flex-col"
+            className="fixed bottom-[7.25rem] right-5 z-40 w-[390px] max-w-[calc(100vw-2.5rem)] h-[570px] max-h-[calc(100vh-8rem)] rounded-2xl bg-white shadow-2xl border-2 border-earth flex flex-col"
             id="haruban-panel"
           >
             {/* 헤더 */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-earth/60 bg-[#FDF6EA] rounded-t-2xl">
-              <HarubangMark className="w-8 h-8" />
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-earth/60 bg-[#FDF6EA] rounded-t-2xl">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-100 bg-white shadow-sm">
+                <HarubangMark className="h-11 w-11" />
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="font-serif-kr font-bold text-[14px] text-basalt">하루방 에이전트</div>
-                <div className="text-[10px] text-basalt-2/70 leading-tight">
+                <div className="font-serif-kr font-bold text-[15px] text-basalt">하루방 에이전트</div>
+                <div className="text-[10.5px] text-basalt-2/70 leading-tight">
                   공공데이터 기반 여행 조율
                 </div>
               </div>
