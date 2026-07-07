@@ -283,9 +283,8 @@ export default function App() {
       <div className="w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
-        <header className="relative overflow-hidden pt-2 pb-8" id="app-header">
-          <HeaderJourneyScene />
-          <div className="relative z-10 flex items-start gap-4 mb-2">
+        <header className="pt-2 pb-8" id="app-header">
+          <div className="flex items-start gap-4 mb-2">
             {/* 마스코트 클릭 = 처음 화면 (관례상 로고=홈). */}
             <motion.button
               type="button"
@@ -342,13 +341,13 @@ export default function App() {
             </motion.button>
           </div>
 
-          <WaveLine className="relative z-10 w-full h-5 mt-3" />
+          <WaveLine className="w-full h-5 mt-3" />
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35, duration: 0.5 }}
-            className="relative z-10 font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-2xl"
+            className="font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-2xl"
           >
             우리는 <span className="text-citrus-2 font-bold">근거 있는 것만</span> 담고,
             <br />
@@ -356,7 +355,7 @@ export default function App() {
           </motion.p>
 
           {state.step !== 'setup' && (
-            <div className="relative z-10 mt-5 inline-flex items-center gap-0.5 p-1 bg-white/80 backdrop-blur rounded-full border border-earth shadow-sm">
+            <div className="mt-5 inline-flex items-center gap-0.5 p-1 bg-white/80 backdrop-blur rounded-full border border-earth shadow-sm">
               <button
                 onClick={goToDashboard}
                 className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition ${
@@ -522,147 +521,5 @@ export default function App() {
       )}
 
     </div>
-  );
-}
-
-function HeaderJourneyScene() {
-  return (
-    <div
-      className="pointer-events-none absolute right-0 top-0 z-0 hidden h-[168px] w-[64%] max-w-[940px] opacity-90 lg:block"
-      aria-hidden="true"
-    >
-      <svg
-        viewBox="0 0 940 168"
-        className="h-full w-full"
-        role="img"
-        aria-label="한라산 능선과 산책하는 여행자들"
-      >
-        <defs>
-          <linearGradient id="headerSkyFade" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#FBF6EA" stopOpacity="0" />
-            <stop offset="58%" stopColor="#FBF6EA" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#FBF6EA" stopOpacity="0.64" />
-          </linearGradient>
-        </defs>
-
-        <rect width="940" height="168" fill="url(#headerSkyFade)" />
-        <path
-          d="M0 97 C82 79 151 72 222 88 C302 106 367 83 452 68 C556 49 654 66 735 78 C814 89 880 72 940 58 L940 168 L0 168 Z"
-          fill="#416F43"
-          opacity="0.34"
-        />
-        <path
-          d="M222 112 C342 83 443 91 548 74 C642 58 724 84 826 90 C870 93 907 83 940 74 L940 168 L222 168 Z"
-          fill="#78A357"
-          opacity="0.42"
-        />
-        <path
-          d="M520 83 C570 49 606 17 662 8 C704 2 733 25 760 58 C783 86 852 91 940 78 L940 168 L487 168 Z"
-          fill="#315F52"
-          opacity="0.44"
-        />
-        <path
-          d="M566 45 C604 27 658 21 716 37"
-          fill="none"
-          stroke="#8EA77A"
-          strokeWidth="6"
-          strokeLinecap="round"
-          opacity="0.45"
-        />
-        <path
-          d="M704 42 C728 50 742 64 762 82"
-          fill="none"
-          stroke="#254C43"
-          strokeWidth="4"
-          strokeLinecap="round"
-          opacity="0.28"
-        />
-        <path
-          d="M0 129 C118 112 195 123 298 111 C424 96 524 111 630 118 C748 125 839 109 940 113 L940 168 L0 168 Z"
-          fill="#B8CD63"
-          opacity="0.5"
-        />
-        <path
-          d="M0 145 C122 132 218 143 333 133 C476 120 585 139 704 134 C802 130 870 118 940 123 L940 168 L0 168 Z"
-          fill="#557E34"
-          opacity="0.48"
-        />
-        <path
-          d="M0 157 C98 147 194 153 296 147 C414 139 536 152 650 150 C762 148 842 138 940 143"
-          fill="none"
-          stroke="#2E5F2C"
-          strokeWidth="8"
-          strokeLinecap="round"
-          opacity="0.24"
-        />
-
-        <HikerFigure x={150} y={133} scale={0.88} shirt="#D7B08B" pants="#4A8779" pack="#B86E22" hair="#DDD4C2" pole />
-        <HikerFigure x={223} y={134} scale={0.74} shirt="#E7683A" pants="#6B4E8D" pack="#7FA36A" hair="#C76B47" />
-        <HikerFigure x={292} y={130} scale={0.94} shirt="#315F52" pants="#2E3235" pack="#6F8550" hair="#2E3235" pole />
-        <HikerFigure x={386} y={135} scale={0.7} shirt="#4A8779" pants="#66715D" pack="#F0B36A" hair="#9A5F45" />
-      </svg>
-    </div>
-  );
-}
-
-function HikerFigure({
-  x,
-  y,
-  scale,
-  shirt,
-  pants,
-  pack,
-  hair,
-  pole = false,
-}: {
-  x: number;
-  y: number;
-  scale: number;
-  shirt: string;
-  pants: string;
-  pack: string;
-  hair: string;
-  pole?: boolean;
-}) {
-  return (
-    <g transform={`translate(${x} ${y}) scale(${scale})`} opacity="0.9">
-      <ellipse cx="2" cy="24" rx="29" ry="4" fill="#1E2E22" opacity="0.14" />
-      {pole && (
-        <path
-          d="M20 -15 L29 25"
-          fill="none"
-          stroke="#6F5A42"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          opacity="0.68"
-        />
-      )}
-      <path d="M-17 -48 C-6 -58 8 -56 17 -46 C9 -42 -5 -42 -17 -48 Z" fill={hair} />
-      <circle cx="0" cy="-41" r="8.5" fill="#E9C6A3" />
-      <path d="M-10 -45 C-4 -55 7 -53 13 -45 C8 -43 -3 -43 -10 -45 Z" fill={hair} />
-      <path d="M-10 -32 C-14 -18 -11 -3 -4 5 C0 9 10 6 13 -1 C18 -13 14 -25 8 -34 Z" fill={shirt} />
-      <path
-        d="M-15 -31 C-31 -28 -34 -9 -23 1 C-17 6 -11 2 -11 -6 L-9 -30 Z"
-        fill={pack}
-      />
-      <path
-        d="M9 -27 C22 -19 25 -14 22 -6"
-        fill="none"
-        stroke={shirt}
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M-8 -27 C-22 -19 -24 -9 -18 -1"
-        fill="none"
-        stroke={shirt}
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <path d="M-4 4 C-13 12 -17 19 -21 25" fill="none" stroke={pants} strokeWidth="6" strokeLinecap="round" />
-      <path d="M8 3 C15 12 20 18 28 21" fill="none" stroke={pants} strokeWidth="6" strokeLinecap="round" />
-      <path d="M-23 25 L-33 25" fill="none" stroke="#2E3235" strokeWidth="3" strokeLinecap="round" />
-      <path d="M29 21 L39 19" fill="none" stroke="#2E3235" strokeWidth="3" strokeLinecap="round" />
-    </g>
   );
 }
