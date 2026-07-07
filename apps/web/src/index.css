@@ -379,6 +379,107 @@
     animation-delay: -2s;
   }
 
+  .pyj-cycle-board {
+    background:
+      radial-gradient(360px 220px at 50% 50%, rgba(231, 104, 58, 0.1), transparent 64%),
+      radial-gradient(260px 180px at 83% 16%, rgba(74, 135, 121, 0.09), transparent 66%),
+      #ffffff;
+  }
+
+  .pyj-cycle-route {
+    position: absolute;
+    inset: 0.75rem;
+    z-index: 1;
+    display: none;
+    width: calc(100% - 1.5rem);
+    height: calc(100% - 1.5rem);
+    pointer-events: none;
+  }
+
+  .pyj-cycle-route-base,
+  .pyj-cycle-route-pulse {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .pyj-cycle-route-base {
+    stroke: rgba(201, 169, 127, 0.28);
+    stroke-width: 1.6;
+    stroke-dasharray: 8 12;
+  }
+
+  .pyj-cycle-route-pulse {
+    stroke: rgba(231, 104, 58, 0.74);
+    stroke-width: 2.4;
+    stroke-dasharray: 42 620;
+    animation: pyj-cycle-route-flow 9.5s linear infinite;
+    filter: drop-shadow(0 0 7px rgba(231, 104, 58, 0.22));
+  }
+
+  .pyj-cycle-flow-dot {
+    fill: #E7683A;
+    filter: drop-shadow(0 0 10px rgba(231, 104, 58, 0.56));
+  }
+
+  .pyj-cycle-flow-dot-b {
+    fill: #4A8779;
+    opacity: 0.72;
+    filter: drop-shadow(0 0 8px rgba(74, 135, 121, 0.42));
+  }
+
+  .pyj-cycle-core {
+    z-index: 20;
+    width: 3.5rem;
+    height: 3.5rem;
+    border: 1px solid rgba(231, 104, 58, 0.18);
+    pointer-events: none;
+    animation: pyj-cycle-core-breathe 6.5s ease-in-out infinite;
+  }
+
+  .pyj-cycle-core::before {
+    content: '';
+    position: absolute;
+    inset: -0.62rem;
+    border-radius: inherit;
+    border: 1px dashed rgba(231, 104, 58, 0.28);
+    animation: pyj-cycle-core-spin 22s linear infinite;
+  }
+
+  .pyj-cycle-node {
+    animation: pyj-cycle-node-glow 9s ease-in-out infinite;
+    animation-delay: calc(var(--cycle-order) * -1.5s);
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .pyj-cycle-node:hover {
+    transform: translateY(-3px);
+    border-color: rgba(231, 104, 58, 0.3);
+    box-shadow: 0 16px 36px -28px rgba(46, 50, 53, 0.36);
+  }
+
+  .pyj-cycle-node-01 { grid-area: n1; }
+  .pyj-cycle-node-02 { grid-area: n2; }
+  .pyj-cycle-node-03 { grid-area: n3; }
+  .pyj-cycle-node-04 { grid-area: n4; }
+  .pyj-cycle-node-05 { grid-area: n5; }
+  .pyj-cycle-node-06 { grid-area: n6; }
+
+  @media (min-width: 1024px) {
+    .pyj-cycle-route {
+      display: block;
+    }
+
+    .pyj-cycle-grid {
+      grid-template-areas:
+        'n1 n2 n3'
+        'n6 n5 n4';
+    }
+  }
+  
   @media (prefers-reduced-motion: reduce) {
     .pyj-sea-haze,
     .pyj-wind,
@@ -395,8 +496,16 @@
     .pyj-arrival-sun,
     .pyj-arrival-hallasan,
     .pyj-arrival-haze,
-    .pyj-arrival-tree {
+    .pyj-arrival-tree,
+    .pyj-cycle-route-pulse,
+    .pyj-cycle-core,
+    .pyj-cycle-core::before,
+    .pyj-cycle-node {
       animation: none;
+    }
+
+    .pyj-cycle-flow-dot {
+      display: none;
     }
   }
 }
@@ -483,4 +592,35 @@
   0%, 100% { transform: rotate(0deg); }
   45% { transform: rotate(-1.8deg); }
   72% { transform: rotate(1.2deg); }
+}
+
+@keyframes pyj-cycle-route-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -662; }
+}
+
+@keyframes pyj-cycle-core-breathe {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 12px 24px -22px rgba(46, 50, 53, 0.42);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+    box-shadow: 0 18px 34px -24px rgba(231, 104, 58, 0.5);
+  }
+}
+
+@keyframes pyj-cycle-core-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pyj-cycle-node-glow {
+  0%, 72%, 100% {
+    border-color: rgba(255, 237, 213, 0.8);
+    box-shadow: 0 1px 2px rgba(46, 50, 53, 0.04);
+  }
+  18% {
+    border-color: rgba(231, 104, 58, 0.34);
+    box-shadow: 0 18px 36px -30px rgba(231, 104, 58, 0.55);
+  }
 }

@@ -341,41 +341,70 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     </div>
                   </div>
 
-                  <div className="relative overflow-hidden rounded-[28px] border border-orange-100/80 bg-white p-4 shadow-pyj-card">
-                    <div className="absolute left-1/2 top-1/2 hidden h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-citrus/35 lg:block" />
-                    <div className="absolute left-1/2 top-1/2 hidden h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#FDF6EA] text-citrus-2 shadow-sm lg:flex">
+                  <div className="pyj-cycle-board relative overflow-hidden rounded-[28px] border border-orange-100/80 bg-white p-4 shadow-pyj-card">
+                    <svg className="pyj-cycle-route" viewBox="0 0 620 360" aria-hidden="true">
+                      <path
+                        className="pyj-cycle-route-base"
+                        d="M84 84H310H536Q568 84 568 116V244Q568 276 536 276H310H84Q52 276 52 244V116Q52 84 84 84Z"
+                      />
+                      <path
+                        className="pyj-cycle-route-pulse"
+                        d="M84 84H310H536Q568 84 568 116V244Q568 276 536 276H310H84Q52 276 52 244V116Q52 84 84 84Z"
+                      />
+                      <circle className="pyj-cycle-flow-dot" r="5.5">
+                        <animateMotion
+                          dur="13s"
+                          repeatCount="indefinite"
+                          path="M84 84H310H536Q568 84 568 116V244Q568 276 536 276H310H84Q52 276 52 244V116Q52 84 84 84Z"
+                        />
+                      </circle>
+                      <circle className="pyj-cycle-flow-dot pyj-cycle-flow-dot-b" r="3.5">
+                        <animateMotion
+                          dur="13s"
+                          begin="-6.5s"
+                          repeatCount="indefinite"
+                          path="M84 84H310H536Q568 84 568 116V244Q568 276 536 276H310H84Q52 276 52 244V116Q52 84 84 84Z"
+                        />
+                      </circle>
+                    </svg>
+                    <div className="pyj-cycle-core absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#FDF6EA] text-citrus-2 shadow-sm lg:flex">
                       <RefreshCw className="h-6 w-6" />
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="pyj-cycle-grid relative z-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <CycleNode
                         step="01"
                         icon={<CloudSun className="h-4 w-4" />}
                         title="공공데이터 API"
                         body="관광·교통·기상·수정요청 데이터를 1차 근거로 수집합니다."
+                        order={0}
                       />
                       <CycleNode
                         step="02"
                         icon={<Database className="h-4 w-4" />}
                         title="정보 기반 정리"
                         body="지역·순간별 확인 후보와 데이터 부족 범위를 나눕니다."
+                        order={1}
                       />
                       <CycleNode
                         step="03"
                         icon={<MessageCircleQuestion className="h-4 w-4" />}
                         title="하루방 에이전트"
                         body="DB 후보 안에서 상담하고, 조건에 맞는 대안을 조율합니다."
+                        order={2}
                       />
                       <CycleNode
                         step="04"
                         icon={<Route className="h-4 w-4" />}
                         title="여행플랜 생성"
                         body="Day별 플랜, 지도, PDF, 공유 텍스트로 실행 가능하게 만듭니다."
+                        order={3}
                       />
                       <CycleNode
                         step="05"
                         icon={<Camera className="h-4 w-4" />}
                         title="방문 기록"
                         body="사용자의 체크인·메모·사진·수정 요청이 구조화됩니다."
+                        order={4}
                       />
                       <CycleNode
                         step="06"
@@ -383,6 +412,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                         title="신뢰 신호 강화"
                         body="최근 방문 확인이 다음 여행자의 플랜과 상담에 반영됩니다."
                         tone="mint"
+                        order={5}
                       />
                     </div>
                   </div>
@@ -786,12 +816,14 @@ function CycleNode({
   title,
   body,
   tone = 'citrus',
+  order = 0,
 }: {
   step: string;
   icon: React.ReactNode;
   title: string;
   body: string;
   tone?: 'citrus' | 'mint';
+  order?: number;
 }) {
   const toneClass = {
     citrus: 'bg-citrus/10 text-citrus-2 border-citrus/20',
@@ -799,7 +831,10 @@ function CycleNode({
   }[tone];
 
   return (
-    <div className="relative rounded-2xl border border-orange-100/80 bg-[#FDFBF7] p-4 shadow-sm">
+    <div
+      className={`pyj-cycle-node pyj-cycle-node-${step} relative rounded-2xl border border-orange-100/80 bg-[#FDFBF7] p-4 shadow-sm`}
+      style={{ '--cycle-order': order } as React.CSSProperties}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${toneClass}`}>
           {icon}
