@@ -283,8 +283,9 @@ export default function App() {
       <div className="w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
-        <header className="pt-2 pb-8" id="app-header">
-          <div className="flex items-start gap-4 mb-2">
+        <header className="relative overflow-hidden pt-2 pb-8" id="app-header">
+          <HeaderJourneyScene />
+          <div className="relative z-10 flex items-start gap-4 mb-2">
             {/* 마스코트 클릭 = 처음 화면 (관례상 로고=홈). */}
             <motion.button
               type="button"
@@ -341,13 +342,13 @@ export default function App() {
             </motion.button>
           </div>
 
-          <WaveLine className="w-full h-5 mt-3" />
+          <WaveLine className="relative z-10 w-full h-5 mt-3" />
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35, duration: 0.5 }}
-            className="font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-2xl"
+            className="relative z-10 font-serif-kr text-[15px] text-basalt mt-5 leading-[1.9] max-w-2xl"
           >
             우리는 <span className="text-citrus-2 font-bold">근거 있는 것만</span> 담고,
             <br />
@@ -355,7 +356,7 @@ export default function App() {
           </motion.p>
 
           {state.step !== 'setup' && (
-            <div className="mt-5 inline-flex items-center gap-0.5 p-1 bg-white/80 backdrop-blur rounded-full border border-earth shadow-sm">
+            <div className="relative z-10 mt-5 inline-flex items-center gap-0.5 p-1 bg-white/80 backdrop-blur rounded-full border border-earth shadow-sm">
               <button
                 onClick={goToDashboard}
                 className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition ${
@@ -521,5 +522,97 @@ export default function App() {
       )}
 
     </div>
+  );
+}
+
+function HeaderJourneyScene() {
+  return (
+    <div
+      className="pointer-events-none absolute right-2 top-2 z-0 hidden h-[148px] w-[58%] max-w-[820px] opacity-80 lg:block"
+      aria-hidden="true"
+    >
+      <svg
+        viewBox="0 0 820 150"
+        className="h-full w-full"
+        role="img"
+        aria-label="한라산을 바라보며 걷는 여행자 실루엣"
+      >
+        <defs>
+          <linearGradient id="headerHillSoft" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="#DCEAD6" stopOpacity="0.18" />
+            <stop offset="58%" stopColor="#7FA36A" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#4A8779" stopOpacity="0.14" />
+          </linearGradient>
+          <linearGradient id="headerHallasan" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#6F8550" stopOpacity="0.34" />
+            <stop offset="100%" stopColor="#315F52" stopOpacity="0.22" />
+          </linearGradient>
+        </defs>
+
+        <path
+          d="M22 112 C132 88 205 118 312 91 C390 70 454 27 528 20 C596 14 640 58 712 67 C756 72 788 66 818 58 L818 150 L22 150 Z"
+          fill="url(#headerHillSoft)"
+        />
+        <path
+          d="M370 102 C420 73 447 34 501 14 C537 1 585 28 616 65 C642 96 706 93 785 82 L820 78 L820 150 L352 150 Z"
+          fill="url(#headerHallasan)"
+        />
+        <path
+          d="M466 42 C498 31 536 30 574 47"
+          fill="none"
+          stroke="#F7F0DF"
+          strokeWidth="4"
+          strokeLinecap="round"
+          opacity="0.42"
+        />
+        <path
+          d="M0 128 C108 119 186 132 278 122 C368 111 431 116 520 124 C616 132 700 115 820 123"
+          fill="none"
+          stroke="#4A8779"
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity="0.34"
+        />
+        <path
+          d="M0 139 C96 132 174 141 268 134 C380 126 472 138 564 135 C655 132 730 124 820 132"
+          fill="none"
+          stroke="#C9A97F"
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity="0.28"
+        />
+
+        <JourneyWalker x={162} y={112} scale={0.9} coat="#58432F" pack="#E7683A" />
+        <JourneyWalker x={218} y={116} scale={0.76} coat="#4A8779" pack="#C9A97F" />
+        <JourneyWalker x={276} y={110} scale={0.98} coat="#2E3235" pack="#6F8550" />
+      </svg>
+    </div>
+  );
+}
+
+function JourneyWalker({
+  x,
+  y,
+  scale,
+  coat,
+  pack,
+}: {
+  x: number;
+  y: number;
+  scale: number;
+  coat: string;
+  pack: string;
+}) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${scale})`} opacity="0.74">
+      <circle cx="0" cy="-43" r="7" fill="#2E3235" />
+      <path d="M-8 -35 L8 -35 L13 -8 L-7 -8 Z" fill={coat} />
+      <path d="M-11 -31 C-22 -25 -24 -12 -17 -4" fill="none" stroke={pack} strokeWidth="5" strokeLinecap="round" />
+      <path d="M5 -31 C16 -24 20 -16 24 -6" fill="none" stroke={coat} strokeWidth="4" strokeLinecap="round" />
+      <path d="M-2 -8 L-13 20" fill="none" stroke="#2E3235" strokeWidth="5" strokeLinecap="round" />
+      <path d="M8 -8 L20 18" fill="none" stroke="#2E3235" strokeWidth="5" strokeLinecap="round" />
+      <path d="M20 -2 L28 -28" fill="none" stroke="#6F5A42" strokeWidth="2.5" strokeLinecap="round" />
+      <ellipse cx="-3" cy="22" rx="12" ry="2.4" fill="#2E3235" opacity="0.16" />
+    </g>
   );
 }
