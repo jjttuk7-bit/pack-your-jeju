@@ -142,8 +142,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     떠나기 전부터 제주가 가까워지는 여행 준비.
                     <br className="hidden sm:block" />
                     지역, 기간, 동행자, 여행 순간을 고르면 하루방 에이전트가
-                    공공데이터로 확인한 장소와 주의 신호를
-                    여행팩에 차분히 담아드립니다.
+                    여행팩에 근거를 확인해 담아드립니다.
                   </p>
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                     <button
@@ -177,7 +176,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                           Live Preview
                         </p>
                         <h2 className="mt-1 font-serif-kr text-[23px] font-bold text-basalt">
-                          구좌 근거 현황 미리보기
+                          우도 추천 미리보기
                         </h2>
                       </div>
                       <span className="pyj-citrus-breathe">
@@ -206,7 +205,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     </div>
                     <div className="mt-5 rounded-2xl border border-earth bg-white p-4">
                       <p className="font-serif-kr text-[14px] font-bold text-basalt">
-                        "구좌는 산책 후보가 충분하지만, 노을은 확인 근거가 아직 약합니다."
+                        "우도는 바다 산책 후보가 충분하지만, 노을은 확인 근거가 아직 약합니다."
                       </p>
                       <p className="mt-2 text-[11.5px] leading-relaxed text-basalt-2">
                         사용자가 팩을 다 만든 뒤가 아니라, 지역을 고르는 순간 신뢰 범위를 먼저
@@ -269,7 +268,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   <FeatureCard
                     icon={<MapPin className="h-5 w-5" />}
                     title="지역 줌인"
-                    body="구좌·애월·성산처럼 지역을 고르면 순간별 근거 현황을 먼저 보여줍니다."
+                    body="우도·애월·성산처럼 지역을 고르면 순간별 추천 가능성과 확인 필요 항목을 먼저 보여줍니다."
                   />
                   <FeatureCard
                     icon={<MessageCircleQuestion className="h-5 w-5" />}
