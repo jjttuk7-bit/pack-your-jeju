@@ -98,6 +98,7 @@ def badge_item(
     *,
     now: datetime,
     note: str | None = None,
+    weather_snapshot: dict | None = None,
 ) -> BadgedItem:
     """단일 place에 대해 배지 결정 (TRUST_ENGINE §3).
 
@@ -145,6 +146,7 @@ def badge_item(
         transit=t,
         now=now,
         visit_signal=visit_signals.latest_visit_signal(hit.external_id),
+        weather_snapshot=weather_snapshot,
     )
 
     display_note = note
@@ -187,6 +189,38 @@ def _to_utc(dt: datetime) -> datetime:
     return dt
 
 
+def _weather_meta(weather_snapshot: dict | None) -> dict:
+    if not weather_snapshot:
+        return {}
+    meta: dict = {
+        "provider": weather_snapshot.get("provider"),
+        "risk_level": weather_snapshot.get("risk_level"),
+        "signals": list(weather_snapshot.get("signals") or []),
+        "labels": list(weather_snapshot.get("labels") or []),
+    }
+    summary = weather_snapshot.get("summary")
+    if summary:
+        meta["summary"] = str(summary)
+    return {k: v for k, v in meta.items() if v not in (None, [], "")}
+
+
+def _weather_score(weather_snapshot: dict | None) -> tuple[int, str, dict]:
+    meta = _weather_meta(weather_snapshot)
+    if not weather_snapshot or not weather_snapshot.get("available"):
+        return 10, "weather_check_required", meta
+
+    risk_level = str(weather_snapshot.get("risk_level") or "normal")
+    signals = set(str(s) for s in (weather_snapshot.get("signals") or []))
+    if risk_level == "normal" and not signals:
+        return 15, "weather_clear", meta
+
+    if signals & {"heavy_rain", "wind", "wave", "fog", "snow"}:
+        return 6, "weather_risk_caution", meta
+    if signals & {"rain", "heat"}:
+        return 9, "weather_watch", meta
+    return 10, "weather_check_required", meta
+
+
 def compute_trust_profile(
     hit: PlaceHit,
     mf: MomentFilter,
@@ -194,11 +228,13 @@ def compute_trust_profile(
     transit: TransitCheck,
     now: datetime,
     visit_signal: dict | None = None,
+    weather_snapshot: dict | None = None,
 ) -> TrustProfile:
     """제안서 100점 루브릭의 규칙 기반 MVP.
 
     점수는 새 사실을 만들지 않고, DB 필드·교통 검증·방문 신호만 사용한다.
-    날씨는 P1 실시간 연동 전까지 야외 카테고리에 "확인 필요"를 남기는 보수적 점수다.
+    날씨는 기상청 API허브 예보 신호가 있으면 야외 카테고리 점수에 반영하고,
+    없거나 실패하면 야외 카테고리에 "확인 필요"를 남기는 보수적 점수다.
     """
     check_required: list[str] = []
     trip_end_dt = datetime.combine(mf.trip_end, datetime.min.time(), tzinfo=timezone.utc)
@@ -226,13 +262,19 @@ def compute_trust_profile(
         user_status = "matched"
 
     outdoor_categories = {"oreum", "beach", "viewpoint", "forest", "experience"}
-    if hit.category in outdoor_categories:
-        weather_points = 10
-        weather_status = "weather_check_required"
-        check_required.append("weather")
+    is_outdoor = hit.category in outdoor_categories
+    weather_meta: dict = {}
+    if is_outdoor:
+        weather_points, weather_status, weather_meta = _weather_score(weather_snapshot)
+        if weather_status != "weather_clear":
+            check_required.append("weather")
+        for signal in weather_meta.get("signals", []):
+            if signal in {"wind", "wave", "heavy_rain", "fog", "heat", "snow"}:
+                check_required.append(f"weather:{signal}")
     else:
         weather_points = 15
         weather_status = "low_weather_dependency"
+        weather_meta = _weather_meta(weather_snapshot)
 
     if transit.parking or transit.bus_walkable:
         movement_points = 10
@@ -293,6 +335,7 @@ def compute_trust_profile(
             "points": weather_points,
             "max": 15,
             "status": weather_status,
+            **weather_meta,
         },
         "movement_feasibility": {
             "points": movement_points,
@@ -337,19 +380,20 @@ def judge_section(
     limit: int = 3,
     strict_fn: Callable[[MomentFilter, int], list[PlaceHit]] = None,
     relaxed_fn: Callable[[MomentFilter, int], list[PlaceHit]] = None,
+    weather_snapshot: dict | None = None,
 ) -> Section:
     now = datetime.now(timezone.utc)
     strict = (strict_fn or _strict_default)(mf, limit)
 
     if strict:
-        items = [badge_item(h, mf, now=now) for h in strict]
+        items = [badge_item(h, mf, now=now, weather_snapshot=weather_snapshot) for h in strict]
         return Section(moment=mf.moment, items=items, fallback=None, observed_reasons=[])
 
     # strict 실패 → relaxed 재시도 (retrieval_miss 관측용 기록)
     relaxed = (relaxed_fn or _relaxed_default)(mf, limit)
     if relaxed:
         items = [
-            badge_item(h, mf, now=now, note="인근 지역 결과")
+            badge_item(h, mf, now=now, note="인근 지역 결과", weather_snapshot=weather_snapshot)
             for h in relaxed
         ]
         return Section(

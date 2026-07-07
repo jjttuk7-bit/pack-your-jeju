@@ -144,8 +144,25 @@ export type TrustScoreBreakdown = Record<
     points: number;
     max: number;
     status: string;
+    provider?: string;
+    risk_level?: string;
+    signals?: string[];
+    labels?: string[];
+    summary?: string;
   }
 >;
+
+export interface WeatherSnapshotDto {
+  available: boolean;
+  provider?: string;
+  risk_level?: 'normal' | 'watch' | 'caution' | string;
+  signals?: string[];
+  labels?: string[];
+  summary?: string;
+  region?: string;
+  source?: string;
+  http_status?: number;
+}
 
 export interface VisitSignalResponse {
   saved: boolean;
@@ -190,6 +207,7 @@ export interface PackResponse {
   intro: { text: string; llm_used: boolean };
   sections: SectionDto[];
   itinerary?: ItineraryDayDto[];   // 규칙 기반 요일별 재배치 (LLM 없음)
+  weather?: WeatherSnapshotDto;
   packing_additions: { item: string; reason: string; badge: BadgeKind; source?: string }[];
   log_id: string | null;
 }

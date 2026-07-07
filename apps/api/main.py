@@ -119,7 +119,7 @@ def health() -> dict:
 def weather_kma_smoke(
     region: str = Query(default="jeju_city", description="제주 권역 id"),
 ) -> dict[str, Any]:
-    """기상청/data.go.kr 키 스모크 테스트. 키 값은 응답에 노출하지 않는다."""
+    """기상청 API허브 키 스모크 테스트. 키 값은 응답에 노출하지 않는다."""
     return weather_mod.smoke_kma_nowcast(region)
 
 
@@ -242,8 +242,9 @@ def pack(body: PackBody) -> dict[str, Any]:
 
     section_objs: list[trust_mod.Section] = []
     with measure_latency() as lat:
+        weather_snapshot = weather_mod.smoke_kma_nowcast(req.regions[0] if req.regions else "jeju_city")
         for mf in f.per_moment:
-            section = trust_mod.judge_section(mf)
+            section = trust_mod.judge_section(mf, weather_snapshot=weather_snapshot)
             section_objs.append(section)
             sections.append(_serialize_section(section))
             all_reasons.extend(section.observed_reasons)
@@ -275,6 +276,7 @@ def pack(body: PackBody) -> dict[str, Any]:
         "intro": {"text": intro.text, "llm_used": intro.llm_used},
         "sections": sections,
         "itinerary": itinerary,
+        "weather": _public_weather_snapshot(weather_snapshot),
         "packing_additions": [],
         "log_id": log_id,
     }
@@ -300,8 +302,9 @@ def pack_pdf(body: PackBody) -> Response:
 
     section_objs: list[trust_mod.Section] = []
     sections: list[dict] = []
+    weather_snapshot = weather_mod.smoke_kma_nowcast(req.regions[0] if req.regions else "jeju_city")
     for mf in f.per_moment:
-        s = trust_mod.judge_section(mf)
+        s = trust_mod.judge_section(mf, weather_snapshot=weather_snapshot)
         section_objs.append(s)
         sections.append(_serialize_section(s))
 
@@ -318,6 +321,7 @@ def pack_pdf(body: PackBody) -> Response:
         "intro": {"text": intro.text, "llm_used": intro.llm_used},
         "sections": sections,
         "itinerary": itinerary,
+        "weather": _public_weather_snapshot(weather_snapshot),
     }
 
     try:
@@ -520,3 +524,20 @@ def _serialize_section(section: trust_mod.Section) -> dict:
             else None
         ),
     }
+
+
+def _public_weather_snapshot(snapshot: dict | None) -> dict:
+    if not snapshot:
+        return {"available": False, "provider": "kma_api_hub"}
+    public_keys = {
+        "available",
+        "provider",
+        "risk_level",
+        "signals",
+        "labels",
+        "summary",
+        "region",
+        "source",
+        "http_status",
+    }
+    return {k: snapshot.get(k) for k in public_keys if k in snapshot}

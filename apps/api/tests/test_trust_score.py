@@ -63,6 +63,50 @@ def test_trust_profile_scores_verified_item_with_breakdown():
     assert "weather" in profile.check_required
 
 
+def test_trust_profile_uses_weather_snapshot_for_outdoor_risk():
+    profile = compute_trust_profile(
+        _hit(category="oreum"),
+        _mf(required_amenities=()),
+        transit=TransitCheck(parking=True, parking_count=2, bus_walkable=True),
+        now=datetime(2026, 7, 7, tzinfo=timezone.utc),
+        visit_signal=None,
+        weather_snapshot={
+            "available": True,
+            "risk_level": "caution",
+            "signals": ["rain", "wind"],
+            "labels": ["비 예보", "강풍 주의"],
+            "summary": "제주도는 비가 오겠고 바람이 강하게 불겠습니다.",
+        },
+    )
+
+    assert profile.breakdown["weather_fit"]["points"] == 6
+    assert profile.breakdown["weather_fit"]["status"] == "weather_risk_caution"
+    assert profile.breakdown["weather_fit"]["labels"] == ["비 예보", "강풍 주의"]
+    assert "weather" in profile.check_required
+    assert "weather:wind" in profile.check_required
+
+
+def test_trust_profile_gives_full_weather_points_when_snapshot_normal():
+    profile = compute_trust_profile(
+        _hit(category="oreum"),
+        _mf(required_amenities=()),
+        transit=TransitCheck(parking=True, parking_count=2, bus_walkable=True),
+        now=datetime(2026, 7, 7, tzinfo=timezone.utc),
+        visit_signal=None,
+        weather_snapshot={
+            "available": True,
+            "risk_level": "normal",
+            "signals": [],
+            "labels": ["날씨 특이 신호 없음"],
+            "summary": "제주도는 대체로 맑겠습니다.",
+        },
+    )
+
+    assert profile.breakdown["weather_fit"]["points"] == 15
+    assert profile.breakdown["weather_fit"]["status"] == "weather_clear"
+    assert "weather" not in profile.check_required
+
+
 def test_trust_profile_flags_missing_amenity_and_fix_request():
     profile = compute_trust_profile(
         _hit(amenities={}, has_fix_request=True),
