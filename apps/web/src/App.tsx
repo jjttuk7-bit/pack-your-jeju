@@ -310,7 +310,7 @@ export default function App() {
                 className="font-serif-kr text-[34px] font-bold text-basalt tracking-tight leading-[1.1]"
                 id="brand-name"
               >
-                Pack Your Jeju
+                제주를 담다
               </motion.h1>
               <motion.p
                 initial={{ opacity: 0 }}
@@ -448,7 +448,7 @@ export default function App() {
         {/* Footer */}
         <footer className="text-center text-basalt-2/60 text-[10px] pt-16 pb-8 mt-auto" id="app-footer">
           <p className="font-hand text-[15px] text-basalt-2 mb-2">고맙수다.</p>
-          <p>© 2026 Pack Your Jeju</p>
+          <p>© 2026 제주를 담다</p>
         </footer>
 
       </div>

@@ -101,14 +101,14 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   type="button"
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                   className="inline-flex items-center gap-2 rounded-full border border-earth bg-white/70 px-3 py-2 text-left shadow-sm transition hover:bg-white"
-                  aria-label="Pack Your Jeju 홈"
+                  aria-label="제주를 담다 홈"
                 >
                   <span className="pyj-citrus-breathe">
                     <CitrusMark className="h-9 w-9" />
                   </span>
                   <span>
                     <span className="block font-serif-kr text-[15px] font-bold leading-none">
-                      Pack Your Jeju
+                      제주를 담다
                     </span>
                     <span className="text-[10px] font-semibold text-basalt-2/70">
                       제주 · 신뢰 여행 준비
@@ -231,7 +231,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   </h2>
                   <p className="mt-4 text-[14px] leading-7 text-basalt-2 sm:text-[15px]">
                     한라산의 능선, 해변의 곡선, 바람에 흔들리는 감귤나무까지.
-                    Pack Your Jeju는 설렘을 누르지 않고, 필요한 확인만 조용히 더해
+                    제주를 담다는 설렘을 누르지 않고, 필요한 확인만 조용히 더해
                     여행플랜으로 이어갑니다.
                   </p>
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -263,7 +263,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <SectionHeader
                   eyebrow="Trust Engine"
                   title="설렘을 깨지 않도록, 먼저 확인합니다."
-                  body="Pack Your Jeju의 핵심은 더 많은 장소를 채우는 것이 아니라, 확인 가능한 정보와 아직 근거가 부족한 정보를 사용자가 구분할 수 있게 만드는 것입니다."
+                  body="제주를 담다의 핵심은 더 많은 장소를 채우는 것이 아니라, 확인 가능한 정보와 아직 근거가 부족한 정보를 사용자가 구분할 수 있게 만드는 것입니다."
                 />
                 <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <FeatureCard
@@ -321,7 +321,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
-                      Pack Your Jeju Trust Cycle
+                      제주를 담다 Trust Cycle
                     </p>
                     <h2 className="mt-3 font-serif-kr text-[36px] font-bold leading-tight text-basalt">
                       공공데이터로 계획하고,
@@ -329,7 +329,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       방문 기록으로 다시 좋아집니다.
                     </h2>
                     <p className="mt-4 text-[14px] leading-7 text-basalt-2">
-                      Pack Your Jeju는 추천에서 끝나지 않습니다. 공공데이터로 만든 여행플랜을
+                      제주를 담다는 추천에서 끝나지 않습니다. 공공데이터로 만든 여행플랜을
                       사용자가 실제로 실행하고, 방문 기록과 수정 신호가 다시 하루방 에이전트의
                       신뢰 신호로 돌아오는 순환형 AI 여행플랜 서비스입니다.
                     </p>
@@ -525,7 +525,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 )}
               </div>
               <footer className="mt-8 text-center text-[10px] text-basalt-2/50">
-                © 2026 Pack Your Jeju
+                © 2026 제주를 담다
               </footer>
             </section>
           </motion.main>

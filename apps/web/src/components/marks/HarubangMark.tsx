@@ -20,7 +20,7 @@ export default function HarubangMark({
       viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="하루방 (Pack Your Jeju 에이전트)"
+      aria-label="하루방 (제주를 담다 에이전트)"
     >
       <defs>
         <radialGradient id="haruban-body" cx="0.5" cy="0.35">

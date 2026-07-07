@@ -761,7 +761,7 @@ function buildShareText(
   const gapLines = collectUnavailableCombos(packResp).slice(0, 5);
   const url = typeof window !== 'undefined' ? window.location.href : 'https://pack-your-jeju.vercel.app/';
   return [
-    'Pack Your Jeju 여행플랜',
+    '제주를 담다 여행플랜',
     `지역: ${regions || '선택 전'}`,
     `일정: ${info.startDate}부터 ${info.durationDays}일`,
     `동행: ${companion}`,
@@ -775,7 +775,7 @@ function buildShareText(
     ...(planLines.length > 0 ? planLines : ['아직 공유할 후보가 없습니다.']),
     ...(gapLines.length > 0 ? ['', '데이터가 부족한 조합 메모', ...gapLines.map((x) => `- ${x}`)] : []),
     '',
-    '장소별 근거와 주의 신호는 Pack Your Jeju에서 확인할 수 있어요.',
+    '장소별 근거와 주의 신호는 제주를 담다에서 확인할 수 있어요.',
     url,
   ].join('\n');
 }

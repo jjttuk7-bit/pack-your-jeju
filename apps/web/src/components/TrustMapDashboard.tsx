@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import { motion } from 'motion/react';
 import {
   AlertTriangle,
   Calendar,
   Check,
   ChevronRight,
-  CloudRain,
   Compass,
   Loader2,
-  MapPinned,
   ShieldCheck,
   Sparkles,
   Users,
-  Wind,
 } from 'lucide-react';
 import type {
   CompanionValue,
@@ -35,54 +30,32 @@ interface TrustMapDashboardProps {
   initialMoments?: MomentId[];
 }
 
-type WeatherMode = 'clear' | 'rain' | 'wind';
-type MobilityMode = 'car' | 'walk';
-type RegionStatus = 'strong' | 'watch' | 'risk' | 'gap';
+type RegionTone = 'verified' | 'caution' | 'gap' | 'loading';
 
-interface RegionShape {
+interface RegionHotspot {
   id: RegionId;
-  d: string;
-  labelX: number;
-  labelY: number;
-  clusterX: number;
-  clusterY: number;
+  x: number;
+  y: number;
+  align?: 'left' | 'center' | 'right';
 }
 
 const DEFAULT_MOMENTS: MomentId[] = ['oreum', 'beach_walk', 'local_food'];
+const NOTES_MAX = 300;
 
-const REGION_SHAPES: RegionShape[] = [
-  { id: 'hallim', d: 'M50 97 L89 76 L122 84 L115 119 L74 127 L45 116 Z', labelX: 83, labelY: 103, clusterX: 62, clusterY: 87 },
-  { id: 'aewol', d: 'M90 75 L141 59 L178 68 L169 105 L116 119 L123 84 Z', labelX: 137, labelY: 88, clusterX: 150, clusterY: 67 },
-  { id: 'jeju_city', d: 'M142 58 L205 49 L247 55 L239 95 L169 105 L178 68 Z', labelX: 207, labelY: 76, clusterX: 225, clusterY: 59 },
-  { id: 'jocheon', d: 'M247 56 L302 68 L318 102 L276 122 L239 95 Z', labelX: 279, labelY: 92, clusterX: 307, clusterY: 82 },
-  { id: 'gujwa', d: 'M302 68 L359 87 L388 119 L349 148 L318 102 Z', labelX: 347, labelY: 112, clusterX: 365, clusterY: 93 },
-  { id: 'udo', d: 'M392 82 L416 91 L421 113 L401 126 L383 111 Z', labelX: 405, labelY: 106, clusterX: 416, clusterY: 88 },
-  { id: 'seongsan', d: 'M350 149 L388 120 L407 143 L388 172 L347 178 L329 161 Z', labelX: 371, labelY: 154, clusterX: 397, clusterY: 147 },
-  { id: 'pyoseon', d: 'M276 123 L318 103 L349 149 L328 162 L278 169 L254 148 Z', labelX: 304, labelY: 146, clusterX: 323, clusterY: 128 },
-  { id: 'namwon', d: 'M214 142 L254 148 L278 169 L247 190 L200 183 L185 159 Z', labelX: 231, labelY: 167, clusterX: 250, clusterY: 184 },
-  { id: 'seogwipo', d: 'M143 143 L185 159 L199 183 L159 201 L111 185 L112 155 Z', labelX: 153, labelY: 174, clusterX: 177, clusterY: 192 },
-  { id: 'andeok', d: 'M75 128 L115 120 L143 143 L112 155 L110 185 L71 174 L56 150 Z', labelX: 99, labelY: 151, clusterX: 79, clusterY: 168 },
-  { id: 'daejeong', d: 'M32 122 L74 128 L56 150 L70 174 L37 181 L16 158 Z', labelX: 45, labelY: 153, clusterX: 28, clusterY: 136 },
+const REGION_HOTSPOTS: RegionHotspot[] = [
+  { id: 'hallim', x: 14, y: 50 },
+  { id: 'aewol', x: 25, y: 42 },
+  { id: 'jeju_city', x: 47, y: 34 },
+  { id: 'jocheon', x: 62, y: 40 },
+  { id: 'gujwa', x: 76, y: 46 },
+  { id: 'udo', x: 90, y: 38 },
+  { id: 'seongsan', x: 85, y: 57 },
+  { id: 'pyoseon', x: 75, y: 67 },
+  { id: 'namwon', x: 60, y: 73 },
+  { id: 'seogwipo', x: 47, y: 76 },
+  { id: 'andeok', x: 29, y: 72 },
+  { id: 'daejeong', x: 17, y: 67 },
 ];
-
-const WEATHER_OPTIONS: Array<{ value: WeatherMode; label: string; icon: typeof CloudRain | typeof Wind | typeof Sparkles }> = [
-  { value: 'clear', label: '맑음', icon: Sparkles },
-  { value: 'rain', label: '비', icon: CloudRain },
-  { value: 'wind', label: '바람', icon: Wind },
-];
-
-const MOBILITY_OPTIONS: Array<{ value: MobilityMode; label: string }> = [
-  { value: 'car', label: '렌터카' },
-  { value: 'walk', label: '뚜벅이' },
-];
-
-const MOMENT_WEATHER_RISK: Partial<Record<MomentId, WeatherMode[]>> = {
-  oreum: ['rain', 'wind'],
-  beach_walk: ['rain', 'wind'],
-  sunset: ['rain', 'wind'],
-  gotjawal: ['rain'],
-  citrus: ['rain'],
-};
 
 export default function TrustMapDashboard({
   onSubmit,
@@ -100,10 +73,9 @@ export default function TrustMapDashboard({
     initialInfo?.startDate || new Date().toISOString().split('T')[0],
   );
   const [durationDays, setDurationDays] = useState(initialInfo?.durationDays ?? 3);
-  const [companion, setCompanion] = useState<CompanionValue>(initialInfo?.companion ?? 'parents');
+  const [companion, setCompanion] = useState<CompanionValue>(initialInfo?.companion ?? 'solo');
   const [purpose, setPurpose] = useState<PurposeValue>(initialInfo?.purpose ?? 'healing');
-  const [weather, setWeather] = useState<WeatherMode>('wind');
-  const [mobility, setMobility] = useState<MobilityMode>('car');
+  const [specialNotes, setSpecialNotes] = useState(initialInfo?.specialNotes ?? '');
   const [previews, setPreviews] = useState<Record<string, RegionCoveragePreview>>({});
   const [previewLoading, setPreviewLoading] = useState(true);
   const [packPreview, setPackPreview] = useState<PackResponse | null>(null);
@@ -152,38 +124,34 @@ export default function TrustMapDashboard({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRegion, selectedMoments.join('|'), startDate, durationDays, companion, purpose]);
-
-  const regionScores = useMemo(() => {
-    const entries = REGIONS.map((region) => {
-      const preview = previews[region.value];
-      return [region.value, scoreRegion(preview, selectedMoments, weather, mobility, companion)] as const;
-    });
-    return Object.fromEntries(entries) as Record<RegionId, ReturnType<typeof scoreRegion>>;
-  }, [previews, selectedMoments, weather, mobility, companion]);
+  }, [activeRegion, selectedMoments.join('|'), startDate, durationDays, companion, purpose, specialNotes]);
 
   const activeEntry = REGIONS.find((region) => region.value === activeRegion) ?? REGIONS[0];
   const activePreview = previews[activeRegion];
-  const activeScore = regionScores[activeRegion];
+  const activeTone = getRegionTone(activePreview, selectedMoments, previewLoading);
   const recommendedPlaces = collectRecommendedPlaces(packPreview);
   const selectedLabels = selectedRegions
     .map((id) => REGIONS.find((region) => region.value === id)?.label ?? id)
     .join(' · ');
+  const coverageSummary = useMemo(
+    () => summarizeSelectedRegions(selectedRegions, previews),
+    [selectedRegions, previews],
+  );
 
   function buildTravelInfo(regions: RegionId[] = selectedRegions): TravelInfo {
-    const condition = [
-      weather === 'rain' ? '비 오는 날' : weather === 'wind' ? '바람 강한 날' : '맑은 날',
-      mobility === 'walk' ? '뚜벅이 이동' : '렌터카 이동',
-    ].join(' · ');
     return {
       regions,
       startDate,
       durationDays,
       companion,
       purpose,
-      specialNotes: `신뢰 지도 조건: ${condition}`,
+      specialNotes: specialNotes.trim() || undefined,
     };
   }
+
+  const inspectRegion = (region: RegionId) => {
+    setActiveRegion(region);
+  };
 
   const toggleRegion = (region: RegionId) => {
     setActiveRegion(region);
@@ -206,150 +174,74 @@ export default function TrustMapDashboard({
 
   return (
     <div className="w-full max-w-6xl mx-auto" id="trust-map-dashboard">
-      <div className="overflow-hidden rounded-[26px] border border-earth bg-[#FFF9F0] shadow-pyj-card">
-        <div className="grid min-h-[720px] lg:grid-cols-[164px_minmax(0,1fr)_300px]">
-          <aside className="hidden border-r border-earth/60 bg-white/62 p-4 lg:block">
-            <div className="mb-8">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-citrus text-white shadow-jeju-chip">
-                <MapPinned className="h-5 w-5" />
-              </div>
-              <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-citrus-2">
-                Trust Intelligence
-              </p>
-              <h2 className="mt-1 font-serif-kr text-[18px] font-bold leading-tight text-basalt">
-                제주 신뢰 지도
-              </h2>
-            </div>
-
-            <nav className="space-y-2 text-[11px] font-bold text-basalt-2">
-              {['Map View', 'Data Explorer', 'Saved Regions', 'Signal Lab'].map((item, idx) => (
-                <div
-                  key={item}
-                  className={`rounded-xl px-3 py-2.5 ${
-                    idx === 0 ? 'bg-citrus text-white shadow-jeju-chip' : 'bg-white/55'
-                  }`}
-                >
-                  {item}
-                </div>
-              ))}
-            </nav>
-
-            <button
-              type="button"
-              onClick={submitPlan}
-              className="mt-10 w-full rounded-2xl bg-citrus px-3 py-3 font-serif-kr text-[13px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
-            >
-              Generate Pack
-            </button>
-          </aside>
-
-          <main className="relative border-r border-earth/60 bg-[#FFF6EA] p-4 sm:p-6">
+      <section className="overflow-hidden rounded-[30px] border border-earth bg-[#FFF9F0] shadow-pyj-card">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <main className="relative bg-gradient-to-br from-[#FFF9F0] via-[#FDF1DE] to-[#F6DFC1] p-4 sm:p-6 lg:p-7">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-citrus-2">
-                  제주를 담다 · Trust Map Dashboard
+                  제주를 담다 · 지역 근거 현황
                 </p>
-                <h1 className="mt-1 font-serif-kr text-[28px] font-bold tracking-tight text-basalt sm:text-[34px]">
-                  지역을 먼저 믿고, 그 다음 플랜에 담기
+                <h1 className="mt-1 font-serif-kr text-[29px] font-bold leading-tight tracking-tight text-basalt sm:text-[38px]">
+                  제주 지도에서 먼저 고르고,
+                  <br className="hidden sm:block" />
+                  공공데이터 근거로 담습니다.
                 </h1>
-                <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-basalt-2">
-                  색은 공공데이터 커버리지와 현재 여행 조건을 합성한 신뢰 신호입니다.
-                  회색은 추천 불가가 아니라 확인 근거가 부족하다는 뜻입니다.
+                <p className="mt-2 max-w-2xl text-[12.5px] leading-relaxed text-basalt-2">
+                  이 화면의 후보·강점·미확인 항목은 기존 API가 조회한 값만 사용합니다.
+                  데이터가 부족한 조합은 추천으로 채우지 않고 그대로 표시합니다.
                 </p>
               </div>
-              <div className="rounded-2xl border border-citrus/20 bg-white/74 px-3 py-2 text-right">
-                <p className="text-[10px] text-basalt-2">선택 지역</p>
-                <p className="font-serif-kr text-[16px] font-bold text-citrus-2">
-                  {selectedRegions.length || 1}곳
+              <div className="rounded-2xl border border-white/80 bg-white/74 px-3 py-2 text-right shadow-sm">
+                <p className="text-[10px] text-basalt-2">플랜 후보</p>
+                <p className="font-serif-kr text-[18px] font-bold text-citrus-2">
+                  {selectedRegions.length}곳
                 </p>
               </div>
             </div>
 
-            <div className="relative mt-6 rounded-[28px] border border-white/70 bg-gradient-to-br from-white/45 to-[#F3E2CB]/50 p-3 sm:p-6">
-              <TrustLegend />
-              <svg
-                viewBox="0 0 440 250"
-                className="mx-auto mt-4 block w-full max-w-3xl drop-shadow-[0_18px_30px_rgba(121,81,40,0.16)]"
-                role="img"
-                aria-label="제주 12권역 신뢰 지도"
-              >
-                <defs>
-                  <filter id="trust-glow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="8" stdDeviation="7" floodColor="#D56A35" floodOpacity="0.16" />
-                  </filter>
-                </defs>
-                <path
-                  d="M18 130C32 99 72 75 125 58c55-18 124-25 185-13 59 12 99 39 111 72 9 26-9 53-51 75-45 24-117 34-190 26-73-8-131-30-154-63-6-8-9-16-8-25Z"
-                  fill="#F7E5CF"
-                  opacity="0.72"
+            <div className="mt-6 rounded-[28px] border border-white/80 bg-white/48 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] sm:p-5">
+              <MapLegend />
+              <JejuSilhouetteMap
+                activeRegion={activeRegion}
+                selectedRegions={selectedRegions}
+                previews={previews}
+                loading={previewLoading}
+                selectedMoments={selectedMoments}
+                onInspect={inspectRegion}
+                onToggle={toggleRegion}
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 rounded-[24px] border border-earth bg-white/72 p-3 md:grid-cols-[1.15fr_0.85fr]">
+              <TripFields
+                startDate={startDate}
+                durationDays={durationDays}
+                companion={companion}
+                purpose={purpose}
+                onStartDate={setStartDate}
+                onDuration={setDurationDays}
+                onCompanion={setCompanion}
+                onPurpose={setPurpose}
+              />
+              <label className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
+                <span className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-basalt-2">
+                  <Sparkles className="h-3 w-3" /> 특별한 요청
+                </span>
+                <textarea
+                  value={specialNotes}
+                  onChange={(e) => setSpecialNotes(e.target.value.slice(0, NOTES_MAX))}
+                  rows={3}
+                  placeholder="예: 부모님과 가니 계단 적은 곳 위주로."
+                  className="w-full resize-none bg-transparent text-[12px] leading-relaxed text-basalt outline-none placeholder:text-basalt-2/50"
                 />
-                {REGION_SHAPES.map((shape) => {
-                  const active = activeRegion === shape.id;
-                  const selected = selectedRegions.includes(shape.id);
-                  const score = regionScores[shape.id];
-                  const region = REGIONS.find((r) => r.value === shape.id);
-                  return (
-                    <g key={shape.id}>
-                      <motion.path
-                        d={shape.d}
-                        initial={false}
-                        animate={{ scale: active ? 1.018 : 1 }}
-                        onClick={() => toggleRegion(shape.id)}
-                        className="cursor-pointer transition"
-                        fill={statusColor(score.status)}
-                        stroke={active ? '#FFFFFF' : '#FDF6EA'}
-                        strokeWidth={active ? 4 : 2}
-                        filter={active ? 'url(#trust-glow)' : undefined}
-                        opacity={selected ? 1 : 0.9}
-                      />
-                      <text
-                        x={shape.labelX}
-                        y={shape.labelY}
-                        textAnchor="middle"
-                        className="pointer-events-none select-none fill-basalt font-serif-kr text-[10px] font-bold"
-                      >
-                        {region?.label}
-                      </text>
-                      <g className="pointer-events-none">
-                        <circle
-                          cx={shape.clusterX}
-                          cy={shape.clusterY}
-                          r="12"
-                          fill="white"
-                          opacity="0.88"
-                          stroke={active ? '#E86F3A' : '#E6CDB0'}
-                        />
-                        <text
-                          x={shape.clusterX}
-                          y={shape.clusterY + 3}
-                          textAnchor="middle"
-                          className="select-none fill-citrus-2 text-[9px] font-bold"
-                        >
-                          {score.display}
-                        </text>
-                      </g>
-                    </g>
-                  );
-                })}
-              </svg>
+                <span className="block text-right text-[10px] text-basalt-2/55">
+                  {specialNotes.length}/{NOTES_MAX}
+                </span>
+              </label>
             </div>
 
-            <FilterDock
-              startDate={startDate}
-              durationDays={durationDays}
-              companion={companion}
-              purpose={purpose}
-              weather={weather}
-              mobility={mobility}
-              onStartDate={setStartDate}
-              onDuration={setDurationDays}
-              onCompanion={setCompanion}
-              onPurpose={setPurpose}
-              onWeather={setWeather}
-              onMobility={setMobility}
-            />
-
-            <div className="mt-4 rounded-[22px] border border-earth bg-white/68 p-3">
+            <div className="mt-4 rounded-[24px] border border-earth bg-white/72 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
                   담고 싶은 순간
@@ -381,168 +273,170 @@ export default function TrustMapDashboard({
             </div>
           </main>
 
-          <aside className="bg-white/78 p-4 sm:p-5">
+          <aside className="border-t border-earth bg-white/82 p-4 sm:p-5 lg:border-l lg:border-t-0">
             <RegionPanel
               region={activeEntry}
               preview={activePreview}
-              score={activeScore}
+              tone={activeTone}
               previewLoading={previewLoading}
               packLoading={packLoading}
               recommendedPlaces={recommendedPlaces}
               selected={selectedRegions.includes(activeRegion)}
               selectedLabels={selectedLabels}
+              coverageSummary={coverageSummary}
               onToggle={() => toggleRegion(activeRegion)}
               onSubmit={submitPlan}
             />
           </aside>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function JejuSilhouetteMap({
+  activeRegion,
+  selectedRegions,
+  previews,
+  loading,
+  selectedMoments,
+  onInspect,
+  onToggle,
+}: {
+  activeRegion: RegionId;
+  selectedRegions: RegionId[];
+  previews: Record<string, RegionCoveragePreview>;
+  loading: boolean;
+  selectedMoments: MomentId[];
+  onInspect: (region: RegionId) => void;
+  onToggle: (region: RegionId) => void;
+}) {
+  return (
+    <div className="relative mx-auto mt-4 aspect-[567/312] w-full max-w-4xl overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F7E6CC]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.85),rgba(255,247,232,0.25)_45%,rgba(222,178,124,0.15))]" />
+      <img
+        src="/jeju_silhouette_refined.svg"
+        alt="제주도 실루엣"
+        className="absolute inset-[5%] h-[90%] w-[90%] object-contain opacity-[0.18] [filter:sepia(1)_saturate(1.7)_hue-rotate(336deg)]"
+      />
+      <div className="absolute inset-[7%] rounded-[50%] border border-citrus/10 bg-citrus/5 blur-2xl" />
+
+      {REGION_HOTSPOTS.map((spot) => {
+        const region = REGIONS.find((r) => r.value === spot.id);
+        const active = activeRegion === spot.id;
+        const selected = selectedRegions.includes(spot.id);
+        const tone = getRegionTone(previews[spot.id], selectedMoments, loading);
+        return (
+          <button
+            key={spot.id}
+            type="button"
+            onClick={() => onInspect(spot.id)}
+            onDoubleClick={() => onToggle(spot.id)}
+            aria-pressed={selected}
+            aria-label={`${region?.label ?? spot.id} 근거 보기`}
+            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1.5 text-[11px] font-bold shadow-sm transition hover:-translate-y-[55%] focus:outline-none focus:ring-2 focus:ring-citrus/35 ${
+              selected
+                ? 'border-citrus bg-citrus text-white shadow-jeju-chip'
+                : active
+                  ? 'border-citrus bg-white text-citrus-2'
+                  : 'border-white/90 bg-white/86 text-basalt hover:border-citrus/50'
+            }`}
+            style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+          >
+            <span
+              className={`mr-1 inline-block h-2 w-2 rounded-full ${toneDotClass(tone)}`}
+              aria-hidden="true"
+            />
+            {selected && <Check className="mr-0.5 inline h-2.5 w-2.5 stroke-[4]" />}
+            {region?.label}
+          </button>
+        );
+      })}
+
+      <div className="absolute bottom-3 left-3 right-3 rounded-2xl border border-white/80 bg-white/72 px-3 py-2 text-[10.5px] leading-relaxed text-basalt-2 backdrop-blur">
+        한 번 누르면 근거를 보고, 선택 버튼으로 플랜 후보에 담습니다. 숫자 점수는 만들지 않고 실제 커버리지와 후보만 표시합니다.
       </div>
     </div>
   );
 }
 
-function TrustLegend() {
+function MapLegend() {
   return (
     <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-semibold text-basalt-2">
-      <LegendDot color="#42B883" label="믿고 담기" />
-      <LegendDot color="#F4C95D" label="확인하고 담기" />
-      <LegendDot color="#E56B5D" label="오늘은 주의" />
-      <LegendDot color="#C9C1B4" label="데이터 부족" />
+      <LegendDot className="bg-mint" label="확인 후보 있음" />
+      <LegendDot className="bg-amber-400" label="확인 필요" />
+      <LegendDot className="bg-stone-300" label="데이터 부족" />
     </div>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
+function LegendDot({ className, label }: { className: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-earth bg-white/70 px-2 py-1">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+      <span className={`h-2.5 w-2.5 rounded-full ${className}`} />
       {label}
     </span>
   );
 }
 
-function FilterDock({
+function TripFields({
   startDate,
   durationDays,
   companion,
   purpose,
-  weather,
-  mobility,
   onStartDate,
   onDuration,
   onCompanion,
   onPurpose,
-  onWeather,
-  onMobility,
 }: {
   startDate: string;
   durationDays: number;
   companion: CompanionValue;
   purpose: PurposeValue;
-  weather: WeatherMode;
-  mobility: MobilityMode;
   onStartDate: (value: string) => void;
   onDuration: (value: number) => void;
   onCompanion: (value: CompanionValue) => void;
   onPurpose: (value: PurposeValue) => void;
-  onWeather: (value: WeatherMode) => void;
-  onMobility: (value: MobilityMode) => void;
 }) {
   return (
-    <div className="mt-5 rounded-[24px] border border-earth bg-white/74 p-3">
-      <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_1fr]">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
-            <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-basalt-2">
-              <Calendar className="h-3 w-3" /> 날짜
-            </span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => onStartDate(e.target.value)}
-              className="w-full bg-transparent text-[12px] font-semibold text-basalt outline-none"
-            />
-          </label>
-          <label className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
-            <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-basalt-2">
-              기간
-            </span>
-            <div className="flex items-center justify-between gap-2">
-              <button type="button" onClick={() => onDuration(Math.max(1, durationDays - 1))}>-</button>
-              <span className="font-serif-kr text-[13px] font-bold text-basalt">{durationDays}일</span>
-              <button type="button" onClick={() => onDuration(Math.min(14, durationDays + 1))}>+</button>
-            </div>
-          </label>
+    <div className="grid gap-2 sm:grid-cols-2">
+      <label className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
+        <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-basalt-2">
+          <Calendar className="h-3 w-3" /> 언제부터
+        </span>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => onStartDate(e.target.value)}
+          className="w-full bg-transparent text-[12px] font-semibold text-basalt outline-none"
+        />
+      </label>
+      <div className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
+        <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-basalt-2">
+          며칠간
+        </span>
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" onClick={() => onDuration(Math.max(1, durationDays - 1))}>-</button>
+          <span className="font-serif-kr text-[13px] font-bold text-basalt">
+            {durationDays - 1 > 0 ? `${durationDays - 1}박 ${durationDays}일` : '당일치기'}
+          </span>
+          <button type="button" onClick={() => onDuration(Math.min(14, durationDays + 1))}>+</button>
         </div>
-
-        <Segmented
-          icon={<CloudRain className="h-3.5 w-3.5" />}
-          label="날씨"
-          value={weather}
-          options={WEATHER_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-          onChange={(v) => onWeather(v as WeatherMode)}
-        />
-        <Segmented
-          icon={<Compass className="h-3.5 w-3.5" />}
-          label="이동"
-          value={mobility}
-          options={MOBILITY_OPTIONS}
-          onChange={(v) => onMobility(v as MobilityMode)}
-        />
       </div>
-
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <SelectLine
-          icon={<Users className="h-3.5 w-3.5" />}
-          label="동행"
-          value={companion}
-          options={COMPANIONS}
-          onChange={(v) => onCompanion(v as CompanionValue)}
-        />
-        <SelectLine
-          icon={<Compass className="h-3.5 w-3.5" />}
-          label="목적"
-          value={purpose}
-          options={PURPOSES}
-          onChange={(value) => onPurpose(value as PurposeValue)}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Segmented({
-  icon,
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-earth bg-[#FFF9F0] p-2">
-      <div className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-basalt-2">
-        {icon} {label}
-      </div>
-      <div className="grid grid-cols-3 gap-1">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={`rounded-xl px-2 py-1.5 text-[11px] font-bold transition ${
-              value === option.value ? 'bg-citrus text-white' : 'bg-white/70 text-basalt-2'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <SelectLine
+        icon={<Users className="h-3.5 w-3.5" />}
+        label="동행"
+        value={companion}
+        options={COMPANIONS}
+        onChange={(value) => onCompanion(value as CompanionValue)}
+      />
+      <SelectLine
+        icon={<Compass className="h-3.5 w-3.5" />}
+        label="목적"
+        value={purpose}
+        options={PURPOSES}
+        onChange={(value) => onPurpose(value as PurposeValue)}
+      />
     </div>
   );
 }
@@ -554,7 +448,7 @@ function SelectLine({
   options,
   onChange,
 }: {
-  icon: ReactNode;
+  icon: React.ReactNode;
   label: string;
   value: string;
   options: Array<{ value: string; label: string }>;
@@ -583,23 +477,25 @@ function SelectLine({
 function RegionPanel({
   region,
   preview,
-  score,
+  tone,
   previewLoading,
   packLoading,
   recommendedPlaces,
   selected,
   selectedLabels,
+  coverageSummary,
   onToggle,
   onSubmit,
 }: {
   region: (typeof REGIONS)[number];
   preview?: RegionCoveragePreview;
-  score: ReturnType<typeof scoreRegion>;
+  tone: RegionTone;
   previewLoading: boolean;
   packLoading: boolean;
   recommendedPlaces: Array<{ name: string; badge: string; note: string | null; source: string }>;
   selected: boolean;
   selectedLabels: string;
+  coverageSummary: { totalPlaces: number; strongMoments: string[]; weakMoments: string[] };
   onToggle: () => void;
   onSubmit: () => void;
 }) {
@@ -614,42 +510,29 @@ function RegionPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-citrus-2">
-            Region Intelligence
-          </p>
-          <h2 className="mt-1 font-serif-kr text-[28px] font-bold text-basalt">
-            {region.label}을 담아도 될까요?
-          </h2>
-        </div>
-        <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full border-4 border-citrus/20 bg-[#FFF9F0]">
-          <span className="font-serif-kr text-[20px] font-bold text-citrus-2">
-            {score.display}
-          </span>
-        </div>
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-citrus-2">
+          선택 지역 근거
+        </p>
+        <h2 className="mt-1 font-serif-kr text-[27px] font-bold leading-tight text-basalt">
+          {region.label}을 담아볼까요?
+        </h2>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-citrus/18 bg-citrus/8 p-3 text-[12px] leading-relaxed text-basalt">
+      <div className={`mt-4 rounded-2xl border p-3 text-[12px] leading-relaxed ${panelToneClass(tone)}`}>
         {previewLoading ? (
           <span className="inline-flex items-center gap-1.5">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             지역 근거를 확인하는 중입니다.
           </span>
         ) : (
-          panelComment(region.label, score.status, recommended, weak)
+          preview?.briefing || '저희가 참조하는 공공데이터 기준으로 확인된 지역 요약이 아직 없습니다.'
         )}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Metric label="확인 후보" value={preview ? preview.total_places.toLocaleString() : '-'} />
-        <Metric label="데이터 부족" value={weak.length ? `${weak.length}개` : '낮음'} />
-      </div>
-
-      <div className="mt-4 space-y-2">
-        <ScoreBar label="공공데이터 커버리지" value={score.breakdown.coverage} />
-        <ScoreBar label="현재 조건 적합도" value={score.breakdown.condition} />
-        <ScoreBar label="운영 정보 안정성" value={score.breakdown.operation} />
+        <Metric label="선택 후보" value={selected ? '담김' : '미선택'} />
       </div>
 
       <div className="mt-5">
@@ -659,6 +542,7 @@ function RegionPanel({
         <div className="mt-2 flex flex-wrap gap-1.5">
           {(recommended.length ? recommended : ['근거 확인 중']).map((label) => (
             <span key={label} className="rounded-full border border-mint/25 bg-mint/8 px-2 py-1 text-[10.5px] font-bold text-mint">
+              <ShieldCheck className="mr-1 inline h-3 w-3" />
               {label}
             </span>
           ))}
@@ -671,14 +555,14 @@ function RegionPanel({
         </p>
         <div className="mt-2 space-y-1.5">
           {weak.length ? weak.map((label) => (
-            <div key={label} className="flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-2 text-[11px] text-amber-900">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              {label}은 저희가 참조하는 공공데이터 기준으로 확인되지 않습니다.
+            <div key={label} className="flex items-start gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{label}은 저희가 참조하는 공공데이터 기준으로 확인되지 않습니다.</span>
             </div>
           )) : (
             <div className="flex items-center gap-1.5 rounded-xl border border-mint/20 bg-mint/7 px-2.5 py-2 text-[11px] text-mint">
               <ShieldCheck className="h-3.5 w-3.5" />
-              선택 조건에서 큰 데이터 공백이 낮게 관측됩니다.
+              선택 지역에서 큰 데이터 공백이 낮게 관측됩니다.
             </div>
           )}
         </div>
@@ -687,7 +571,7 @@ function RegionPanel({
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
-            대표 후보
+            실제 후보
           </p>
           {packLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-citrus-2" />}
         </div>
@@ -706,11 +590,22 @@ function RegionPanel({
             </div>
           )) : (
             <div className="rounded-2xl border border-dashed border-earth bg-[#FFF9F0] p-4 text-center text-[11px] leading-relaxed text-basalt-2">
-              선택한 순간과 지역으로 대표 후보를 확인하는 중입니다.
+              선택한 순간과 지역으로 실제 후보를 조회하는 중입니다.
             </div>
           )}
         </div>
       </div>
+
+      {selectedLabels && (
+        <div className="mt-5 rounded-2xl border border-citrus/20 bg-citrus/7 p-3 text-[11px] leading-relaxed text-basalt-2">
+          <p className="font-bold text-basalt">현재 플랜 후보: {selectedLabels}</p>
+          <p className="mt-1">
+            합산 확인 후보 {coverageSummary.totalPlaces.toLocaleString()}곳 ·
+            강점 {coverageSummary.strongMoments.slice(0, 3).join(' · ') || '확인 중'} ·
+            미확인 {coverageSummary.weakMoments.slice(0, 2).join(' · ') || '낮음'}
+          </p>
+        </div>
+      )}
 
       <div className="mt-auto pt-5">
         <button
@@ -729,7 +624,7 @@ function RegionPanel({
           onClick={onSubmit}
           className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-citrus px-4 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
         >
-          {selectedLabels || region.label} 여행팩 생성
+          {selectedLabels || region.label} 제주팩 받기
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -746,71 +641,36 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-[10.5px] font-semibold text-basalt-2">
-        <span>{label}</span>
-        <span>{value}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-earth">
-        <div
-          className="h-full rounded-full bg-citrus transition-all"
-          style={{ width: `${Math.max(8, Math.min(100, value))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function scoreRegion(
+function getRegionTone(
   preview: RegionCoveragePreview | undefined,
   selectedMoments: MomentId[],
-  weather: WeatherMode,
-  mobility: MobilityMode,
-  companion: CompanionValue,
-) {
-  if (!preview) {
-    return {
-      value: 42,
-      display: '-',
-      status: 'gap' as RegionStatus,
-      breakdown: { coverage: 35, condition: 45, operation: 40 },
-    };
-  }
-
+  loading: boolean,
+): RegionTone {
+  if (loading && !preview) return 'loading';
+  if (!preview || preview.total_places === 0) return 'gap';
   const selected = selectedMoments.length ? selectedMoments : DEFAULT_MOMENTS;
-  const moments = selected
+  const selectedStats = selected
     .map((id) => preview.moments.find((m) => m.moment === id))
     .filter(Boolean);
-  const totalSelected = Math.max(1, moments.length);
-  const covered = moments.filter((m) => !m?.coverage_gap).length;
-  const caution = moments.reduce((sum, m) => sum + (m?.caution ?? 0), 0);
-  const verified = moments.reduce((sum, m) => sum + (m?.verified ?? 0), 0);
-  const riskyMoments = selected.filter((id) => MOMENT_WEATHER_RISK[id]?.includes(weather)).length;
-  const mobilityPenalty = mobility === 'walk' && preview.region === 'udo' ? 10 : mobility === 'walk' ? 4 : 0;
-  const companionPenalty = companion === 'parents' && riskyMoments > 0 ? 5 : companion === 'kids' && riskyMoments > 0 ? 4 : 0;
-
-  const coverage = Math.round((covered / totalSelected) * 100);
-  const condition = Math.max(25, 92 - riskyMoments * 14 - mobilityPenalty - companionPenalty);
-  const operation = Math.max(30, Math.min(96, 88 - caution * 3 + Math.min(12, verified * 2)));
-  const value = Math.round(coverage * 0.48 + condition * 0.34 + operation * 0.18);
-  const status: RegionStatus =
-    coverage < 36 ? 'gap' : value >= 78 ? 'strong' : value >= 58 ? 'watch' : 'risk';
-
-  return {
-    value,
-    display: String(value),
-    status,
-    breakdown: { coverage, condition, operation },
-  };
+  if (selectedStats.length === 0) return 'gap';
+  const gaps = selectedStats.filter((m) => m?.coverage_gap).length;
+  if (gaps === selectedStats.length) return 'gap';
+  if (gaps > 0) return 'caution';
+  return 'verified';
 }
 
-function statusColor(status: RegionStatus): string {
-  if (status === 'strong') return '#42B883';
-  if (status === 'watch') return '#F4C95D';
-  if (status === 'risk') return '#E56B5D';
-  return '#C9C1B4';
+function toneDotClass(tone: RegionTone): string {
+  if (tone === 'verified') return 'bg-mint';
+  if (tone === 'caution') return 'bg-amber-400';
+  if (tone === 'gap') return 'bg-stone-300';
+  return 'bg-citrus/40';
+}
+
+function panelToneClass(tone: RegionTone): string {
+  if (tone === 'verified') return 'border-mint/20 bg-mint/7 text-mint';
+  if (tone === 'caution') return 'border-amber-100 bg-amber-50/70 text-amber-900';
+  if (tone === 'gap') return 'border-stone-200 bg-stone-50 text-stone-700';
+  return 'border-citrus/20 bg-citrus/8 text-basalt';
 }
 
 function collectRecommendedPlaces(pack: PackResponse | null) {
@@ -833,22 +693,27 @@ function collectRecommendedPlaces(pack: PackResponse | null) {
     }));
 }
 
-function panelComment(
-  regionLabel: string,
-  status: RegionStatus,
-  recommended: Array<string | undefined>,
-  weak: Array<string | undefined>,
+function summarizeSelectedRegions(
+  selectedRegions: RegionId[],
+  previews: Record<string, RegionCoveragePreview>,
 ) {
-  if (status === 'strong') {
-    const topics = recommended.filter(Boolean).slice(0, 2).join(' · ');
-    return `${regionLabel}은 ${topics || '선택한 순간'} 쪽 공공데이터 근거가 비교적 안정적입니다. 지금 조건에서 플랜에 담기 좋은 후보입니다.`;
-  }
-  if (status === 'watch') {
-    return `${regionLabel}은 담을 수 있는 후보가 있지만 일부 순간은 확인이 필요합니다. 운영 정보와 날씨 변수를 함께 보고 담는 편이 좋습니다.`;
-  }
-  if (status === 'risk') {
-    return `${regionLabel}은 현재 조건에서 야외·이동 변수의 영향이 큽니다. 대체 지역이나 실내 순간을 함께 담는 것이 안전합니다.`;
-  }
-  const gaps = weak.filter(Boolean).slice(0, 2).join(' · ');
-  return `${regionLabel}은 ${gaps || '선택 조건'}이 저희가 참조하는 공공데이터 기준으로 충분히 확인되지 않습니다. 없다고 단정하지 않고 데이터 부족으로 표시합니다.`;
+  const selectedPreviews = selectedRegions
+    .map((id) => previews[id])
+    .filter(Boolean);
+  const totalPlaces = selectedPreviews.reduce((sum, preview) => sum + preview.total_places, 0);
+  const strongMoments = Array.from(new Set(
+    selectedPreviews.flatMap((preview) =>
+      preview.recommended_moments
+        .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+        .filter(Boolean),
+    ),
+  )) as string[];
+  const weakMoments = Array.from(new Set(
+    selectedPreviews.flatMap((preview) =>
+      preview.weak_moments
+        .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+        .filter(Boolean),
+    ),
+  )) as string[];
+  return { totalPlaces, strongMoments, weakMoments };
 }

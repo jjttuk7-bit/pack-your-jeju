@@ -8,7 +8,7 @@ export default function CitrusMark({ className = 'w-10 h-10' }: { className?: st
       viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="Pack Your Jeju"
+      aria-label="제주를 담다"
     >
       {/* 잎 (뒷쪽) */}
       <path

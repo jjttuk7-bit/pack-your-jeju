@@ -358,7 +358,7 @@ def _safe_text(value: Any) -> str:
 def _source_label(item: dict) -> str:
     sources = item.get("sources") or []
     if not sources:
-        return "근거: Pack Your Jeju 데이터"
+        return "근거: 제주를 담다 데이터"
     src = sources[0] or {}
     return f"근거: {src.get('name') or '공공데이터'}"
 
@@ -507,7 +507,7 @@ def _draw_footer(canvas, doc):
     canvas.saveState()
     canvas.setFont(FONT_REGULAR, 8)
     canvas.setFillColor(BASALT_2)
-    canvas.drawString(20 * mm, 12 * mm, "Pack Your Jeju — 신뢰 기반 여행플랜")
+    canvas.drawString(20 * mm, 12 * mm, "제주를 담다 — 신뢰 기반 여행플랜")
     canvas.drawRightString(A4[0] - 20 * mm, 12 * mm, f"{doc.page}")
     canvas.setStrokeColor(EARTH)
     canvas.setLineWidth(0.4)
@@ -529,7 +529,7 @@ def _draw_cover(canvas, doc):
 def _cover_story(req: dict, pack: dict, styles: dict) -> list:
     story: list = []
     story.append(Spacer(1, 55 * mm))
-    story.append(Paragraph("PACK YOUR JEJU", styles["cover_kicker"]))
+    story.append(Paragraph("제주를 담다", styles["cover_kicker"]))
     story.append(Paragraph("제주 여행플랜", styles["cover_title"]))
     story.append(Spacer(1, 4 * mm))
 
@@ -647,7 +647,7 @@ def _plan_notes_page(pack: dict, styles: dict) -> list:
 
     story.append(Spacer(1, 8 * mm))
     story.append(Paragraph(
-        "Pack Your Jeju — 신뢰 기반 제주 여행플랜.",
+        "제주를 담다 — 신뢰 기반 제주 여행플랜.",
         styles["closing"],
     ))
     return story
@@ -674,8 +674,8 @@ def build_pack_pdf(pack: dict, req: dict) -> bytes:
         pagesize=A4,
         leftMargin=20 * mm, rightMargin=20 * mm,
         topMargin=22 * mm, bottomMargin=22 * mm,
-        title="Pack Your Jeju — 여행플랜",
-        author="Pack Your Jeju",
+        title="제주를 담다 — 여행플랜",
+        author="제주를 담다",
     )
     frame = Frame(
         doc.leftMargin, doc.bottomMargin,
