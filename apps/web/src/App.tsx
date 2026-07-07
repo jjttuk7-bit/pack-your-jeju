@@ -60,6 +60,7 @@ export default function App() {
   });
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [harubanSessionKey, setHarubanSessionKey] = useState(0);
 
   // 시연용 문지기 상태. 초대 코드 통과 여부만 localStorage에 저장한다.
   const [authenticated, setAuthenticated] = useState<boolean>(() => {
@@ -487,6 +488,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setState(defaultState);
+                    setHarubanSessionKey((key) => key + 1);
                     setShowResetConfirm(false);
                   }}
                   className="py-3 bg-citrus hover:bg-citrus-2 text-white font-serif-kr font-bold text-[14px] rounded-2xl transition shadow-jeju-chip cursor-pointer"
@@ -502,6 +504,7 @@ export default function App() {
       {/* 하루방 챗 위젯 — 우측 하단 상주. verify 페이지에서는 숨김 (검증 시연 화면 방해 방지). */}
       {state.step !== 'verify' && (
         <HarubanChat
+          key={`haruban-${harubanSessionKey}`}
           info={state.info}
           selectedMomentIds={state.selectedMomentIds}
           selectedPlanItems={state.selectedPlanItems || []}
