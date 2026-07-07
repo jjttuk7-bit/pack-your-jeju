@@ -291,6 +291,73 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
             </section>
 
             <section className="px-5 pb-16 lg:px-10">
+              <div className="mx-auto max-w-6xl rounded-[34px] border border-orange-100/80 bg-[#FFF9EE] p-5 shadow-pyj-card lg:p-8">
+                <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
+                      GPT-5-mini RAG Design
+                    </p>
+                    <h2 className="mt-3 font-serif-kr text-[34px] font-bold leading-tight text-basalt">
+                      모델이 답하기 전에,
+                      <br />
+                      근거가 먼저 줄을 섭니다.
+                    </h2>
+                    <p className="mt-4 text-[14px] leading-7 text-basalt-2">
+                      제주를 담다는 GPT-5-mini에게 장소를 상상하게 하지 않습니다. 폼 입력으로 DB 후보를
+                      찾고, 공공데이터·수정요청·기상청·방문 신호를 점수화한 뒤, 모델은 조회된 근거를
+                      사용자가 읽기 쉬운 말로 정리합니다.
+                    </p>
+                    <div className="mt-5 rounded-3xl border border-citrus/20 bg-white p-4">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-citrus/10 px-2.5 py-1 text-[10px] font-bold text-citrus-2">
+                        <ShieldCheck className="h-3 w-3" />
+                        No Hallucination Guard
+                      </span>
+                      <p className="mt-3 text-[12px] leading-relaxed text-basalt-2">
+                        장소명·주소·운영 정보는 DB 조회값만 사용합니다. GPT-5-mini는 근거 요약,
+                        리뷰 claim 분해, 안내 문구 조립에만 들어갑니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute left-6 top-8 hidden h-[calc(100%-4rem)] w-px bg-orange-200 lg:block" />
+                    <div className="space-y-3">
+                      <RagFlowStep
+                        number="01"
+                        icon={<Search className="h-4 w-4" />}
+                        title="구조화 입력"
+                        body="지역·기간·동행자·목적·순간카드를 폼으로 받아 검색 범위를 먼저 좁힙니다."
+                      />
+                      <RagFlowStep
+                        number="02"
+                        icon={<Database className="h-4 w-4" />}
+                        title="근거 검색"
+                        body="비짓제주, 수정요청, 교통·주차, 기상청 예보, 방문 신호에서 후보와 위험 신호를 가져옵니다."
+                      />
+                      <RagFlowStep
+                        number="03"
+                        icon={<ShieldCheck className="h-4 w-4" />}
+                        title="신뢰도 계산"
+                        body="공공데이터 일치도, 사용자 조건, 날씨, 이동 가능성, 운영 정보, 방문 신호를 100점 루브릭으로 계산합니다."
+                      />
+                      <RagFlowStep
+                        number="04"
+                        icon={<Sparkles className="h-4 w-4" />}
+                        title="GPT-5-mini 조립"
+                        body="모델은 검색된 후보와 점수만 받아 소개 문구, 하루방 응답, 리뷰 검증 설명을 정리합니다."
+                      />
+                      <RagFlowStep
+                        number="05"
+                        icon={<BookOpenCheck className="h-4 w-4" />}
+                        title="검증 가능한 결과"
+                        body="사용자는 추천 카드에서 출처, 확인 필요 항목, fallback_reason, 날씨 신호, 방문 피드백 흐름을 봅니다."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="px-5 pb-16 lg:px-10">
               <div className="mx-auto max-w-6xl rounded-[30px] border border-orange-100/80 bg-white/80 p-5 shadow-pyj-card backdrop-blur lg:p-8">
                 <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
                   <div>
@@ -893,6 +960,41 @@ function FeatureCard({
       </div>
       <h3 className="font-serif-kr text-[16px] font-bold text-basalt">{title}</h3>
       <p className="mt-2 text-[12.5px] leading-relaxed text-basalt-2">{body}</p>
+    </div>
+  );
+}
+
+function RagFlowStep({
+  number,
+  icon,
+  title,
+  body,
+}: {
+  number: string;
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="relative rounded-3xl border border-orange-100/80 bg-white p-4 shadow-sm">
+      <div className="flex gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-citrus/20 bg-citrus/10 text-citrus-2">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#FDF6EA] px-2 py-0.5 text-[10px] font-bold text-citrus-2">
+              {number}
+            </span>
+            <h3 className="font-serif-kr text-[15px] font-bold text-basalt">
+              {title}
+            </h3>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-basalt-2">
+            {body}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
