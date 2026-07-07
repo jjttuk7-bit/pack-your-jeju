@@ -640,6 +640,7 @@ function RegionPanel({
     .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
     .filter(Boolean)
     .slice(0, 3) ?? [];
+  const regionObjectLabel = withObjectParticle(region.label);
 
   return (
     <div className="flex h-full flex-col">
@@ -648,7 +649,7 @@ function RegionPanel({
           선택 지역 근거
         </p>
         <h2 className="mt-1 font-serif-kr text-[27px] font-bold leading-tight text-basalt">
-          {region.label}을 담아볼까요?
+          {regionObjectLabel} 담아볼까요?
         </h2>
       </div>
 
@@ -750,7 +751,7 @@ function RegionPanel({
               : 'border-citrus/30 bg-white text-citrus-2 hover:bg-orange-50'
           }`}
         >
-          {selected ? '이 지역은 플랜 후보에 담겼어요' : '이 지역을 플랜 후보에 담기'}
+          {selected ? `${region.label}은 플랜 후보에 담겼어요` : `${regionObjectLabel} 플랜 후보에 담기`}
         </button>
         <button
           type="button"
@@ -799,6 +800,17 @@ function regionFillClass(tone: RegionTone, active: boolean, selected: boolean): 
   if (tone === 'caution') return 'fill-[#F4E1B8]';
   if (tone === 'gap') return 'fill-[#E6E3DD]';
   return 'fill-[#EFE2D0]';
+}
+
+function withObjectParticle(label: string): string {
+  const lastChar = label.trim().at(-1);
+  if (!lastChar) return label;
+  const code = lastChar.charCodeAt(0);
+  const hangulStart = 0xac00;
+  const hangulEnd = 0xd7a3;
+  if (code < hangulStart || code > hangulEnd) return `${label}를`;
+  const hasFinalConsonant = (code - hangulStart) % 28 !== 0;
+  return `${label}${hasFinalConsonant ? '을' : '를'}`;
 }
 
 function panelToneClass(tone: RegionTone): string {
