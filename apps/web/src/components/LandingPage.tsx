@@ -132,11 +132,11 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     신뢰 기반 제주 여행팩
                   </div>
                   <h1 className="mt-5 font-serif-kr text-[44px] font-bold leading-[1.04] tracking-tight text-basalt sm:text-[58px] lg:text-[68px]">
-                    이번 제주는,
+                    이번 제주는
                     <br />
                     설렘부터
                     <br />
-                    근거 있게.
+                    근거 있게
                   </h1>
                   <p className="mt-5 max-w-2xl text-[15px] leading-8 text-basalt-2 sm:text-[17px]">
                     떠나기 전부터 제주가 가까워지는 여행 준비.
