@@ -528,7 +528,7 @@ export default function App() {
 function HeaderHallasanScene() {
   return (
     <div
-      className="pointer-events-none absolute right-0 top-4 z-0 hidden h-[90px] w-[63%] max-w-[830px] overflow-hidden lg:block"
+      className="pyj-header-hallasan pointer-events-none absolute right-0 top-4 z-0 hidden h-[90px] w-[63%] max-w-[830px] overflow-hidden lg:block"
       aria-hidden="true"
     >
       <svg
@@ -539,12 +539,12 @@ function HeaderHallasanScene() {
         aria-label="한라산 초록 능선"
       >
         <path
-          d="M-38 112 C28 113 77 121 143 119 C207 116 253 96 315 111 C366 124 419 126 481 113 C551 99 611 76 681 74 C746 72 793 85 874 83 L874 200 L-38 200 Z"
+          d="M-180 147 C-118 139 -62 128 0 119 C62 110 93 121 143 119 C207 116 253 96 315 111 C366 124 419 126 481 113 C551 99 611 76 681 74 C746 72 793 85 874 83 L874 200 L-180 200 Z"
           fill="#82986C"
           opacity="0.58"
         />
         <path
-          d="M-38 136 C65 143 170 142 264 127 C356 112 431 105 516 99 C606 93 690 96 874 112 L874 200 L-38 200 Z"
+          d="M-180 166 C-95 158 -24 148 50 140 C126 132 195 140 264 127 C356 112 431 105 516 99 C606 93 690 96 874 112 L874 200 L-180 200 Z"
           fill="#B6C989"
           opacity="0.72"
         />
@@ -583,7 +583,7 @@ function HeaderHallasanScene() {
           opacity="0.26"
         />
         <path
-          d="M-38 157 C76 164 196 153 311 146 C438 139 553 135 665 122 C737 114 791 112 874 113 L874 200 L-38 200 Z"
+          d="M-180 178 C-82 171 12 164 96 160 C170 156 239 151 311 146 C438 139 553 135 665 122 C737 114 791 112 874 113 L874 200 L-180 200 Z"
           fill="#C5D47F"
           opacity="0.82"
         />
