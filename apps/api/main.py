@@ -545,6 +545,7 @@ def _public_weather_snapshot(snapshot: dict | None) -> dict:
         "labels",
         "summary",
         "issued_at_label",
+        "daily_forecasts",
         "region",
         "source",
         "http_status",

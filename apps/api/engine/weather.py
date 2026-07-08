@@ -230,6 +230,32 @@ def _first_forecast_values(
     return values
 
 
+def _forecast_values_by_day(
+    items: list[dict[str, Any]],
+    *,
+    target_start: date | None = None,
+    target_days: int = 1,
+    now: datetime | None = None,
+) -> list[dict[str, str]]:
+    if not target_start:
+        values = _first_forecast_values(items, now=now)
+        return [values] if values else []
+
+    days = max(1, min(target_days, 3))
+    forecasts: list[dict[str, str]] = []
+    for idx in range(days):
+        target_day = target_start + timedelta(days=idx)
+        values = _first_forecast_values(
+            items,
+            target_start=target_day,
+            target_days=1,
+            now=now,
+        )
+        if values:
+            forecasts.append(values)
+    return forecasts
+
+
 def _safe_float(value: str | None) -> float | None:
     if value is None:
         return None
@@ -239,40 +265,11 @@ def _safe_float(value: str | None) -> float | None:
         return None
 
 
-def parse_vilage_fcst_payload(
-    payload: dict[str, Any],
-    *,
-    region: str = "jeju_city",
-    target_start: date | None = None,
-    target_days: int = 1,
-) -> dict[str, Any]:
-    """Normalize data.go.kr getVilageFcst JSON into travel weather signals."""
-    response = payload.get("response") or {}
-    header = response.get("header") or {}
-    result_code = str(header.get("resultCode") or "")
-    if result_code and result_code != "00":
-        return {
-            "available": False,
-            "provider": "kma_vilage_fcst",
-            "reason": str(header.get("resultMsg") or f"resultCode={result_code}"),
-            "labels": ["날씨 판단 보류"],
-            "summary": "기상청 단기예보 응답을 받았지만 정상 예보 데이터가 아닙니다. 출발 전 최신 예보를 확인해 주세요.",
-        }
+def _risk_rank(risk_level: str) -> int:
+    return {"normal": 0, "watch": 1, "caution": 2}.get(risk_level, 1)
 
-    items = (((response.get("body") or {}).get("items") or {}).get("item") or [])
-    if not isinstance(items, list):
-        items = [items]
-    values = _first_forecast_values(items, target_start=target_start, target_days=target_days)
-    if not values:
-        target_label = f"{target_start.isoformat()}부터 {target_days}일" if target_start else "현재 이후"
-        return {
-            "available": False,
-            "provider": "kma_vilage_fcst",
-            "reason": "no future forecast items",
-            "labels": ["날씨 판단 보류"],
-            "summary": f"기상청 단기예보에서 {target_label}에 해당하는 예보를 찾지 못했습니다. 출발 전 최신 예보를 확인해 주세요.",
-        }
 
+def _snapshot_from_values(values: dict[str, str], *, region: str) -> dict[str, Any]:
     sky = SKY_LABELS.get(values.get("SKY", ""), "하늘상태 확인 중")
     pty = PTY_LABELS.get(values.get("PTY", ""), "강수형태 확인 중")
     pop = _safe_float(values.get("POP"))
@@ -301,6 +298,7 @@ def parse_vilage_fcst_payload(
     fcst_date = values["fcstDate"]
     fcst_time = values["fcstTime"]
     issued_at_label = f"{int(fcst_date[4:6])}월 {int(fcst_date[6:8])}일 {int(fcst_time[:2]):02d}시 예보"
+    date_label = f"{int(fcst_date[4:6])}월 {int(fcst_date[6:8])}일"
     detail_parts = [sky]
     if values.get("PTY") and values.get("PTY") != "0":
         detail_parts.append(pty)
@@ -321,6 +319,8 @@ def parse_vilage_fcst_payload(
         "labels": list(dict.fromkeys(labels)),
         "summary": f"{issued_at_label} 기준: " + " · ".join(detail_parts),
         "issued_at_label": issued_at_label,
+        "date": f"{fcst_date[:4]}-{fcst_date[4:6]}-{fcst_date[6:8]}",
+        "date_label": date_label,
         "region": region,
         "forecast": {
             "sky": sky,
@@ -332,6 +332,80 @@ def parse_vilage_fcst_payload(
             "fcst_date": fcst_date,
             "fcst_time": fcst_time,
         },
+    }
+
+
+def parse_vilage_fcst_payload(
+    payload: dict[str, Any],
+    *,
+    region: str = "jeju_city",
+    target_start: date | None = None,
+    target_days: int = 1,
+) -> dict[str, Any]:
+    """Normalize data.go.kr getVilageFcst JSON into travel weather signals."""
+    response = payload.get("response") or {}
+    header = response.get("header") or {}
+    result_code = str(header.get("resultCode") or "")
+    if result_code and result_code != "00":
+        return {
+            "available": False,
+            "provider": "kma_vilage_fcst",
+            "reason": str(header.get("resultMsg") or f"resultCode={result_code}"),
+            "labels": ["날씨 판단 보류"],
+            "summary": "기상청 단기예보 응답을 받았지만 정상 예보 데이터가 아닙니다. 출발 전 최신 예보를 확인해 주세요.",
+        }
+
+    items = (((response.get("body") or {}).get("items") or {}).get("item") or [])
+    if not isinstance(items, list):
+        items = [items]
+    daily_forecasts = [
+        _snapshot_from_values(values, region=region)
+        for values in _forecast_values_by_day(
+            items,
+            target_start=target_start,
+            target_days=target_days,
+        )
+    ]
+    if not daily_forecasts:
+        target_label = f"{target_start.isoformat()}부터 {target_days}일" if target_start else "현재 이후"
+        return {
+            "available": False,
+            "provider": "kma_vilage_fcst",
+            "reason": "no future forecast items",
+            "labels": ["날씨 판단 보류"],
+            "summary": f"기상청 단기예보에서 {target_label}에 해당하는 예보를 찾지 못했습니다. 출발 전 최신 예보를 확인해 주세요.",
+        }
+
+    primary = daily_forecasts[0]
+    labels = list(dict.fromkeys(label for day in daily_forecasts for label in (day.get("labels") or [])))
+    signals = sorted(set(signal for day in daily_forecasts for signal in (day.get("signals") or [])))
+    risk_level = max((str(day.get("risk_level") or "normal") for day in daily_forecasts), key=_risk_rank)
+    if target_start:
+        summary_parts = []
+        for day in daily_forecasts:
+            forecast = day["forecast"]
+            parts = [str(forecast.get("sky") or "날씨 확인 중")]
+            if forecast.get("precipitation_type") and forecast.get("precipitation_type") != "강수 없음":
+                parts.append(str(forecast["precipitation_type"]))
+            if forecast.get("precipitation_probability") is not None:
+                parts.append(f"강수확률 {forecast['precipitation_probability']}%")
+            if forecast.get("temperature") is not None:
+                parts.append(f"기온 {forecast['temperature']:g}도")
+            summary_parts.append(f"{day['issued_at_label']} " + " · ".join(parts))
+        summary = "여행 기간 예보: " + " / ".join(summary_parts)
+    else:
+        summary = str(primary.get("summary") or "")
+    return {
+        "available": True,
+        "provider": "kma_vilage_fcst",
+        "risk_level": risk_level,
+        "signals": signals,
+        "labels": labels,
+        "summary": summary,
+        "issued_at_label": primary.get("issued_at_label"),
+        "region": region,
+        "forecast": primary.get("forecast"),
+        "daily_forecasts": daily_forecasts,
     }
 
 

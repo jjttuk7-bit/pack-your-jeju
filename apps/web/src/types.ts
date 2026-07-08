@@ -161,6 +161,27 @@ export interface WeatherSnapshotDto {
   labels?: string[];
   summary?: string;
   issued_at_label?: string;
+  daily_forecasts?: {
+    available: boolean;
+    provider?: string;
+    risk_level?: 'normal' | 'watch' | 'caution' | string;
+    signals?: string[];
+    labels?: string[];
+    summary?: string;
+    issued_at_label?: string;
+    date?: string;
+    date_label?: string;
+    forecast?: {
+      sky?: string;
+      precipitation_type?: string;
+      precipitation_probability?: number | null;
+      temperature?: number | null;
+      wind_speed?: number | null;
+      humidity?: number | null;
+      fcst_date?: string;
+      fcst_time?: string;
+    };
+  }[];
   region?: string;
   source?: string;
   http_status?: number;

@@ -125,3 +125,43 @@ def test_parse_vilage_fcst_payload_prefers_trip_dates_over_current_day():
     assert "7월 9일 12시 예보" in parsed["summary"]
     assert "강수확률 70%" in parsed["summary"]
     assert parsed["forecast"]["fcst_date"] == "20990709"
+
+
+def test_parse_vilage_fcst_payload_returns_daily_trip_forecasts():
+    payload = {
+        "response": {
+            "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+            "body": {
+                "items": {
+                    "item": [
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "SKY", "fcstValue": "4"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "POP", "fcstValue": "30"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "TMP", "fcstValue": "28"},
+                        {"fcstDate": "20990710", "fcstTime": "1200", "category": "SKY", "fcstValue": "3"},
+                        {"fcstDate": "20990710", "fcstTime": "1200", "category": "PTY", "fcstValue": "1"},
+                        {"fcstDate": "20990710", "fcstTime": "1200", "category": "POP", "fcstValue": "70"},
+                        {"fcstDate": "20990710", "fcstTime": "1200", "category": "TMP", "fcstValue": "25"},
+                        {"fcstDate": "20990711", "fcstTime": "1200", "category": "SKY", "fcstValue": "1"},
+                        {"fcstDate": "20990711", "fcstTime": "1200", "category": "POP", "fcstValue": "10"},
+                        {"fcstDate": "20990711", "fcstTime": "1200", "category": "TMP", "fcstValue": "27"},
+                    ]
+                }
+            },
+        }
+    }
+
+    parsed = parse_vilage_fcst_payload(
+        payload,
+        region="udo",
+        target_start=date(2099, 7, 9),
+        target_days=3,
+    )
+
+    assert parsed["available"] is True
+    assert [day["date"] for day in parsed["daily_forecasts"]] == [
+        "2099-07-09",
+        "2099-07-10",
+        "2099-07-11",
+    ]
+    assert "7월 10일" in parsed["summary"]
+    assert "비 예보" in parsed["labels"]

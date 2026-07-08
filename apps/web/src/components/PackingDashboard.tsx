@@ -924,6 +924,7 @@ function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
   const labels = weather.labels?.length ? weather.labels : ['날씨 정보 확인 중'];
   const isCaution = weather.risk_level === 'caution' || weather.risk_level === 'watch';
   const isUnavailable = !weather.available;
+  const daily = weather.daily_forecasts ?? [];
   return (
     <div className={`rounded-[24px] border p-5 shadow-pyj-card ${
       isCaution || isUnavailable
@@ -937,10 +938,12 @@ function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
         KMA Weather Signal
       </span>
       <h3 className="mt-2 font-serif-kr text-[16px] font-bold text-basalt">
-        {isUnavailable ? '현재 날씨 판단은 보류합니다.' : '기상청 예보를 여행 판단에 반영합니다.'}
+        {isUnavailable ? '여행 기간 날씨 판단은 보류합니다.' : '여행 기간 예보를 함께 봅니다.'}
       </h3>
       <p className="mt-1 text-[10.5px] font-semibold text-basalt-2/75">
-        {weather.issued_at_label ?? (isUnavailable ? '기상청 API 연결 확인 · 예보 문장 미확인' : '기상청 최신 발표 기준')}
+        {daily.length > 1
+          ? `${daily[0]?.date_label ?? '출발일'}부터 ${daily.length}일 예보`
+          : weather.issued_at_label ?? (isUnavailable ? '기상청 API 연결 확인 · 예보 문장 미확인' : '기상청 최신 발표 기준')}
       </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {labels.map((label) => (
@@ -952,8 +955,51 @@ function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
           </span>
         ))}
       </div>
-      {weather.summary && (
-        <p className="mt-3 text-[11px] leading-relaxed text-basalt-2">
+      {daily.length > 0 && (
+        <div className="mt-3 grid gap-2">
+          {daily.map((day) => {
+            const forecast = day.forecast ?? {};
+            const dayLabels = day.labels?.length ? day.labels.slice(0, 3) : ['예보 확인'];
+            return (
+              <div
+                key={day.date ?? day.issued_at_label}
+                className="rounded-2xl border border-white/80 bg-white/78 px-3 py-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[12px] font-bold text-basalt">
+                      {day.date_label ?? day.issued_at_label ?? '여행일'}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-semibold text-basalt-2/65">
+                      {day.issued_at_label ?? '기상청 단기예보 기준'}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {dayLabels.map((label) => (
+                      <span
+                        key={`${day.date}-${label}`}
+                        className="rounded-full bg-[#FDF6EA] px-2 py-0.5 text-[10px] font-bold text-basalt-2"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-1.5 text-[10.5px] leading-relaxed text-basalt-2">
+                  {[
+                    forecast.sky,
+                    forecast.precipitation_probability != null ? `강수확률 ${forecast.precipitation_probability}%` : null,
+                    forecast.temperature != null ? `기온 ${forecast.temperature}도` : null,
+                    forecast.wind_speed != null ? `풍속 ${forecast.wind_speed}m/s` : null,
+                  ].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {weather.summary && daily.length === 0 && (
+        <p className="mt-3 text-[11px] leading-relaxed text-basalt-2/90">
           {weather.summary}
         </p>
       )}
@@ -1094,26 +1140,6 @@ function checkRequiredText(keys: string[] | undefined): string {
   return (keys ?? []).map(checkRequiredLabel).join(' · ');
 }
 
-function itemWeatherNotice(it: PackItemDto): {
-  labels: string[];
-  summary?: string;
-  issuedAt?: string;
-  status: string;
-} | null {
-  const weather = it.score_breakdown?.weather_fit;
-  if (!weather) return null;
-  const labels = weather.labels ?? [];
-  const hasSignal = labels.length > 0 && !labels.includes('날씨 특이 신호 없음');
-  const needsWeatherCheck = (it.check_required ?? []).some((key) => key.startsWith('weather'));
-  if (!hasSignal && !needsWeatherCheck) return null;
-  return {
-    labels: labels.length ? labels : ['날씨 판단 보류'],
-    summary: weather.summary,
-    issuedAt: weather.issued_at_label,
-    status: weather.status,
-  };
-}
-
 function buildShareText(
   info: TravelInfo,
   selectedMomentIds: MomentId[],
@@ -1195,10 +1221,6 @@ function buildSelectedPlanLines(
       if (item.check_required?.length) {
         lines.push(`  · 확인 필요: ${checkRequiredText(item.check_required)}`);
       }
-      const weather = item.score_breakdown?.weather_fit;
-      if (weather?.labels?.length && !weather.labels.includes('날씨 특이 신호 없음')) {
-        lines.push(`  · 날씨 신호: ${weather.labels.join(' · ')}`);
-      }
       if (item.address) lines.push(`  · 주소: ${item.address}`);
       if (item.note) lines.push(`  · 주의 메모: ${item.note}`);
       if (visit) {
@@ -1227,11 +1249,8 @@ function buildShareDayLines(day: ItineraryDayDto): string[] {
     const moment = MOMENTS.find((m) => m.id === item.moment)?.title ?? item.moment;
     const checks = item.check_required?.length ? ` · 확인 필요: ${checkRequiredText(item.check_required)}` : '';
     const score = typeof item.trust_score === 'number' ? ` · 신뢰도 ${item.trust_score}점` : '';
-    const weather = item.score_breakdown?.weather_fit?.labels?.length
-      ? ` · 날씨: ${item.score_breakdown.weather_fit.labels.join(' · ')}`
-      : '';
     const address = item.address ? ` · 주소: ${item.address}` : '';
-    return `- ${shareSlotLabel(item, idx)}: ${item.name} (${moment} · ${shareBadgeLabel(item.badge)}${score}${checks}${weather}${address})`;
+    return `- ${shareSlotLabel(item, idx)}: ${item.name} (${moment} · ${shareBadgeLabel(item.badge)}${score}${checks}${address})`;
   });
   const rest = Math.max((day.items?.length ?? 0) - itemLines.length, 0);
   return [
@@ -1631,7 +1650,6 @@ function PackItemCard({
   const [open, setOpen] = useState(false);
   // 썸네일: 제주 ITS API로 병합된 visitjeju CDN 이미지. 결측 시 렌더 안 함.
   const thumbnail = (it.amenities as any)?.thumbnail_path as string | undefined;
-  const weatherNotice = itemWeatherNotice(it);
   return (
     <div
       className={`rounded-2xl border bg-[#FDFBF7] transition overflow-hidden ${
@@ -1708,29 +1726,6 @@ function PackItemCard({
         {(it.check_required?.length ?? 0) > 0 && (
           <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[10.5px] font-semibold text-amber-900">
             확인 필요: {checkRequiredText(it.check_required)}
-          </div>
-        )}
-        {weatherNotice && (
-          <div className="mt-2 rounded-xl border border-sky-100 bg-sky-50/80 px-2.5 py-2 text-[10.5px] text-sky-950">
-            <div className="flex items-center gap-1 font-bold">
-              <CloudSun className="h-3 w-3 text-sky-700" />
-              기상청 날씨 신호
-            </div>
-            <p className="mt-0.5 text-[10px] font-semibold text-sky-900/65">
-              {weatherNotice.issuedAt ?? '기상청 최신 발표 기준'}
-            </p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {weatherNotice.labels.map((label) => (
-                <span key={label} className="rounded-full bg-white px-2 py-0.5 font-semibold text-sky-900">
-                  {label}
-                </span>
-              ))}
-            </div>
-            {weatherNotice.summary && (
-              <p className="mt-1.5 leading-relaxed text-sky-900/80">
-                {weatherNotice.summary}
-              </p>
-            )}
           </div>
         )}
       </button>
