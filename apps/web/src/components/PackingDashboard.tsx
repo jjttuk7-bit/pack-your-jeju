@@ -212,6 +212,7 @@ export default function PackingDashboard(props: Props) {
     () => packResp ? buildShareText(info, selectedMomentIds, packResp, selectedPlanItems, visitChecks) : '',
     [info, selectedMomentIds, packResp, selectedPlanItems, visitChecks]
   );
+  const hasPackInput = info.regions.length > 0 && selectedMomentIds.length > 0;
 
   const handleCopyShare = async () => {
     if (!shareText) return;
@@ -240,7 +241,7 @@ export default function PackingDashboard(props: Props) {
         if (!cancelled) setLoading(false);
       }
     }
-    if (selectedMomentIds.length > 0) fetchPack();
+    if (hasPackInput) fetchPack();
     else {
       setPackResp(null);
       setLoading(false);
@@ -255,6 +256,7 @@ export default function PackingDashboard(props: Props) {
     info.durationDays,
     info.companion,
     info.purpose,
+    hasPackInput,
     JSON.stringify(selectedMomentIds),
   ]);
 
@@ -420,6 +422,23 @@ export default function PackingDashboard(props: Props) {
           <div className="font-mono text-[10px] break-all bg-white/70 rounded p-2">{error}</div>
           <p className="text-[10.5px] leading-relaxed text-rose-700">
             <code className="bg-white/70 rounded px-1">VITE_API_BASE_URL</code>이 올바른 Railway URL인지 확인해 주세요.
+          </p>
+        </div>
+      )}
+      {!loading && !error && !packResp && !hasPackInput && (
+        <div
+          className="rounded-[24px] border border-orange-100 bg-white p-6 text-center shadow-pyj-card"
+          id="pack-empty-state"
+        >
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-citrus">
+            <MapPin className="h-5 w-5" />
+          </div>
+          <h2 className="font-serif-kr text-[18px] font-bold text-basalt">
+            지역과 여행 순간을 먼저 골라주세요
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-basalt-2">
+            저장된 여행팩 조건이 비어 있어 공공데이터 후보를 불러오지 않았습니다.
+            상단의 처음 화면에서 지역과 순간 카드를 다시 선택하면 대시보드가 열립니다.
           </p>
         </div>
       )}

@@ -10,6 +10,7 @@ import TrustMapDashboard from './components/TrustMapDashboard';
 import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import StoneWallPattern from './components/marks/StoneWallPattern';
+import { MOMENTS, REGIONS } from './data';
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
@@ -39,11 +40,53 @@ const defaultState: SavedTravel = {
 function migrateSavedTravel(saved: any): SavedTravel {
   if (!saved || typeof saved !== 'object') return defaultState;
   const info = saved.info ?? {};
+  const validRegions = new Set(REGIONS.map((region) => region.value));
+  const validMoments = new Set(MOMENTS.map((moment) => moment.id));
+  const regions = Array.isArray(info.regions)
+    ? info.regions.filter((region: unknown) => typeof region === 'string' && validRegions.has(region as any))
+    : info.region && validRegions.has(info.region)
+      ? [info.region]
+      : [];
+  const selectedMomentIds = Array.isArray(saved.selectedMomentIds)
+    ? saved.selectedMomentIds.filter((moment: unknown) => typeof moment === 'string' && validMoments.has(moment as any))
+    : [];
+  const step =
+    saved.step === 'dashboard' && (regions.length === 0 || selectedMomentIds.length === 0)
+      ? 'setup'
+      : saved.step === 'dashboard' || saved.step === 'verify' || saved.step === 'setup'
+        ? saved.step
+        : 'setup';
   if (!Array.isArray(info.regions)) {
-    info.regions = info.region ? [info.region] : [];
     delete info.region;
   }
-  return { ...defaultState, ...saved, info: { ...defaultState.info, ...info } };
+  return {
+    ...defaultState,
+    ...saved,
+    info: {
+      ...defaultState.info,
+      ...info,
+      regions,
+      durationDays:
+        typeof info.durationDays === 'number' && Number.isFinite(info.durationDays) && info.durationDays > 0
+          ? info.durationDays
+          : defaultState.info.durationDays,
+    },
+    selectedMomentIds,
+    checkedItemIds: Array.isArray(saved.checkedItemIds) ? saved.checkedItemIds : [],
+    checkedMemoryIds: Array.isArray(saved.checkedMemoryIds) ? saved.checkedMemoryIds : [],
+    customBasicItems: Array.isArray(saved.customBasicItems) ? saved.customBasicItems : [],
+    customMomentItems:
+      saved.customMomentItems && typeof saved.customMomentItems === 'object'
+        ? saved.customMomentItems
+        : defaultState.customMomentItems,
+    customMemories: Array.isArray(saved.customMemories) ? saved.customMemories : [],
+    selectedPlanItems: Array.isArray(saved.selectedPlanItems) ? saved.selectedPlanItems : [],
+    visitChecks:
+      saved.visitChecks && typeof saved.visitChecks === 'object'
+        ? saved.visitChecks
+        : {},
+    step,
+  };
 }
 
 export default function App() {
