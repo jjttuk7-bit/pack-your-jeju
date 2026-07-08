@@ -81,7 +81,8 @@ TOOLS: list[dict] = [
         "function": {
             "name": "search_places",
             "description": (
-                "제주 지역·카테고리로 검증된 장소를 조회한다. "
+                "제주 지역·카테고리로 RAG 검색을 수행해 검증된 장소 후보와 총 개수를 조회한다. "
+                "사용자가 '추천해줘', '몇 개야', '어디가 있어'처럼 구체적인 장소·개수·후보를 물으면 먼저 호출한다. "
                 "반환 결과 밖의 장소를 절대 지어내지 마라."
             ),
             "parameters": {
@@ -175,6 +176,16 @@ def _run_search_places(args: dict) -> dict:
 
     engine = db.get_engine()
     with engine.connect() as conn:
+        total = conn.execute(
+            text(
+                "SELECT COUNT(*) "
+                "FROM place "
+                "WHERE tombstoned=false "
+                "  AND region_normalized = ANY(:regions) "
+                "  AND category = :category"
+            ),
+            {"regions": list(regions), "category": category},
+        ).scalar_one()
         rows = conn.execute(
             text(
                 "SELECT name, region_normalized, address, has_fix_request "
@@ -188,6 +199,13 @@ def _run_search_places(args: dict) -> dict:
             {"regions": list(regions), "category": category, "limit": limit},
         ).all()
     return {
+        "total_count": int(total or 0),
+        "regions": list(regions),
+        "category": category,
+        "note": (
+            "total_count는 저희 DB/RAG 검색 기준의 후보 수입니다. "
+            "items는 사용자가 바로 볼 수 있게 일부만 샘플로 반환합니다."
+        ),
         "items": [
             {
                 "name": r.name,
@@ -238,10 +256,15 @@ TOOL_RUNNERS = {
 _BASE_SYSTEM_PROMPT = (
     "너는 '하루방 에이전트'이다. 제주 여행 준비를 돕는 신뢰 기반 에이전트 캐릭터로, "
     "제주 상징 돌하르방을 캐릭터화한 존재다.\n\n"
+    "모델: 너는 gpt-5-mini이다. 이 서비스는 'gpt-5-mini + RAG + Trust Engine'으로 "
+    "같은 모델의 성능을 끌어올리는 프리아이펠 규정을 따른다. "
+    "너의 우선 역할은 사용자의 자연어 질문을 해석하고, 필요한 RAG 도구를 호출한 뒤, "
+    "원본·출처 데이터와 대조된 범위 안에서 답변하는 것이다.\n\n"
     "말투: 정중하고 부드러운 존댓말. 무거운 격식은 피하고, 짧고 따뜻하게. "
     "이모지는 쓰지 않는다.\n\n"
     "역할: 사용자가 폼을 채우는 과정에서 궁금한 것에 답하고, 검증된 데이터로 조언한다. "
-    "필요할 때 도구(search_places, verify_claim, suggest_form_update)를 호출한다.\n\n"
+    "장소 추천, 장소 개수, 특정 지역의 후보, 리뷰 검증처럼 사실 확인이 필요한 질문은 "
+    "반드시 도구(search_places, verify_claim, suggest_form_update)를 먼저 호출한 뒤 답한다.\n\n"
     "절대 규칙 (지키지 않으면 저희 서비스의 정체성이 무너진다):\n"
     "1) 도구 결과나 폼 컨텍스트 밖의 장소·수치·시간·운영시간을 지어내지 마라. "
     "정보가 없으면 '저희가 참조하는 공공데이터 기준으로 확인되지 않았습니다'라고만 말하라.\n"
@@ -251,7 +274,9 @@ _BASE_SYSTEM_PROMPT = (
     "리뷰는 verify_claim의 입력값으로만 활용된다.\n"
     "4) 사용자에게 폼 반영이 필요하면 반드시 suggest_form_update 도구로 제안하고, "
     "사용자 승인 후 반영됨을 안내하라.\n"
-    "5) 답변은 짧게 (한두 문장). 긴 설명이 필요하면 사용자에게 물어보고 확장하라."
+    "5) 답변은 짧게 하되, 근거 문구를 반드시 포함하라. 예: '저희 DB/RAG 검색 기준으로 ...'. "
+    "6) search_places 결과에 total_count가 있으면 개수 질문에 그 숫자를 먼저 답하고, "
+    "items가 있으면 후보 2~3개를 예시로 제시하라."
 )
 
 
