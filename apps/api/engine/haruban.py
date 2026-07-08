@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any
@@ -98,6 +99,17 @@ TOOLS: list[dict] = [
                         "enum": list(set(filters_mod.MOMENT_TO_CATEGORY.values())),
                     },
                     "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                    "exclude_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "이미 사용자에게 보여줬거나 사용자가 제외해달라고 한 장소명.",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200,
+                        "description": "같은 조건의 다음 후보를 볼 때 건너뛸 개수.",
+                    },
                 },
                 "required": ["regions", "category"],
             },
@@ -171,9 +183,13 @@ def _run_search_places(args: dict) -> dict:
     regions = args.get("regions") or []
     category = args.get("category") or ""
     limit = int(args.get("limit") or 5)
+    offset = max(0, int(args.get("offset") or 0))
+    exclude_names = args.get("exclude_names") or []
+    exclude_keys = {_normalize_place_name(name) for name in exclude_names if name}
     if not regions or not category:
         return {"items": [], "note": "regions와 category가 필요합니다"}
 
+    fetch_limit = min(80, limit + offset + len(exclude_keys) + 20)
     engine = db.get_engine()
     with engine.connect() as conn:
         total = conn.execute(
@@ -194,14 +210,24 @@ def _run_search_places(args: dict) -> dict:
                 "  AND region_normalized = ANY(:regions) "
                 "  AND category = :category "
                 "ORDER BY has_fix_request DESC, updated_at DESC "
-                "LIMIT :limit"
+                "LIMIT :limit OFFSET :offset"
             ),
-            {"regions": list(regions), "category": category, "limit": limit},
+            {
+                "regions": list(regions),
+                "category": category,
+                "limit": fetch_limit,
+                "offset": offset,
+            },
         ).all()
+    filtered_rows = [
+        row for row in rows
+        if _normalize_place_name(row.name) not in exclude_keys
+    ][:limit]
     return {
         "total_count": int(total or 0),
         "regions": list(regions),
         "category": category,
+        "excluded_names": list(exclude_names),
         "note": (
             "total_count는 제주를 담다가 참조하는 공공데이터 기준의 후보 수입니다. "
             "items는 사용자에게 예시로 보여줄 수 있는 일부 후보입니다."
@@ -213,7 +239,7 @@ def _run_search_places(args: dict) -> dict:
                 "address": r.address,
                 "has_fix_request": bool(r.has_fix_request),
             }
-            for r in rows
+            for r in filtered_rows
         ],
     }
 
@@ -251,6 +277,57 @@ TOOL_RUNNERS = {
 }
 
 
+def _normalize_place_name(name: str | None) -> str:
+    return re.sub(r"[\s,·ㆍ]+", "", name or "").lower()
+
+
+def _unique_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        clean = value.strip(" \t\n\r,，.。·ㆍ-")
+        if not clean:
+            continue
+        key = _normalize_place_name(clean)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(clean)
+    return result
+
+
+def _extract_candidate_names_from_assistant_text(text_in: str) -> list[str]:
+    matches = re.findall(r"먼저\s+(.+?)(?:\s+같은 후보|\s+후보를|\s+볼 수|\s+확인)", text_in)
+    names: list[str] = []
+    for match in matches:
+        names.extend(re.split(r"\s*,\s*|\s*·\s*|\s*ㆍ\s*", match))
+    return _unique_preserve_order(names)
+
+
+def _extract_explicit_exclusions_from_user_text(text_in: str) -> list[str]:
+    if not re.search(r"제외|빼고|말고", text_in):
+        return []
+    before = re.split(r"제외|빼고|말고", text_in, maxsplit=1)[0]
+    before = re.sub(r"은$|는$|을$|를$", "", before.strip())
+    names = re.split(r"\s*,\s*|\s*·\s*|\s*ㆍ\s*", before)
+    return _unique_preserve_order(names)
+
+
+def _conversation_exclude_names(conv: list[dict]) -> list[str]:
+    user_messages = [m.get("content") or "" for m in conv if m.get("role") == "user"]
+    last_user = user_messages[-1] if user_messages else ""
+    wants_more = bool(re.search(r"더|이외|다른|추가|제외|빼고|말고", last_user))
+    if not wants_more:
+        return []
+
+    names: list[str] = []
+    for message in conv:
+        if message.get("role") == "assistant":
+            names.extend(_extract_candidate_names_from_assistant_text(message.get("content") or ""))
+    names.extend(_extract_explicit_exclusions_from_user_text(last_user))
+    return _unique_preserve_order(names)
+
+
 def _category_label(category: str | None) -> str:
     if not category:
         return "선택한 순간"
@@ -262,6 +339,16 @@ def _category_label(category: str | None) -> str:
 
 def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
     """LLM이 도구 호출 뒤 최종 문장을 비우는 경우를 위한 사용자용 안전 답변."""
+    last_user = next(
+        (m.get("content") or "" for m in reversed(conv) if m.get("role") == "user"),
+        "",
+    )
+    if re.search(r"왜.*반복|반복.*왜|계속.*나와|또.*나와", last_user):
+        return (
+            "이전 후보를 제외 조건으로 넘기지 못해서 같은 장소가 반복됐어요. "
+            "이제 이미 보여드린 이전 후보와 사용자가 제외한 후보는 빼고 다시 좁혀드릴게요."
+        )
+
     for message in reversed(conv):
         if message.get("role") != "tool":
             continue
@@ -495,6 +582,12 @@ def _chat_turn_raw(
                 args = json.loads(tc.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
+            if name == "search_places":
+                inferred_excludes = _conversation_exclude_names(conv)
+                if inferred_excludes:
+                    args["exclude_names"] = _unique_preserve_order(
+                        list(args.get("exclude_names") or []) + inferred_excludes
+                    )
 
             runner = TOOL_RUNNERS.get(name)
             if runner is None:
