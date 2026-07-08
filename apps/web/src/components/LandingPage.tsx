@@ -100,17 +100,17 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <button
                   type="button"
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  className="inline-flex items-center gap-2 rounded-full border border-earth bg-white/70 px-3 py-2 text-left shadow-sm transition hover:bg-white"
+                  className="pyj-landing-brand-chip inline-flex items-center gap-3 rounded-[28px] border border-earth/80 bg-white/82 px-4 py-3 text-left shadow-jeju-chip transition hover:bg-white"
                   aria-label="제주를 담다 홈"
                 >
-                  <span className="pyj-citrus-breathe">
-                    <CitrusMark className="h-9 w-9" />
+                  <span className="pyj-citrus-breathe pyj-citrus-brand-mark">
+                    <CitrusMark className="h-[46px] w-[46px]" />
                   </span>
                   <span>
-                    <span className="block font-serif-kr text-[15px] font-bold leading-none">
+                    <span className="block font-serif-kr text-[20px] font-bold leading-none tracking-[-0.01em] text-basalt">
                       제주를 담다
                     </span>
-                    <span className="text-[10px] font-semibold text-basalt-2/70">
+                    <span className="mt-1 block text-[11.5px] font-bold text-basalt-2/78">
                       제주 · 신뢰 여행 준비
                     </span>
                   </span>
