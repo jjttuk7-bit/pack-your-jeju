@@ -196,9 +196,13 @@ export default function PackingDashboard(props: Props) {
     [info.purpose]
   );
   const packItems = useMemo(() => collectPackItems(packResp), [packResp]);
-  const mapPlanItems = useMemo(
-    () => enrichPlanItemsWithCoordinates(selectedPlanItems, packItems),
+  const currentPlanItemsForMap = useMemo(
+    () => filterPlanItemsForCurrentPack(selectedPlanItems, packItems),
     [selectedPlanItems, packItems],
+  );
+  const mapPlanItems = useMemo(
+    () => enrichPlanItemsWithCoordinates(currentPlanItemsForMap, packItems),
+    [currentPlanItemsForMap, packItems],
   );
   const selectedPlanIds = useMemo(
     () => new Set(selectedPlanItems.map((item) => item.id)),
@@ -597,6 +601,28 @@ function collectPackItems(packResp: PackResponse | null): PackItemDto[] {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
+  });
+}
+
+function normalizePlaceKey(value: string | null | undefined): string {
+  return (value ?? '').replace(/\s+/g, '').toLowerCase();
+}
+
+function filterPlanItemsForCurrentPack(
+  planItems: TravelPlanItem[],
+  packItems: PackItemDto[],
+): TravelPlanItem[] {
+  if (planItems.length === 0 || packItems.length === 0) return planItems;
+
+  const currentExternalIds = new Set(
+    packItems.map((item) => item.external_id).filter(Boolean),
+  );
+  const currentNames = new Set(packItems.map((item) => normalizePlaceKey(item.name)));
+
+  return planItems.filter((item) => {
+    if (item.source === 'user_added') return true;
+    if (item.external_id && currentExternalIds.has(item.external_id)) return true;
+    return currentNames.has(normalizePlaceKey(item.name));
   });
 }
 
