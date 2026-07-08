@@ -46,6 +46,100 @@ def test_haruban_fallback_reply_from_search_tool_is_user_facing():
     assert "DB/RAG" not in reply
 
 
+def test_haruban_fallback_recommends_one_place_when_user_asks_for_one():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "2박3일 일정인데 성산에서는 점심을 먹을 예정이야, 한곳을 추천해준다면?"},
+        {
+            "role": "tool",
+            "name": "search_places",
+            "content": json.dumps({
+                "intent": "recommend",
+                "total_count": 77,
+                "regions": ["seongsan"],
+                "category": "food",
+                "items": [
+                    {
+                        "name": "WORLD CLASS FISH&CHIPS",
+                        "address": "제주특별자치도 서귀포시 성산읍",
+                        "has_fix_request": False,
+                    },
+                    {
+                        "name": "소심한이층",
+                        "address": "제주특별자치도 서귀포시 성산읍",
+                        "has_fix_request": False,
+                    },
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "한 곳만" in reply
+    assert "WORLD CLASS FISH&CHIPS" in reply
+    assert "77곳" in reply
+    assert "더 좁혀드릴까요" not in reply
+
+
+def test_haruban_fallback_answers_place_detail_from_detail_tool():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "소심한 이층에 관해 자세히 알려줘"},
+        {
+            "role": "tool",
+            "name": "get_place_detail",
+            "content": json.dumps({
+                "query": "소심한 이층",
+                "items": [
+                    {
+                        "name": "소심한이층",
+                        "region": "seongsan",
+                        "category": "food",
+                        "address": "제주특별자치도 서귀포시 성산읍",
+                        "source": "비짓제주",
+                        "has_fix_request": False,
+                        "check_required": ["operating", "public_data"],
+                    }
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "소심한이층" in reply
+    assert "성산" in reply
+    assert "주소" in reply
+    assert "영업시간" in reply
+    assert "공공데이터 기준" in reply
+
+
+def test_haruban_infers_detail_query_from_spaced_place_name():
+    conv = [
+        {
+            "role": "assistant",
+            "content": "먼저 해오름, WORLD CLASS FISH&CHIPS, 소심한이층 같은 후보를 볼 수 있어요.",
+        },
+        {"role": "user", "content": "소심한 이층에 관해 자세히 알려줘"},
+    ]
+
+    assert haruban._infer_place_detail_query(conv) == "소심한이층"
+
+
+def test_haruban_builds_search_pool_args_for_one_seafood_lunch():
+    conv = [
+        {"role": "user", "content": "2박3일 일정인데 성산에서는 점심을 먹을 예정이야, 한곳을 추천해준다면?"},
+        {"role": "assistant", "content": "조건을 조금 더 알려주세요."},
+        {"role": "user", "content": "혼자이고 제주도에서 먹을 수 있는 해산물이면 좋겠어"},
+    ]
+    args = haruban._infer_search_places_args(conv, {
+        "regions": ["seongsan"],
+        "moments": ["local_food"],
+        "companion": "solo",
+    })
+
+    assert args["regions"] == ["seongsan"]
+    assert args["category"] == "food"
+    assert args["intent"] == "recommend"
+    assert args["limit"] == 1
+    assert "해산물" in args["keywords"]
+
+
 def test_haruban_extracts_previous_candidates_for_more_requests():
     conv = [
         {

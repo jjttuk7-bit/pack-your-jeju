@@ -83,7 +83,7 @@ TOOLS: list[dict] = [
             "name": "search_places",
             "description": (
                 "제주 지역·카테고리로 공공데이터 근거 검색을 수행해 검증된 장소 후보와 총 개수를 조회한다. "
-                "사용자가 '추천해줘', '몇 개야', '어디가 있어'처럼 구체적인 장소·개수·후보를 물으면 먼저 호출한다. "
+                "사용자가 '추천해줘', '몇 개야', '총 개수', '어디가 있어'처럼 구체적인 장소·개수·후보를 물으면 먼저 호출한다. "
                 "반환 결과 밖의 장소를 절대 지어내지 마라."
             ),
             "parameters": {
@@ -110,8 +110,53 @@ TOOLS: list[dict] = [
                         "maximum": 200,
                         "description": "같은 조건의 다음 후보를 볼 때 건너뛸 개수.",
                     },
+                    "intent": {
+                        "type": "string",
+                        "enum": ["list", "recommend", "count"],
+                        "description": "목록 요청(list), 한 곳 추천(recommend), 개수 질문(count) 중 하나.",
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "사용자 선호 키워드. 예: 해산물, 조용한, 점심.",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "장소명 일부나 사용자가 언급한 검색어.",
+                    },
                 },
                 "required": ["regions", "category"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_place_detail",
+            "description": (
+                "사용자가 특정 장소명을 언급하며 자세한 정보, 주소, 어떤 곳인지 묻는 경우 호출한다. "
+                "이 도구 결과 밖의 메뉴·영업시간·평점은 지어내지 않는다."
+            ),
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "description": "사용자가 물어본 장소명 또는 장소명 일부.",
+                    },
+                    "regions": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": list(filters_mod.REGIONS)},
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": list(set(filters_mod.MOMENT_TO_CATEGORY.values())),
+                    },
+                },
+                "required": ["query"],
             },
         },
     },
@@ -178,6 +223,41 @@ TOOLS: list[dict] = [
 ]
 
 
+_SEAFOOD_KEYWORDS = (
+    "해산물", "해물", "생선", "회", "횟집", "갈치", "고등어", "전복", "우럭",
+    "fish", "seafood",
+)
+
+
+def _expanded_keywords(keywords: list[str]) -> list[str]:
+    expanded: list[str] = []
+    for keyword in keywords:
+        k = str(keyword or "").strip()
+        if not k:
+            continue
+        expanded.append(k)
+        if _normalize_place_name(k) in {_normalize_place_name(x) for x in _SEAFOOD_KEYWORDS}:
+            expanded.extend(_SEAFOOD_KEYWORDS)
+    return _unique_preserve_order(expanded)
+
+
+def _score_search_row(row: Any, *, query: str, keywords: list[str], intent: str, index: int) -> tuple[int, int]:
+    haystack = " ".join(
+        str(v or "") for v in (row.name, row.address, row.region_normalized)
+    )
+    norm_haystack = _normalize_place_name(haystack)
+    score = 0
+    q = _normalize_place_name(query)
+    if q and q in norm_haystack:
+        score += 100
+    for keyword in _expanded_keywords(keywords):
+        if _normalize_place_name(keyword) in norm_haystack:
+            score += 35
+    if intent == "recommend":
+        score += 25 if not bool(row.has_fix_request) else -10
+    return (-score, index)
+
+
 def _run_search_places(args: dict) -> dict:
     """search_places 도구 실행. 검증된 place만 반환. 없으면 빈 리스트."""
     regions = args.get("regions") or []
@@ -185,11 +265,14 @@ def _run_search_places(args: dict) -> dict:
     limit = int(args.get("limit") or 5)
     offset = max(0, int(args.get("offset") or 0))
     exclude_names = args.get("exclude_names") or []
+    intent = args.get("intent") or "list"
+    keywords = [str(k) for k in (args.get("keywords") or []) if str(k).strip()]
+    query = str(args.get("query") or "").strip()
     exclude_keys = {_normalize_place_name(name) for name in exclude_names if name}
     if not regions or not category:
         return {"items": [], "note": "regions와 category가 필요합니다"}
 
-    fetch_limit = min(80, limit + offset + len(exclude_keys) + 20)
+    fetch_limit = min(200, max(80, limit + offset + len(exclude_keys) + 20))
     engine = db.get_engine()
     with engine.connect() as conn:
         total = conn.execute(
@@ -204,29 +287,45 @@ def _run_search_places(args: dict) -> dict:
         ).scalar_one()
         rows = conn.execute(
             text(
-                "SELECT name, region_normalized, address, has_fix_request "
+                "SELECT external_id, name, category, region_normalized, address, "
+                "       info_type, valid_until, has_fix_request, source_url "
                 "FROM place "
                 "WHERE tombstoned=false "
                 "  AND region_normalized = ANY(:regions) "
                 "  AND category = :category "
-                "ORDER BY has_fix_request DESC, updated_at DESC "
-                "LIMIT :limit OFFSET :offset"
+                "ORDER BY has_fix_request ASC, updated_at DESC "
+                "LIMIT :limit OFFSET 0"
             ),
             {
                 "regions": list(regions),
                 "category": category,
                 "limit": fetch_limit,
-                "offset": offset,
             },
         ).all()
-    filtered_rows = [
+    ranked_rows = [
         row for row in rows
         if _normalize_place_name(row.name) not in exclude_keys
-    ][:limit]
+    ]
+    if query or keywords or intent == "recommend":
+        ranked_rows = sorted(
+            enumerate(ranked_rows),
+            key=lambda pair: _score_search_row(
+                pair[1],
+                query=query,
+                keywords=keywords,
+                intent=intent,
+                index=pair[0],
+            ),
+        )
+        ranked_rows = [row for _, row in ranked_rows]
+    filtered_rows = ranked_rows[offset:offset + limit]
     return {
+        "intent": intent,
         "total_count": int(total or 0),
         "regions": list(regions),
         "category": category,
+        "keywords": keywords,
+        "query": query,
         "excluded_names": list(exclude_names),
         "note": (
             "total_count는 제주를 담다가 참조하는 공공데이터 기준의 후보 수입니다. "
@@ -234,13 +333,98 @@ def _run_search_places(args: dict) -> dict:
         ),
         "items": [
             {
+                "external_id": r.external_id,
                 "name": r.name,
                 "region": r.region_normalized,
+                "category": r.category,
                 "address": r.address,
+                "source": "비짓제주" if r.source_url else "공공데이터 근거",
+                "info_type": r.info_type,
+                "valid_until": r.valid_until.isoformat() if r.valid_until else None,
                 "has_fix_request": bool(r.has_fix_request),
             }
             for r in filtered_rows
         ],
+    }
+
+
+def _run_get_place_detail(args: dict) -> dict:
+    """장소명 상세 조회. 이름·주소·출처 등 DB에 있는 값만 반환한다."""
+    query = str(args.get("query") or "").strip()
+    if not query:
+        return {"query": query, "items": [], "note": "query가 필요합니다"}
+    regions = [str(r) for r in (args.get("regions") or []) if str(r).strip()]
+    category = str(args.get("category") or "").strip()
+
+    where = ["tombstoned=false"]
+    params: dict[str, Any] = {
+        "query": query,
+        "like": f"%{query}%",
+        "norm_query": _normalize_place_name(query),
+        "norm_like": f"%{_normalize_place_name(query)}%",
+    }
+    if regions:
+        where.append("region_normalized = ANY(:regions)")
+        params["regions"] = regions
+    if category:
+        where.append("category = :category")
+        params["category"] = category
+
+    where.append(
+        "("
+        " name ILIKE :like "
+        " OR replace(lower(name), ' ', '') LIKE :norm_like "
+        " OR similarity(name, :query) > 0.18"
+        ")"
+    )
+
+    with db.get_engine().connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT external_id, name, category, region_normalized, address, "
+                "       info_type, valid_until, has_fix_request, source_url "
+                "FROM place "
+                f"WHERE {' AND '.join(where)} "
+                "ORDER BY "
+                "  CASE WHEN replace(lower(name), ' ', '') = :norm_query THEN 0 ELSE 1 END, "
+                "  similarity(name, :query) DESC, "
+                "  has_fix_request ASC, updated_at DESC "
+                "LIMIT 3"
+            ),
+            params,
+        ).all()
+
+    return {
+        "query": query,
+        "regions": regions,
+        "category": category,
+        "items": [_detail_row_to_payload(row) for row in rows],
+        "note": (
+            "장소 상세는 DB에 저장된 이름·주소·출처·수정요청 신호만 반환합니다. "
+            "영업시간·대표 메뉴가 없으면 확인 불가로 안내해야 합니다."
+        ),
+    }
+
+
+def _detail_row_to_payload(row: Any) -> dict[str, Any]:
+    check_required: list[str] = ["operating", "public_data"]
+    if bool(row.has_fix_request):
+        check_required.insert(0, "feedback")
+    return {
+        "external_id": row.external_id,
+        "name": row.name,
+        "region": row.region_normalized,
+        "region_label": REGION_LABEL_KO.get(row.region_normalized, row.region_normalized),
+        "category": row.category,
+        "category_label": _category_label(row.category),
+        "address": row.address,
+        "source": "비짓제주" if row.source_url else "공공데이터 근거",
+        "source_url": row.source_url,
+        "info_type": row.info_type,
+        "valid_until": row.valid_until.isoformat() if row.valid_until else None,
+        "has_fix_request": bool(row.has_fix_request),
+        "note": "이용자 정보 수정요청 이력" if bool(row.has_fix_request) else None,
+        "check_required": check_required,
     }
 
 
@@ -272,6 +456,7 @@ def _run_suggest_form_update(args: dict) -> dict:
 
 TOOL_RUNNERS = {
     "search_places": _run_search_places,
+    "get_place_detail": _run_get_place_detail,
     "verify_claim": _run_verify_claim,
     "suggest_form_update": _run_suggest_form_update,
 }
@@ -328,6 +513,131 @@ def _conversation_exclude_names(conv: list[dict]) -> list[str]:
     return _unique_preserve_order(names)
 
 
+def _latest_user_text(conv: list[dict]) -> str:
+    return next(
+        (m.get("content") or "" for m in reversed(conv) if m.get("role") == "user"),
+        "",
+    )
+
+
+def _all_user_text(conv: list[dict]) -> str:
+    return " ".join(m.get("content") or "" for m in conv if m.get("role") == "user")
+
+
+def _infer_regions_from_text(text_in: str, form_state: dict | None = None) -> list[str]:
+    regions: list[str] = []
+    for key, label in REGION_LABEL_KO.items():
+        if label and label in text_in:
+            regions.append(key)
+    if regions:
+        return _unique_preserve_order(regions)
+
+    raw_regions = (form_state or {}).get("regions") or []
+    if isinstance(raw_regions, str):
+        raw_regions = [raw_regions]
+    return [r for r in raw_regions if r in filters_mod.REGIONS]
+
+
+def _infer_category_from_text(text_in: str, form_state: dict | None = None) -> str:
+    if re.search(r"맛집|식당|점심|저녁|아침|해산물|해물|횟집|먹|음식|한식|갈치|고등어|전복|우럭", text_in):
+        return "food"
+    if re.search(r"카페|커피|차|글쓰기", text_in):
+        return "cafe"
+    if re.search(r"오름|산책|걷|트레킹", text_in):
+        return "oreum"
+    if re.search(r"시장|오일장|로컬", text_in):
+        return "market"
+
+    moments = (form_state or {}).get("moments") or []
+    if isinstance(moments, str):
+        moments = [moments]
+    for moment in moments:
+        category = filters_mod.MOMENT_TO_CATEGORY.get(moment)
+        if category:
+            return category
+    return ""
+
+
+def _infer_keywords_from_text(text_in: str) -> list[str]:
+    keywords: list[str] = []
+    if re.search(r"해산물|해물|횟집|회|생선|갈치|고등어|전복|우럭|fish|seafood", text_in, re.IGNORECASE):
+        keywords.append("해산물")
+    if re.search(r"혼자|혼밥|혼자서|솔로", text_in):
+        keywords.append("혼자")
+    if re.search(r"점심|런치", text_in):
+        keywords.append("점심")
+    if re.search(r"조용|한적|고요", text_in):
+        keywords.append("조용한")
+    return _unique_preserve_order(keywords)
+
+
+def _infer_limit_from_text(text_in: str) -> int:
+    match = re.search(r"(\d+)\s*곳", text_in)
+    if match:
+        return max(1, min(10, int(match.group(1))))
+    if re.search(r"한\s*곳|한곳|하나|1\s*곳|한\s*군데|한군데|추천해준다면", text_in):
+        return 1
+    return 3
+
+
+def _is_search_like_text(text_in: str) -> bool:
+    return bool(re.search(
+        r"추천|맛집|식당|카페|오름|해산물|해물|점심|저녁|어디|몇\s*개|몇\s*곳|리스트|알려줘|후보|한\s*곳|한곳",
+        text_in,
+    ))
+
+
+def _infer_search_places_args(conv: list[dict], form_state: dict | None = None) -> dict:
+    text_all = _all_user_text(conv)
+    last_user = _latest_user_text(conv)
+    intent = "list"
+    if re.search(r"몇\s*개|몇\s*곳|총\s*개수|개수", last_user):
+        intent = "count"
+    elif re.search(r"추천|한\s*곳|한곳|하나|점심|저녁|해산물|해물|혼자", text_all):
+        intent = "recommend"
+
+    return {
+        "regions": _infer_regions_from_text(text_all, form_state),
+        "category": _infer_category_from_text(text_all, form_state),
+        "limit": _infer_limit_from_text(text_all if text_all else last_user),
+        "intent": intent,
+        "keywords": _infer_keywords_from_text(text_all),
+        "exclude_names": _conversation_exclude_names(conv),
+    }
+
+
+def _infer_place_detail_query(conv: list[dict]) -> str:
+    last_user = _latest_user_text(conv).strip()
+    if not last_user:
+        return ""
+
+    previous_candidates: list[str] = []
+    for message in conv:
+        if message.get("role") == "assistant":
+            previous_candidates.extend(_extract_candidate_names_from_assistant_text(message.get("content") or ""))
+    normalized_user = _normalize_place_name(last_user)
+    for candidate in _unique_preserve_order(previous_candidates):
+        key = _normalize_place_name(candidate)
+        if key and key in normalized_user:
+            return candidate
+
+    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|정보|위치|주소|알려줘|알려줘요|하\.*", last_user))
+    asks_list = bool(re.search(r"추천|리스트|몇\s*개|몇\s*곳|후보|어디|맛집들|식당들", last_user))
+    if not asks_detail or asks_list:
+        return ""
+
+    cleaned = re.sub(
+        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|하\.*)",
+        " ",
+        last_user,
+    )
+    cleaned = re.sub(r"[?？！!~…]+", " ", cleaned)
+    cleaned = cleaned.strip(" \t\n\r,，.。·ㆍ")
+    if len(_normalize_place_name(cleaned)) < 2:
+        return ""
+    return cleaned
+
+
 def _category_label(category: str | None) -> str:
     if not category:
         return "선택한 순간"
@@ -335,6 +645,101 @@ def _category_label(category: str | None) -> str:
         if mapped_category == category:
             return MOMENT_LABEL_KO.get(moment, category)
     return category
+
+
+_SEARCH_POOL_CONTEXT_PREFIX = "HARUBANG_SEARCH_POOL_JSON:"
+
+
+def _format_search_pool_context(pool: dict) -> str:
+    return _SEARCH_POOL_CONTEXT_PREFIX + "\n" + json.dumps(pool, ensure_ascii=False)
+
+
+def _search_pool_context_messages(conv: list[dict]) -> list[dict]:
+    messages: list[dict] = []
+    for message in conv:
+        if message.get("role") != "system":
+            continue
+        content = message.get("content") or ""
+        if _SEARCH_POOL_CONTEXT_PREFIX not in content:
+            continue
+        raw = content.split(_SEARCH_POOL_CONTEXT_PREFIX, 1)[1].strip()
+        try:
+            pool = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        tool_name = pool.get("tool")
+        result = pool.get("result")
+        if tool_name and isinstance(result, dict):
+            messages.append({
+                "role": "tool",
+                "name": tool_name,
+                "content": json.dumps(result, ensure_ascii=False),
+            })
+    return messages
+
+
+def _candidate_names_from_pool_context(conv: list[dict]) -> list[str]:
+    names: list[str] = []
+    for message in _search_pool_context_messages(conv):
+        try:
+            payload = json.loads(message.get("content") or "{}")
+        except json.JSONDecodeError:
+            continue
+        for item in payload.get("items") or []:
+            name = item.get("name")
+            if name:
+                names.append(name)
+    return _unique_preserve_order(names)
+
+
+def _should_replace_low_value_reply(reply: str, conv: list[dict]) -> bool:
+    if not _search_pool_context_messages(conv):
+        return False
+    normalized_reply = _normalize_place_name(reply)
+    for name in _candidate_names_from_pool_context(conv):
+        if _normalize_place_name(name) in normalized_reply:
+            return False
+    return bool(re.search(
+        r"조건을.*알려|조금 더 확인|바로 단정|지역,?\s*음식|동행자.*알려|더 좁혀",
+        reply,
+    ))
+
+
+def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dict | None:
+    conv = [
+        {"role": m.get("role"), "content": m.get("content") or ""}
+        for m in messages_in
+        if m.get("role") in {"user", "assistant"}
+    ]
+    last_user = _latest_user_text(conv)
+    if not last_user:
+        return None
+
+    detail_query = _infer_place_detail_query(conv)
+    if detail_query:
+        args = {"query": detail_query}
+        inferred = _infer_search_places_args(conv, form_state)
+        if inferred.get("regions"):
+            args["regions"] = inferred["regions"]
+        if inferred.get("category"):
+            args["category"] = inferred["category"]
+        try:
+            result = _run_get_place_detail(args)
+        except Exception as e:
+            result = {"query": detail_query, "items": [], "error": f"{type(e).__name__}: {e}"}
+        return {"tool": "get_place_detail", "args": args, "result": result}
+
+    if not _is_search_like_text(_all_user_text(conv)):
+        return None
+
+    args = _infer_search_places_args(conv, form_state)
+    if not args.get("regions") or not args.get("category"):
+        return None
+    try:
+        result = _run_search_places(args)
+    except Exception as e:
+        result = {"items": [], "error": f"{type(e).__name__}: {e}"}
+    return {"tool": "search_places", "args": args, "result": result}
 
 
 def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
@@ -349,7 +754,8 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             "이제 이미 보여드린 이전 후보와 사용자가 제외한 후보는 빼고 다시 좁혀드릴게요."
         )
 
-    for message in reversed(conv):
+    conv_with_pool = conv + _search_pool_context_messages(conv)
+    for message in reversed(conv_with_pool):
         if message.get("role") != "tool":
             continue
         try:
@@ -365,11 +771,31 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             category_text = _category_label(payload.get("category"))
             items = payload.get("items") or []
             item_names = [item.get("name") for item in items[:3] if item.get("name")]
+            intent = payload.get("intent") or "list"
+            wants_one = intent == "recommend" or bool(re.search(r"한\s*곳|한곳|하나|추천해준다면", last_user))
 
             if total <= 0:
                 return (
                     f"{region_text}의 {category_text} 후보는 제주를 담다가 확인한 공공데이터 기준으로 "
                     "아직 확인되지 않았습니다. 지역이나 순간을 조금 바꾸면 다시 찾아볼게요."
+                )
+
+            if wants_one and items:
+                first = items[0]
+                place_name = first.get("name") or "이 후보"
+                address = first.get("address")
+                keywords = payload.get("keywords") or []
+                reason = "수정요청 신호가 없는 후보" if not first.get("has_fix_request") else "확인 필요 신호가 있어 방문 전 확인이 필요한 후보"
+                seafood_note = ""
+                if any(_normalize_place_name(k) == "해산물" for k in keywords):
+                    seafood_note = " 해산물 선호는 검색 조건에 반영했지만, 대표 메뉴는 저희 데이터만으로 확인되지 않습니다."
+                address_text = f" 주소는 {address}입니다." if address else " 주소는 저희 데이터에 없습니다."
+                return (
+                    f"한 곳만 고르면 {place_name}을 먼저 보겠습니다. "
+                    f"{region_text}의 {category_text} 후보는 공공데이터 기준으로 {total}곳 확인되고, "
+                    f"이 후보는 그중 {reason}입니다."
+                    f"{address_text}"
+                    f"{seafood_note} 영업시간은 저희가 참조하는 공공데이터 기준으로 확인되지 않아 방문 전 확인이 필요합니다."
                 )
 
             if item_names:
@@ -382,6 +808,28 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             return (
                 f"{region_text}에서 {category_text} 후보는 공공데이터 기준으로 {total}곳 확인됩니다. "
                 "후보를 더 좁히려면 동행자나 원하는 분위기를 하나만 더 알려주세요."
+            )
+
+        if name == "get_place_detail":
+            query = payload.get("query") or "물어보신 장소"
+            items = payload.get("items") or []
+            if not items:
+                return (
+                    f"{query}은(는) 저희가 참조하는 공공데이터 기준으로는 아직 확인되지 않았습니다. "
+                    "장소명을 조금 다르게 적어주시면 다시 찾아볼게요."
+                )
+            item = items[0]
+            place_name = item.get("name") or query
+            region_text = item.get("region_label") or REGION_LABEL_KO.get(item.get("region"), item.get("region") or "선택한 지역")
+            category_text = item.get("category_label") or _category_label(item.get("category"))
+            address = item.get("address")
+            source = item.get("source") or "공공데이터 근거"
+            caution = " 이용자 정보 수정요청 이력이 있어 방문 전 재확인이 필요합니다." if item.get("has_fix_request") else ""
+            address_text = f" 주소: {address}." if address else " 주소는 저희 데이터에 없습니다."
+            return (
+                f"{place_name}은(는) {region_text}의 {category_text} 후보로 공공데이터 기준 확인됩니다. "
+                f"{address_text} 근거 출처는 {source}입니다."
+                f"{caution} 영업시간·대표 메뉴·혼잡도는 현재 저희가 참조하는 공공데이터 기준으로 확인되지 않아 방문 전 확인이 필요합니다."
             )
 
         if name == "verify_claim":
@@ -414,9 +862,14 @@ _BASE_SYSTEM_PROMPT = (
     "이모지는 쓰지 않는다.\n\n"
     "역할: 사용자가 폼을 채우는 과정에서 궁금한 것에 답하고, 검증된 데이터로 조언한다. "
     "일반 여행 상담, 준비물, 서비스 사용법, 선택 기준 설명처럼 새 사실 조회가 필요 없는 질문은 "
-    "gpt-5-mini가 바로 답해도 된다. 장소 추천, 장소 개수, 특정 지역의 후보, 리뷰 검증처럼 "
-    "사실 확인이 필요한 질문은 반드시 도구(search_places, verify_claim, suggest_form_update)를 "
+    "gpt-5-mini가 바로 답해도 된다. 장소 추천, 장소 개수, 특정 지역의 후보, 특정 장소 상세, 리뷰 검증처럼 "
+    "사실 확인이 필요한 질문은 반드시 도구(search_places, get_place_detail, verify_claim, suggest_form_update)를 "
     "먼저 호출한 뒤 답한다.\n\n"
+    "도구 사용 정책:\n"
+    "- 사용자가 특정 장소명을 말하며 '자세히', '어때', '위치', '주소', '정보'를 물으면 get_place_detail을 먼저 호출한다.\n"
+    "- 사용자가 '한 곳만', '하나만', '점심으로 한 곳 추천'을 말하면 search_places의 intent='recommend', limit=1을 사용한다.\n"
+    "- 사용자가 '더', '이외에', '제외하고', '빼고'를 말하면 이미 보여준 후보와 사용자가 제외한 후보를 exclude_names에 넣는다.\n"
+    "- '해산물', '조용한', '혼자', '점심' 같은 선호는 keywords로 넘긴다. 단, 메뉴·영업시간은 도구 결과에 없으면 말하지 않는다.\n\n"
     "답변 구조:\n"
     "- 첫 문장은 사용자의 질문에 대한 직접 답변으로 시작한다.\n"
     "- 그 다음 현재 폼 상태나 여행 목적을 반영해 왜 그렇게 판단했는지 짧게 설명한다.\n"
@@ -434,7 +887,8 @@ _BASE_SYSTEM_PROMPT = (
     "5) 사용자에게 'DB/RAG', 'tool', '도구 호출', '검색 기준' 같은 내부 구현 표현을 노출하지 마라. "
     "사용자 표현은 '제주를 담다가 확인한 공공데이터 기준'으로 통일한다.\n"
     "6) search_places 결과에 total_count가 있으면 개수 질문에 그 숫자를 먼저 답하고, "
-    "items가 있으면 후보 2~3개를 예시로 제시하라."
+    "items가 있으면 후보 2~3개를 예시로 제시하라.\n"
+    "7) 검색 풀 컨텍스트가 제공되면 그 안의 result만 사실 근거로 사용하고, 같은 질문을 다시 묻지 마라."
 )
 
 
@@ -484,12 +938,12 @@ def chat_turn(
     llm.complete_with_tools는 단일 system/user만 받아서, 여기서는 openai 클라이언트를
     직접 사용해 conv 배열 통째로 전달하고 도구 실행 루프를 돌린다. 모델·키 규칙은 유지.
     """
-    if not llm.is_available():
-        return HarubanTurn(available=False, reason="OPENAI_API_KEY not set")
-
     system_prompt = _BASE_SYSTEM_PROMPT + _form_context_block(form_state)
+    search_pool = _build_search_pool_context(messages_in, form_state)
 
     conv: list[dict] = [{"role": "system", "content": system_prompt}]
+    if search_pool:
+        conv.append({"role": "system", "content": _format_search_pool_context(search_pool)})
     for m in messages_in:
         role = m.get("role")
         if role == "user":
@@ -507,13 +961,32 @@ def chat_turn(
                 "content": m.get("content") or "",
             })
 
-    return _chat_turn_raw(conv, [], max_iterations)
+    trace = []
+    if search_pool:
+        trace.append({
+            "tool": f"preload:{search_pool.get('tool')}",
+            "args": search_pool.get("args") or {},
+            "result_size": len(json.dumps(search_pool.get("result") or {}, ensure_ascii=False)),
+        })
+
+    if not llm.is_available():
+        if search_pool:
+            return HarubanTurn(
+                available=True,
+                reply_text=_fallback_reply_from_tool_messages(conv),
+                tool_trace=trace,
+                reason="OPENAI_API_KEY not set; used search pool fallback",
+            )
+        return HarubanTurn(available=False, reason="OPENAI_API_KEY not set", tool_trace=trace)
+
+    return _chat_turn_raw(conv, trace, max_iterations, form_state)
 
 
 def _chat_turn_raw(
     conv: list[dict],
     trace: list[dict],
     max_iterations: int,
+    form_state: dict | None = None,
 ) -> HarubanTurn:
     """openai client를 직접 사용해 conv 배열 통째 전달 + tool 실행 루프."""
     import os
@@ -550,7 +1023,7 @@ def _chat_turn_raw(
 
         if not tool_calls:
             # 최종 응답. 반환.
-            if not text_reply:
+            if not text_reply or _should_replace_low_value_reply(text_reply, conv):
                 text_reply = _fallback_reply_from_tool_messages(conv)
             return HarubanTurn(
                 available=True,
@@ -583,11 +1056,24 @@ def _chat_turn_raw(
             except json.JSONDecodeError:
                 args = {}
             if name == "search_places":
+                inferred_args = _infer_search_places_args(conv, form_state or {})
+                for key in ("regions", "category", "intent", "limit", "keywords"):
+                    if inferred_args.get(key) and not args.get(key):
+                        args[key] = inferred_args[key]
                 inferred_excludes = _conversation_exclude_names(conv)
                 if inferred_excludes:
                     args["exclude_names"] = _unique_preserve_order(
                         list(args.get("exclude_names") or []) + inferred_excludes
                     )
+            elif name == "get_place_detail":
+                inferred_query = _infer_place_detail_query(conv)
+                if inferred_query and not args.get("query"):
+                    args["query"] = inferred_query
+                inferred_args = _infer_search_places_args(conv, form_state or {})
+                if inferred_args.get("regions") and not args.get("regions"):
+                    args["regions"] = inferred_args["regions"]
+                if inferred_args.get("category") and not args.get("category"):
+                    args["category"] = inferred_args["category"]
 
             runner = TOOL_RUNNERS.get(name)
             if runner is None:
