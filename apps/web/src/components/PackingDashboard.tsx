@@ -380,7 +380,10 @@ export default function PackingDashboard(props: Props) {
       )}
 
       {packResp && !loading && !error && (
-        <TrustFeedbackLoopCard />
+        <TrustFeedbackLoopCard
+          planItems={selectedPlanItems}
+          visitChecks={visitChecks}
+        />
       )}
         </aside>
 
@@ -1067,34 +1070,139 @@ function WeatherSignalCard({ weather }: { weather: WeatherSnapshotDto }) {
   );
 }
 
-function TrustFeedbackLoopCard() {
+type FeedbackDashboardEntry = {
+  itemId: string;
+  name: string;
+  status: VisitCheckStatus;
+  statusLabel: string;
+  memo?: string;
+  scoreLabel?: string;
+  queueLabel?: string;
+  queued: boolean;
+  updatedAt: string;
+};
+
+type FeedbackDashboardSummary = {
+  total: number;
+  queued: number;
+  changed: number;
+  scoreDelta: number;
+  entries: FeedbackDashboardEntry[];
+};
+
+function TrustFeedbackLoopCard({
+  planItems,
+  visitChecks,
+}: {
+  planItems: TravelPlanItem[];
+  visitChecks: Record<string, VisitCheck>;
+}) {
+  const dashboard = buildFeedbackDashboard(planItems, visitChecks);
+  const hasEntries = dashboard.total > 0;
   return (
     <div className="rounded-[24px] border border-mint/20 bg-[#F4FBF8] p-5 shadow-pyj-card">
       <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-mint">
         <ClipboardCheck className="h-3 w-3" />
-        Trust Feedback Loop
+        Feedback Dashboard
       </span>
       <h3 className="mt-2 font-serif-kr text-[16px] font-bold text-basalt">
-        방문 기록이 다음 신뢰 신호가 됩니다.
+        피드백이 내부 신뢰 기록으로 쌓입니다.
       </h3>
-      <div className="mt-4 grid gap-2 text-[11px] font-semibold text-basalt-2">
-        {[
-          ['1', '방문 후 피드백 작성'],
-          ['2', '신뢰도 점수 업데이트'],
-          ['3', '공공데이터 수정요청 큐 저장'],
-          ['4', '다음 여행팩 판단에 반영'],
-        ].map(([step, label]) => (
-          <div key={step} className="flex items-center gap-2 rounded-2xl border border-mint/15 bg-white/78 px-3 py-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mint text-[10px] font-bold text-white">
-              {step}
-            </span>
-            <span>{label}</span>
-          </div>
-        ))}
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <FeedbackMetric label="기록" value={`${dashboard.total}건`} tone="mint" />
+        <FeedbackMetric label="수정요청 큐" value={`${dashboard.queued}건`} tone="amber" />
+        <FeedbackMetric
+          label="신뢰도 변화"
+          value={`${dashboard.scoreDelta >= 0 ? '+' : ''}${dashboard.scoreDelta}`}
+          tone={dashboard.scoreDelta < 0 ? 'rose' : 'mint'}
+        />
       </div>
+
+      {hasEntries ? (
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-mint">
+              Recent Signals
+            </p>
+            <span className="rounded-full border border-mint/20 bg-white/80 px-2 py-0.5 text-[9.5px] font-bold text-mint">
+              내부 대시보드 기록
+            </span>
+          </div>
+          {dashboard.entries.map((entry) => (
+            <div
+              key={`${entry.itemId}-${entry.updatedAt}`}
+              className="rounded-2xl border border-mint/15 bg-white/78 px-3 py-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-bold text-basalt">{entry.name}</div>
+                  <div className="mt-0.5 text-[10px] font-semibold text-basalt-2/70">
+                    {entry.statusLabel}
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-bold ${
+                  entry.queued
+                    ? 'bg-mint/10 text-mint'
+                    : 'bg-amber-50 text-amber-800'
+                }`}>
+                  {entry.queueLabel ?? '로컬 기록'}
+                </span>
+              </div>
+              {entry.memo && (
+                <p className="mt-2 line-clamp-2 rounded-xl bg-[#FDF6EA] px-2.5 py-1.5 text-[10.5px] leading-relaxed text-basalt-2">
+                  “{entry.memo}”
+                </p>
+              )}
+              {entry.scoreLabel && (
+                <div className="mt-2 text-[10px] font-bold text-mint">
+                  신뢰도 변화 {entry.scoreLabel}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2 text-[11px] font-semibold text-basalt-2">
+          {[
+            ['1', '방문 후 피드백 작성'],
+            ['2', '신뢰도 점수 업데이트'],
+            ['3', '공공데이터 수정요청 큐 저장'],
+            ['4', '다음 여행팩 판단에 반영'],
+          ].map(([step, label]) => (
+            <div key={step} className="flex items-center gap-2 rounded-2xl border border-mint/15 bg-white/78 px-3 py-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mint text-[10px] font-bold text-white">
+                {step}
+              </span>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <p className="mt-3 text-[10.5px] leading-relaxed text-basalt-2">
-        사용자가 남긴 메모는 추천 사실로 즉시 쓰지 않고, 검토 가능한 수정요청 큐와 방문 신호로 분리 저장합니다.
+        사용자 메모는 원본 공공데이터를 바로 수정하지 않고, 내부 방문 신호와 수정요청 큐로 분리해 기록합니다.
       </p>
+    </div>
+  );
+}
+
+function FeedbackMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'mint' | 'amber' | 'rose';
+}) {
+  const toneClass = {
+    mint: 'border-mint/25 bg-white/82 text-mint',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    rose: 'border-rose-200 bg-rose-50 text-rose-700',
+  }[tone];
+  return (
+    <div className={`rounded-2xl border px-2.5 py-2 ${toneClass}`}>
+      <div className="text-[9px] font-bold leading-none opacity-80">{label}</div>
+      <div className="mt-1 font-serif-kr text-[16px] font-bold leading-none">{value}</div>
     </div>
   );
 }
@@ -1156,6 +1264,46 @@ function publicDataStatusLabel(status: string): string {
   if (status === 'save_failed') return '서버 저장 실패';
   if (status === 'request_failed') return '전송 실패';
   return status;
+}
+
+function buildFeedbackDashboard(
+  planItems: TravelPlanItem[],
+  visitChecks: Record<string, VisitCheck>,
+): FeedbackDashboardSummary {
+  const itemById = new Map(planItems.map((item) => [item.id, item]));
+  const entries = Object.entries(visitChecks)
+    .map(([itemId, check]) => {
+      const item = itemById.get(itemId);
+      const previous = check.previousTrustScore;
+      const updated = check.updatedTrustScore;
+      const scoreLabel = previous != null && updated != null
+        ? `${previous} → ${updated}점`
+        : undefined;
+      return {
+        itemId,
+        name: item?.name ?? '플랜에서 제거된 장소',
+        status: check.status,
+        statusLabel: visitStatusLabel(check.status),
+        memo: check.memo,
+        scoreLabel,
+        queueLabel: check.publicDataStatus ? publicDataStatusLabel(check.publicDataStatus) : undefined,
+        queued: Boolean(check.publicDataQueued),
+        updatedAt: check.updatedAt,
+      };
+    })
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const changedStatuses = new Set<VisitCheckStatus>([
+    'changed',
+    'info_mismatch',
+    'unsatisfied',
+  ]);
+  return {
+    total: entries.length,
+    queued: entries.filter((entry) => entry.queued).length,
+    changed: entries.filter((entry) => changedStatuses.has(entry.status)).length,
+    scoreDelta: Object.values(visitChecks).reduce((sum, check) => sum + (check.trustDelta ?? 0), 0),
+    entries: entries.slice(0, 4),
+  };
 }
 
 function infoTypeLabel(infoType: string): string {
