@@ -118,6 +118,10 @@ npm run dev
 
 대용량 원본, 수집 로그, 스모크 응답 JSON, PDF 산출물은 재생성 가능한 파일로 보고 `.gitignore`에서 제외합니다. 자세한 기준은 [data/README.md](data/README.md)를 참고하세요.
 
+## 제출 산출물
+
+프리아이펠 제출용 제안서, 작업내역, 20분 발표자료 구성안은 [docs/submission](docs/submission)에서 확인할 수 있습니다.
+
 ## 검증
 
 ```powershell
