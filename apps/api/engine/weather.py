@@ -1,13 +1,14 @@
-"""KMA API Hub weather client.
+"""KMA weather clients.
 
-The configured key is for apihub.kma.go.kr. This module keeps weather as a
-public-data signal: it fetches a KMA short regional forecast and converts only
-weather-risk phrases into conservative recommendation signals.
+Weather is a public-data signal. Prefer the data.go.kr KMA VilageFcst
+structured forecast, then fall back to the legacy KMA API Hub text probe.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
@@ -15,6 +16,35 @@ from urllib.request import Request, urlopen
 
 
 KMA_API_HUB_ENDPOINT = "https://apihub.kma.go.kr/api/typ01/url/fct_shrt_reg.php"
+KMA_VILAGE_FCST_ENDPOINT = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+KST = timezone(timedelta(hours=9))
+
+JEJU_GRID: dict[str, tuple[int, int]] = {
+    "jeju_city": (53, 38),
+    "seogwipo": (52, 33),
+    "aewol": (49, 38),
+    "hallim": (48, 38),
+    "seongsan": (60, 37),
+    "jocheon": (55, 38),
+    "gujwa": (59, 38),
+    "andeok": (49, 32),
+    "daejeong": (48, 32),
+    "pyoseon": (56, 33),
+    "namwon": (54, 33),
+    "udo": (60, 38),
+}
+
+SKY_LABELS = {"1": "맑음", "3": "구름 많음", "4": "흐림"}
+PTY_LABELS = {
+    "0": "강수 없음",
+    "1": "비",
+    "2": "비/눈",
+    "3": "눈",
+    "4": "소나기",
+    "5": "빗방울",
+    "6": "빗방울/눈날림",
+    "7": "눈날림",
+}
 
 SIGNAL_RULES: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("heavy_rain", ("호우", "많은 비", "강한 비", "폭우"), "호우 주의"),
@@ -27,9 +57,18 @@ SIGNAL_RULES: tuple[tuple[str, tuple[str, ...], str], ...] = (
 )
 
 
-def _service_key() -> tuple[str, str]:
-    """Return configured KMA key and env name without exposing the value."""
+def _api_hub_service_key() -> tuple[str, str]:
+    """Return configured legacy KMA API Hub key and env name without exposing it."""
     for name in ("KMA_SERVICE_KEY", "KMA_API_KEY", "WEATHER_API_KEY"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value, name
+    return "", ""
+
+
+def _vilage_fcst_service_key() -> tuple[str, str]:
+    """Return configured data.go.kr VilageFcst key and env name without exposing it."""
+    for name in ("DATA_GO_KR_SERVICE_KEY", "KMA_VILAGE_FCST_KEY", "VILAGE_FCST_SERVICE_KEY"):
         value = os.environ.get(name, "").strip()
         if value:
             return value, name
@@ -131,14 +170,220 @@ def parse_kma_api_hub_forecast(raw_text: str) -> dict[str, Any]:
     return result
 
 
+def _vilage_base_datetime(now: datetime | None = None) -> tuple[str, str]:
+    """Return latest KMA VilageFcst base_date/base_time.
+
+    KMA short-term forecast base times are every three hours. Use a one-hour
+    buffer so the latest slot is normally published before we query it.
+    """
+    current = (now or datetime.now(KST)).astimezone(KST) - timedelta(hours=1)
+    base_hours = (2, 5, 8, 11, 14, 17, 20, 23)
+    hour = max((h for h in base_hours if h <= current.hour), default=23)
+    base_day = current
+    if current.hour < 2:
+        base_day = current - timedelta(days=1)
+    return base_day.strftime("%Y%m%d"), f"{hour:02d}00"
+
+
+def _first_forecast_values(items: list[dict[str, Any]], now: datetime | None = None) -> dict[str, str]:
+    current_key = (now or datetime.now(KST)).astimezone(KST).strftime("%Y%m%d%H%M")
+    by_time: dict[str, dict[str, str]] = {}
+    for item in items:
+        fcst_date = str(item.get("fcstDate") or "")
+        fcst_time = str(item.get("fcstTime") or "")
+        category = str(item.get("category") or "")
+        value = str(item.get("fcstValue") or "")
+        if not fcst_date or not fcst_time or not category:
+            continue
+        key = f"{fcst_date}{fcst_time}"
+        if key < current_key:
+            continue
+        by_time.setdefault(key, {})[category] = value
+    if not by_time:
+        return {}
+    preferred = sorted(by_time.items(), key=lambda pair: (-len(pair[1]), pair[0]))[0]
+    values = dict(preferred[1])
+    values["fcstDate"] = preferred[0][:8]
+    values["fcstTime"] = preferred[0][8:]
+    return values
+
+
+def _safe_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_vilage_fcst_payload(payload: dict[str, Any], *, region: str = "jeju_city") -> dict[str, Any]:
+    """Normalize data.go.kr getVilageFcst JSON into travel weather signals."""
+    response = payload.get("response") or {}
+    header = response.get("header") or {}
+    result_code = str(header.get("resultCode") or "")
+    if result_code and result_code != "00":
+        return {
+            "available": False,
+            "provider": "kma_vilage_fcst",
+            "reason": str(header.get("resultMsg") or f"resultCode={result_code}"),
+            "labels": ["날씨 판단 보류"],
+            "summary": "기상청 단기예보 응답을 받았지만 정상 예보 데이터가 아닙니다. 출발 전 최신 예보를 확인해 주세요.",
+        }
+
+    items = (((response.get("body") or {}).get("items") or {}).get("item") or [])
+    if not isinstance(items, list):
+        items = [items]
+    values = _first_forecast_values(items)
+    if not values:
+        return {
+            "available": False,
+            "provider": "kma_vilage_fcst",
+            "reason": "no future forecast items",
+            "labels": ["날씨 판단 보류"],
+            "summary": "기상청 단기예보에서 현재 이후 시간대 예보를 찾지 못했습니다. 출발 전 최신 예보를 확인해 주세요.",
+        }
+
+    sky = SKY_LABELS.get(values.get("SKY", ""), "하늘상태 확인 중")
+    pty = PTY_LABELS.get(values.get("PTY", ""), "강수형태 확인 중")
+    pop = _safe_float(values.get("POP"))
+    tmp = _safe_float(values.get("TMP"))
+    wsd = _safe_float(values.get("WSD"))
+    reh = _safe_float(values.get("REH"))
+
+    signals: list[str] = []
+    labels: list[str] = [sky]
+    if values.get("PTY") and values.get("PTY") != "0":
+        signals.append("rain" if values.get("PTY") in {"1", "4", "5"} else "snow")
+        labels.append(f"{pty} 예보")
+    if pop is not None and pop >= 60:
+        signals.append("rain")
+        labels.append("강수확률 높음")
+    if wsd is not None and wsd >= 9:
+        signals.append("wind")
+        labels.append("강풍 주의")
+    elif wsd is not None and wsd >= 4:
+        labels.append("바람 확인")
+
+    severe = {"wind", "snow"}
+    risk_level = "caution" if any(signal in severe for signal in signals) or (pop or 0) >= 70 else (
+        "watch" if signals or (wsd or 0) >= 4 or (pop or 0) >= 40 else "normal"
+    )
+    fcst_date = values["fcstDate"]
+    fcst_time = values["fcstTime"]
+    issued_at_label = f"{int(fcst_date[4:6])}월 {int(fcst_date[6:8])}일 {int(fcst_time[:2]):02d}시 예보"
+    detail_parts = [sky]
+    if values.get("PTY") and values.get("PTY") != "0":
+        detail_parts.append(pty)
+    if pop is not None:
+        detail_parts.append(f"강수확률 {int(pop)}%")
+    if tmp is not None:
+        detail_parts.append(f"기온 {tmp:g}도")
+    if wsd is not None:
+        detail_parts.append(f"풍속 {wsd:g}m/s")
+    if reh is not None:
+        detail_parts.append(f"습도 {int(reh)}%")
+
+    return {
+        "available": True,
+        "provider": "kma_vilage_fcst",
+        "risk_level": risk_level,
+        "signals": sorted(set(signals)),
+        "labels": list(dict.fromkeys(labels)),
+        "summary": f"{issued_at_label} 기준: " + " · ".join(detail_parts),
+        "issued_at_label": issued_at_label,
+        "region": region,
+        "forecast": {
+            "sky": sky,
+            "precipitation_type": pty,
+            "precipitation_probability": int(pop) if pop is not None else None,
+            "temperature": tmp,
+            "wind_speed": wsd,
+            "humidity": int(reh) if reh is not None else None,
+            "fcst_date": fcst_date,
+            "fcst_time": fcst_time,
+        },
+    }
+
+
+def _build_vilage_url(key: str, *, region: str) -> str:
+    base_date, base_time = _vilage_base_datetime()
+    nx, ny = JEJU_GRID.get(region, JEJU_GRID["jeju_city"])
+    params = {
+        "pageNo": "1",
+        "numOfRows": "1000",
+        "dataType": "JSON",
+        "base_date": base_date,
+        "base_time": base_time,
+        "nx": str(nx),
+        "ny": str(ny),
+    }
+    query = urlencode(params, quote_via=quote)
+    return f"{KMA_VILAGE_FCST_ENDPOINT}?serviceKey={quote(key, safe='%')}&{query}"
+
+
+def _fetch_vilage_fcst(region: str, key: str, key_name: str) -> dict[str, Any]:
+    url = _build_vilage_url(key, region=region)
+    req = Request(url, headers={"User-Agent": "pack-your-jeju/0.1"})
+    try:
+        with urlopen(req, timeout=8) as resp:
+            status = getattr(resp, "status", 200)
+            raw = resp.read()
+    except HTTPError as e:
+        body = _decode_kma_body(e.read())
+        return {
+            "available": False,
+            "reason": f"HTTPError: HTTP Error {e.code}: {e.reason}",
+            "http_status": e.code,
+            "key_configured": True,
+            "key_env": key_name,
+            "provider": "kma_vilage_fcst",
+            "error_sample": body[:240],
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "reason": f"{type(e).__name__}: {e}",
+            "key_configured": True,
+            "key_env": key_name,
+            "provider": "kma_vilage_fcst",
+        }
+    try:
+        payload = json.loads(_decode_kma_body(raw))
+    except json.JSONDecodeError:
+        return {
+            "available": False,
+            "reason": "KMA VilageFcst returned non-JSON body",
+            "http_status": status,
+            "key_configured": True,
+            "key_env": key_name,
+            "provider": "kma_vilage_fcst",
+            "error_sample": _decode_kma_body(raw)[:240],
+        }
+    parsed = parse_vilage_fcst_payload(payload, region=region)
+    parsed.update(
+        {
+            "key_configured": True,
+            "key_env": key_name,
+            "http_status": status,
+            "source": "data.go.kr getVilageFcst",
+        }
+    )
+    return parsed
+
+
 def smoke_kma_nowcast(region: str = "jeju_city") -> dict[str, Any]:
-    key, key_name = _service_key()
+    key, key_name = _vilage_fcst_service_key()
+    if key:
+        return _fetch_vilage_fcst(region, key, key_name)
+
+    key, key_name = _api_hub_service_key()
     if not key:
         return {
             "available": False,
-            "reason": "KMA_SERVICE_KEY or KMA_API_KEY not set",
+            "reason": "DATA_GO_KR_SERVICE_KEY not set",
             "key_configured": False,
-            "provider": "kma_api_hub",
+            "provider": "kma_vilage_fcst",
         }
 
     params = {

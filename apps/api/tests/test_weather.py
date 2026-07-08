@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apps.api.engine.weather import parse_kma_api_hub_forecast
+from apps.api.engine.weather import parse_kma_api_hub_forecast, parse_vilage_fcst_payload
 
 
 def test_parse_kma_api_hub_forecast_extracts_weather_signals():
@@ -59,3 +59,33 @@ def test_parse_kma_api_hub_forecast_exposes_issued_at_label():
     parsed = parse_kma_api_hub_forecast(raw)
 
     assert parsed["issued_at_label"] == "2026년 7월 8일 05시 발표"
+
+
+def test_parse_vilage_fcst_payload_builds_travel_weather_summary():
+    payload = {
+        "response": {
+            "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+            "body": {
+                "items": {
+                    "item": [
+                        {"fcstDate": "20990708", "fcstTime": "1000", "category": "SKY", "fcstValue": "4"},
+                        {"fcstDate": "20990708", "fcstTime": "1000", "category": "PTY", "fcstValue": "1"},
+                        {"fcstDate": "20990708", "fcstTime": "1000", "category": "POP", "fcstValue": "70"},
+                        {"fcstDate": "20990708", "fcstTime": "1000", "category": "TMP", "fcstValue": "25"},
+                        {"fcstDate": "20990708", "fcstTime": "1000", "category": "WSD", "fcstValue": "4.3"},
+                        {"fcstDate": "20990708", "fcstTime": "1000", "category": "REH", "fcstValue": "82"},
+                    ]
+                }
+            },
+        }
+    }
+
+    parsed = parse_vilage_fcst_payload(payload, region="udo")
+
+    assert parsed["available"] is True
+    assert parsed["provider"] == "kma_vilage_fcst"
+    assert parsed["risk_level"] == "caution"
+    assert parsed["labels"] == ["흐림", "비 예보", "강수확률 높음", "바람 확인"]
+    assert "강수확률 70%" in parsed["summary"]
+    assert "기온 25도" in parsed["summary"]
+    assert "풍속 4.3m/s" in parsed["summary"]
