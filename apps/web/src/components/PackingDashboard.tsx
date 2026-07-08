@@ -1534,6 +1534,7 @@ function shareSlotLabel(item: ItineraryItemDto, index: number): string {
 }
 
 type MappableItem = PackItemDto | TravelPlanItem;
+type MapMarkerItem = { item: MappableItem; coord: { lat: number; lng: number } };
 
 function resolveItemCoordinate(item: MappableItem): { lat: number; lng: number } | null {
   const raw = item as any;
@@ -1573,7 +1574,7 @@ function TripMapCard({
   const markerItems = useMemo(
     () => items
       .map((item) => ({ item, coord: resolveItemCoordinate(item) }))
-      .filter((x): x is { item: MappableItem; coord: { lat: number; lng: number } } => !!x.coord)
+      .filter((x): x is MapMarkerItem => !!x.coord)
       .slice(0, 12),
     [items],
   );
@@ -1586,6 +1587,7 @@ function TripMapCard({
 
     let cancelled = false;
     let markers: any[] = [];
+    let authCheckTimer: number | null = null;
 
     const ensureScript = () =>
       new Promise<void>((resolve, reject) => {
@@ -1639,7 +1641,16 @@ function TripMapCard({
           markerItems.forEach(({ coord }) => bounds.extend(new w.naver.maps.LatLng(coord.lat, coord.lng)));
           map.fitBounds(bounds, { top: 36, right: 36, bottom: 36, left: 36 });
         }
-        setMapStatus('ready');
+        authCheckTimer = window.setTimeout(() => {
+          if (cancelled || !mapRef.current) return;
+          const mapText = mapRef.current.textContent ?? '';
+          if (mapText.includes('인증') && mapText.includes('실패')) {
+            mapRef.current.innerHTML = '';
+            setMapStatus('fallback');
+            return;
+          }
+          setMapStatus('ready');
+        }, 700);
       })
       .catch(() => {
         if (!cancelled) setMapStatus('fallback');
@@ -1647,6 +1658,7 @@ function TripMapCard({
 
     return () => {
       cancelled = true;
+      if (authCheckTimer) window.clearTimeout(authCheckTimer);
       markers.forEach((marker) => marker.setMap(null));
       markers = [];
     };
@@ -1671,7 +1683,7 @@ function TripMapCard({
 
       <div className="overflow-hidden rounded-2xl border border-earth bg-[#FDF6EA]">
         <div ref={mapRef} className="h-[220px] w-full">
-          {mapStatus !== 'ready' && <FallbackJejuMap regions={regions} />}
+          {mapStatus !== 'ready' && <FallbackJejuMap regions={regions} markers={markerItems} />}
         </div>
       </div>
 
@@ -1684,7 +1696,13 @@ function TripMapCard({
   );
 }
 
-function FallbackJejuMap({ regions }: { regions: TravelInfo['regions'] }) {
+function FallbackJejuMap({
+  regions,
+  markers,
+}: {
+  regions: TravelInfo['regions'];
+  markers: MapMarkerItem[];
+}) {
   const labels = regions
     .map((r) => REGIONS.find((x) => x.value === r)?.label ?? r)
     .slice(0, 4);
@@ -1711,17 +1729,52 @@ function FallbackJejuMap({ regions }: { regions: TravelInfo['regions'] }) {
           strokeWidth="3"
           strokeLinecap="round"
         />
+        {markers.map(({ item, coord }, idx) => {
+          const point = projectJejuCoordinate(coord);
+          return (
+            <g key={`${item.name}-${idx}`} transform={`translate(${point.x} ${point.y})`}>
+              <circle r="11" fill="#E7683A" stroke="#fff" strokeWidth="2.5" />
+              <text
+                y="4"
+                textAnchor="middle"
+                fill="#fff"
+                fontSize="10"
+                fontWeight="800"
+                fontFamily="Arial, sans-serif"
+              >
+                {idx + 1}
+              </text>
+            </g>
+          );
+        })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
         <p className="font-serif-kr text-[15px] font-bold text-basalt">
-          {labels.length > 0 ? labels.join(' · ') : '제주'} 중심 여행팩
+          {markers.length > 0
+            ? `플랜 장소 ${markers.length}곳 표시`
+            : `${labels.length > 0 ? labels.join(' · ') : '제주'} 중심 여행팩`}
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">
-          네이버 지도 키 또는 좌표가 준비되면 이 영역에 장소 마커가 표시됩니다.
+          {markers.length > 0
+            ? '네이버 지도 인증 전에도 좌표가 확인된 장소를 간이 지도에 표시합니다.'
+            : '네이버 지도 키 또는 좌표가 준비되면 이 영역에 장소 마커가 표시됩니다.'}
         </p>
       </div>
     </div>
   );
+}
+
+function projectJejuCoordinate(coord: { lat: number; lng: number }): { x: number; y: number } {
+  const lngMin = 126.1;
+  const lngMax = 126.98;
+  const latMin = 33.1;
+  const latMax = 33.58;
+  const x = 34 + ((coord.lng - lngMin) / (lngMax - lngMin)) * 292;
+  const y = 48 + ((latMax - coord.lat) / (latMax - latMin)) * 132;
+  return {
+    x: Math.min(330, Math.max(30, x)),
+    y: Math.min(190, Math.max(36, y)),
+  };
 }
 
 function SummaryLine({ icon, label }: { icon: React.ReactNode; label: string }) {
