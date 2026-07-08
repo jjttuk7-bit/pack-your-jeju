@@ -40,6 +40,11 @@ docs/donut.png
 docs/qr.png
 docs/qr-placeholder.png
 
+# --- Office 임시 잠금 파일 ---
+~$*.pptx
+~$*.docx
+~$*.xlsx
+
 # --- 프론트 부산물 / 원본 압축본 ---
 pack-your-moment.zip
 apps/web/node_modules/
