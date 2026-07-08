@@ -194,7 +194,7 @@ python -c "from apps.api import db; print(db.ping())"   # True 나오면 OK
 # 3) 데이터 심기 (원격 DB에 UPSERT — 원본 유지, idempotent)
 python -m apps.pipelines.ingest_visitjeju --fetch-all                   # 5-10분
 python -m apps.pipelines.process                                        # 30초 이내
-python -m apps.pipelines.ingest_file --fix-request-csv "제주관광공사_비짓제주(VISIT JEJU)_콘텐츠수정요청_20250806 (1).CSV"
+python -m apps.pipelines.ingest_file --fix-request-csv data/sources/visitjeju_fix_requests_20250806.csv
 
 # 3-b) 주차장 · 정류장 (교통 배지)
 python -m apps.pipelines.ingest_file --parking-csv data/parking/jeju_city_parking.csv --parking-csv data/parking/seogwipo_parking.csv

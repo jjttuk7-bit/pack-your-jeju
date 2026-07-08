@@ -1,6 +1,6 @@
 # 킥3 — 1,686건의 증거 (오프닝 슬라이드 자료)
 
-- 소스: `제주관광공사_비짓제주(VISIT JEJU)_콘텐츠수정요청_20250806 (1).CSV`
+- 소스: `data/sources/visitjeju_fix_requests_20250806.csv`
 - 총 요청: **1,686건**
 - 재생성: `python scripts/kick3_stats.py`
 

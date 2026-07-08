@@ -1,6 +1,7 @@
 # --- secrets ---
 .env
 .env.local
+.claude/
 
 # --- Python 부산물 ---
 __pycache__/
@@ -17,6 +18,14 @@ node_modules/
 data/raw/
 data/*.csv
 data/*.log
+data/parking/
+data/*_smoke.json
+data/agent_*_smoke.json
+data/haruban_*_smoke.json
+data/pack_*.json
+data/pack_*.pdf
+data/prod_*.pdf
+data/solarfit_outline.txt
 # ingest_visitjeju --probe 로 재생성 가능
 data/probe/
 # 게이트 리포트 원본 (재실행으로 재생성). .md만 커밋해 사람이 읽도록.

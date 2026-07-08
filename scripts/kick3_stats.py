@@ -19,7 +19,7 @@ import csv
 from collections import Counter
 from pathlib import Path
 
-DEFAULT_CSV = Path("제주관광공사_비짓제주(VISIT JEJU)_콘텐츠수정요청_20250806 (1).CSV")
+DEFAULT_CSV = Path("data/sources/visitjeju_fix_requests_20250806.csv")
 DEFAULT_OUT = Path("docs/kick3_stats.md")
 
 CATEGORIES: list[tuple[str, list[str]]] = [
@@ -74,7 +74,7 @@ ORDER = [name for name, _ in CATEGORIES] + ["기타"]
 
 def render_md(total: int, counter: Counter, sample: dict[str, str], csv_path: Path) -> str:
     lines = ["# 킥3 — 1,686건의 증거 (오프닝 슬라이드 자료)", ""]
-    lines.append(f"- 소스: `{csv_path.name}`")
+    lines.append(f"- 소스: `{csv_path.as_posix()}`")
     lines.append(f"- 총 요청: **{total:,}건**")
     lines.append(f"- 재생성: `python scripts/kick3_stats.py`")
     lines.append("")

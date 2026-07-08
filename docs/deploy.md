@@ -54,7 +54,7 @@ python -m apps.pipelines.ingest_visitjeju --fetch-all
 python -m apps.pipelines.process
 
 # 수정요청 CSV 실적재
-python -m apps.pipelines.ingest_file --fix-request-csv "제주관광공사_비짓제주(VISIT JEJU)_콘텐츠수정요청_20250806 (1).CSV"
+python -m apps.pipelines.ingest_file --fix-request-csv data/sources/visitjeju_fix_requests_20250806.csv
 ```
 
 ### 1.5 배포 확인
@@ -76,6 +76,9 @@ Project Settings → **Environment Variables**:
 | 이름 | 값 |
 |---|---|
 | `VITE_API_BASE_URL` | Railway 백엔드 URL (예: `https://xxx.up.railway.app`) |
+| `VITE_NAVER_MAP_CLIENT_ID` | 선택. 네이버 지도 JavaScript API Client ID |
+
+네이버 지도를 실제로 띄우려면 네이버 클라우드 콘솔에서 Vercel 배포 도메인도 Web 서비스 URL로 허용해야 합니다.
 
 ### 2.3 배포
 - Deploy 클릭
