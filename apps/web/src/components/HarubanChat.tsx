@@ -214,7 +214,7 @@ export default function HarubanChat({
         setError(
           resp.reason?.includes('OPENAI_API_KEY')
             ? '하루방 에이전트는 아직 준비 중이에요. 곧 연결할게요.'
-            : `하루방 에이전트가 답을 못 드렸어요: ${resp.reason || 'unknown'}`,
+            : '지금은 답변 연결이 잠시 불안정해요. 같은 질문을 한 번만 다시 보내주세요.',
         );
         return;
       }
@@ -311,7 +311,7 @@ export default function HarubanChat({
               <div className="flex-1 min-w-0">
                 <div className="font-serif-kr font-bold text-[15px] text-basalt">하루방 에이전트</div>
                 <div className="text-[10.5px] text-basalt-2/70 leading-tight">
-                  gpt-5-mini RAG 여행 조율
+                  gpt-5-mini 공공데이터 여행 조율
                 </div>
               </div>
               <button
@@ -334,8 +334,7 @@ export default function HarubanChat({
                 <div className="text-[12px] text-basalt-2/70 leading-relaxed px-1">
                   안녕하세요. 제주 여행 준비를 돕는 하루방 에이전트입니다.
                   <br />
-                  질문을 주시면 gpt-5-mini가 의도를 먼저 해석하고, 필요한 공공데이터/RAG 근거를
-                  확인해 답변드릴게요.
+                  질문을 주시면 gpt-5-mini가 의도를 먼저 해석하고, 필요한 공공데이터 근거를 확인해 답변드릴게요.
                   <br />
                   <span className="text-basalt-2/50">
                     장소명·개수·운영 정보는 조회된 근거 밖에서 지어내지 않습니다.
@@ -367,7 +366,7 @@ export default function HarubanChat({
 
               {introLoading && (
                 <div className="flex items-center gap-1.5 text-[11px] text-basalt-2/60 px-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> gpt-5-mini가 RAG 근거를 조회하고 있어요...
+                  <Loader2 className="w-3 h-3 animate-spin" /> gpt-5-mini가 공공데이터 근거를 확인하고 있어요...
                 </div>
               )}
               {loading && (
