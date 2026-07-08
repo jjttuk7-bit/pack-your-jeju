@@ -46,6 +46,18 @@ def is_available() -> bool:
     return _api_key() is not None
 
 
+def _chat_completion_params(*, max_completion_tokens: int, temperature: float) -> dict[str, Any]:
+    """OpenAI chat completion 공통 파라미터.
+
+    gpt-5-mini는 현재 기본 temperature(1)만 지원한다. 호출부가 0.0~0.4 같은
+    값으로 의도를 표현하더라도 API에는 보내지 않아 400 unsupported_value를 막는다.
+    """
+    params: dict[str, Any] = {"max_completion_tokens": max_completion_tokens}
+    if not MODEL.startswith("gpt-5") and temperature != 1:
+        params["temperature"] = temperature
+    return params
+
+
 def complete(
     *,
     system: str,
@@ -76,8 +88,10 @@ def complete(
                 {"role": "system", "content": system + "\n\n" + NO_HALLUCINATION_CLAUSE},
                 {"role": "user", "content": user},
             ],
-            max_completion_tokens=max_completion_tokens,
-            temperature=temperature,
+            **_chat_completion_params(
+                max_completion_tokens=max_completion_tokens,
+                temperature=temperature,
+            ),
         )
     except Exception as e:
         return LLMResponse(available=False, reason=f"openai call failed: {e}")
@@ -136,8 +150,10 @@ def complete_with_tools(
             ],
             tools=tools,
             tool_choice="auto",
-            max_completion_tokens=max_completion_tokens,
-            temperature=temperature,
+            **_chat_completion_params(
+                max_completion_tokens=max_completion_tokens,
+                temperature=temperature,
+            ),
         )
     except Exception as e:
         return ToolCallResponse(available=False, reason=f"openai call failed: {e}")

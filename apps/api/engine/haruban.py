@@ -354,7 +354,6 @@ def _chat_turn_raw(
                 tools=TOOLS,
                 tool_choice="auto",
                 max_completion_tokens=600,
-                temperature=0.3,
             )
         except Exception as e:
             return HarubanTurn(available=False, reason=f"openai call failed: {e}", tool_trace=trace)

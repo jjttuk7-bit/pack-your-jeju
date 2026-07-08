@@ -38,3 +38,8 @@ def test_complete_returns_unavailable_signal_without_key(monkeypatch):
 def test_no_hallucination_clause_mentions_no_fabrication():
     # 프롬프트 공통 규칙 — TRUST_ENGINE §5
     assert "만들지" in llm.NO_HALLUCINATION_CLAUSE
+
+
+def test_gpt_5_mini_omits_unsupported_temperature():
+    params = llm._chat_completion_params(max_completion_tokens=123, temperature=0.3)
+    assert params == {"max_completion_tokens": 123}
