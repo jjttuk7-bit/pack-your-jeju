@@ -74,6 +74,8 @@ export interface TravelPlanItem {
   note?: string | null;
   day?: number | null;
   date?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   trust_score?: number;
   score_breakdown?: TrustScoreBreakdown;
   check_required?: string[];

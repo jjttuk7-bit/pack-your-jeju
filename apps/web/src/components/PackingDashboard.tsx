@@ -364,8 +364,9 @@ export default function PackingDashboard(props: Props) {
 
       {packResp && !loading && !error && (
         <TripMapCard
-          items={packItems}
+          items={selectedPlanItems.length > 0 ? selectedPlanItems : packItems}
           regions={info.regions}
+          isPlanMap={selectedPlanItems.length > 0}
         />
       )}
 
@@ -657,6 +658,7 @@ function buildPlanPackingItems(planItems: TravelPlanItem[]): PlanPackingSuggesti
 function toPlanItem(item: PackItemDto | ItineraryItemDto, day?: ItineraryDayDto): TravelPlanItem {
   const maybeMoment = (item as ItineraryItemDto).moment;
   const moment = maybeMoment ?? item.category ?? 'custom';
+  const coord = resolveItemCoordinate(item);
   return {
     id: `public-${item.external_id || item.name}-${moment}`,
     name: item.name,
@@ -669,6 +671,8 @@ function toPlanItem(item: PackItemDto | ItineraryItemDto, day?: ItineraryDayDto)
     note: item.note ?? null,
     day: day?.day ?? null,
     date: day?.date ?? null,
+    latitude: coord?.lat ?? null,
+    longitude: coord?.lng ?? null,
     trust_score: item.trust_score,
     score_breakdown: item.score_breakdown,
     check_required: item.check_required,
@@ -1497,9 +1501,11 @@ function shareSlotLabel(item: ItineraryItemDto, index: number): string {
   return ['오전 후보', '점심 후보', '오후 후보', '저녁 후보'][Math.min(index, 3)];
 }
 
-function resolveItemCoordinate(item: PackItemDto): { lat: number; lng: number } | null {
+type MappableItem = PackItemDto | TravelPlanItem;
+
+function resolveItemCoordinate(item: MappableItem): { lat: number; lng: number } | null {
   const raw = item as any;
-  const amenities = (item.amenities ?? {}) as Record<string, unknown>;
+  const amenities = ('amenities' in item ? item.amenities ?? {} : {}) as Record<string, unknown>;
   const lat = toNumber(
     raw.latitude ?? raw.lat ?? amenities.latitude ?? amenities.lat ?? amenities.mapy ?? amenities.y,
   );
@@ -1523,9 +1529,11 @@ function toNumber(value: unknown): number | null {
 function TripMapCard({
   items,
   regions,
+  isPlanMap,
 }: {
-  items: PackItemDto[];
+  items: MappableItem[];
   regions: TravelInfo['regions'];
+  isPlanMap: boolean;
 }) {
   const mapRef = React.useRef<HTMLDivElement | null>(null);
   const [mapStatus, setMapStatus] = useState<'idle' | 'ready' | 'fallback'>('idle');
@@ -1533,7 +1541,7 @@ function TripMapCard({
   const markerItems = useMemo(
     () => items
       .map((item) => ({ item, coord: resolveItemCoordinate(item) }))
-      .filter((x): x is { item: PackItemDto; coord: { lat: number; lng: number } } => !!x.coord)
+      .filter((x): x is { item: MappableItem; coord: { lat: number; lng: number } } => !!x.coord)
       .slice(0, 12),
     [items],
   );
@@ -1621,11 +1629,11 @@ function TripMapCard({
             이번 여행 지도
           </span>
           <h3 className="font-serif-kr font-bold text-[15px] text-basalt tracking-tight">
-            선택한 제주를 한눈에 보기
+            {isPlanMap ? '내 플랜 장소를 한눈에 보기' : '선택한 제주를 한눈에 보기'}
           </h3>
         </div>
         <span className="rounded-full border border-earth bg-[#FDF6EA] px-2 py-1 text-[10px] font-semibold text-basalt-2">
-          마커 {markerItems.length}곳
+          {isPlanMap ? '플랜 마커' : '마커'} {markerItems.length}곳
         </span>
       </div>
 
@@ -1636,7 +1644,9 @@ function TripMapCard({
       </div>
 
       <p className="text-[10.5px] text-basalt-2 leading-relaxed">
-        좌표가 확인된 장소만 지도 마커로 표시합니다. 좌표가 없는 장소는 아래 장소 카드의 근거와 주소에서 확인해 주세요.
+        {isPlanMap
+          ? '플랜에 담은 장소 중 좌표가 확인된 곳만 지도 마커로 표시합니다. 직접 추가했거나 좌표가 없는 장소는 카드의 주소에서 확인해 주세요.'
+          : '좌표가 확인된 장소만 지도 마커로 표시합니다. 좌표가 없는 장소는 아래 장소 카드의 근거와 주소에서 확인해 주세요.'}
       </p>
     </div>
   );
