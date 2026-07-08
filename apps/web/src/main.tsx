@@ -4,7 +4,7 @@ import {registerSW} from 'virtual:pwa-register';
 import App from './App.tsx';
 import './index.css';
 
-const APP_CACHE_VERSION = '2026-07-09-haruban-decision-panel-v2';
+const APP_CACHE_VERSION = '2026-07-09-jeju-date-fix-v1';
 const APP_CACHE_VERSION_KEY = 'pyj-app-cache-version';
 
 async function refreshStalePwaCache() {

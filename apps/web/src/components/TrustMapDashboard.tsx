@@ -20,6 +20,7 @@ import type {
 } from '../types';
 import { COMPANIONS, MOMENTS, PURPOSES, REGIONS } from '../data';
 import { requestPack, requestRegionCoveragePreview } from '../api';
+import { normalizeTripStartDate } from '../date';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 
@@ -129,7 +130,7 @@ export default function TrustMapDashboard({
     initialMoments?.length ? initialMoments : DEFAULT_MOMENTS,
   );
   const [startDate, setStartDate] = useState(
-    initialInfo?.startDate || new Date().toISOString().split('T')[0],
+    normalizeTripStartDate(initialInfo?.startDate),
   );
   const [durationDays, setDurationDays] = useState(initialInfo?.durationDays ?? 3);
   const [companion, setCompanion] = useState<CompanionValue>(initialInfo?.companion ?? 'solo');

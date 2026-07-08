@@ -11,6 +11,7 @@ import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import StoneWallPattern from './components/marks/StoneWallPattern';
 import { MOMENTS, REGIONS } from './data';
+import { normalizeTripStartDate, todayInJeju } from './date';
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
@@ -19,7 +20,7 @@ const GATE_STORAGE_KEY = 'pack_your_jeju_gate_v1';
 const defaultState: SavedTravel = {
   info: {
     regions: [],
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: todayInJeju(),
     durationDays: 3,
     companion: 'solo',
     purpose: 'healing',
@@ -66,6 +67,7 @@ function migrateSavedTravel(saved: any): SavedTravel {
       ...defaultState.info,
       ...info,
       regions,
+      startDate: normalizeTripStartDate(info.startDate),
       durationDays:
         typeof info.durationDays === 'number' && Number.isFinite(info.durationDays) && info.durationDays > 0
           ? info.durationDays

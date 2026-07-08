@@ -15,6 +15,7 @@ import { COMPANIONS, PURPOSES, MOMENTS } from '../data';
 import RegionChips from './RegionChips';
 import MomentIcon from './marks/MomentIcon';
 import HarubangMark from './marks/HarubangMark';
+import { normalizeTripStartDate } from '../date';
 import {
   requestHarubanAugment,
   type HarubanAugmentSuggestion,
@@ -45,7 +46,7 @@ function useDebounced<T>(value: T, delayMs: number): T {
 export default function TravelForm({ onSubmit, initialInfo, initialMoments }: TravelFormProps) {
   const [regions, setRegions] = useState<RegionId[]>(initialInfo?.regions || []);
   const [startDate, setStartDate] = useState(
-    initialInfo?.startDate || new Date().toISOString().split('T')[0]
+    normalizeTripStartDate(initialInfo?.startDate)
   );
   const [durationDays, setDurationDays] = useState<number>(initialInfo?.durationDays || 3);
   const [companion, setCompanion] = useState<CompanionValue>(initialInfo?.companion || 'solo');
