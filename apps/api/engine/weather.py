@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import date
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.error import HTTPError
@@ -185,8 +186,21 @@ def _vilage_base_datetime(now: datetime | None = None) -> tuple[str, str]:
     return base_day.strftime("%Y%m%d"), f"{hour:02d}00"
 
 
-def _first_forecast_values(items: list[dict[str, Any]], now: datetime | None = None) -> dict[str, str]:
+def _first_forecast_values(
+    items: list[dict[str, Any]],
+    *,
+    target_start: date | None = None,
+    target_days: int = 1,
+    now: datetime | None = None,
+) -> dict[str, str]:
     current_key = (now or datetime.now(KST)).astimezone(KST).strftime("%Y%m%d%H%M")
+    target_dates: set[str] = set()
+    if target_start:
+        days = max(1, min(target_days, 3))
+        target_dates = {
+            (target_start + timedelta(days=idx)).strftime("%Y%m%d")
+            for idx in range(days)
+        }
     by_time: dict[str, dict[str, str]] = {}
     for item in items:
         fcst_date = str(item.get("fcstDate") or "")
@@ -195,13 +209,21 @@ def _first_forecast_values(items: list[dict[str, Any]], now: datetime | None = N
         value = str(item.get("fcstValue") or "")
         if not fcst_date or not fcst_time or not category:
             continue
+        if target_dates and fcst_date not in target_dates:
+            continue
         key = f"{fcst_date}{fcst_time}"
         if key < current_key:
             continue
         by_time.setdefault(key, {})[category] = value
     if not by_time:
         return {}
-    preferred = sorted(by_time.items(), key=lambda pair: (-len(pair[1]), pair[0]))[0]
+    def sort_key(pair: tuple[str, dict[str, str]]) -> tuple[int, int, str]:
+        key, values = pair
+        hour = int(key[8:10])
+        noon_distance = abs(hour - 12)
+        return (-len(values), noon_distance, key)
+
+    preferred = sorted(by_time.items(), key=sort_key)[0]
     values = dict(preferred[1])
     values["fcstDate"] = preferred[0][:8]
     values["fcstTime"] = preferred[0][8:]
@@ -217,7 +239,13 @@ def _safe_float(value: str | None) -> float | None:
         return None
 
 
-def parse_vilage_fcst_payload(payload: dict[str, Any], *, region: str = "jeju_city") -> dict[str, Any]:
+def parse_vilage_fcst_payload(
+    payload: dict[str, Any],
+    *,
+    region: str = "jeju_city",
+    target_start: date | None = None,
+    target_days: int = 1,
+) -> dict[str, Any]:
     """Normalize data.go.kr getVilageFcst JSON into travel weather signals."""
     response = payload.get("response") or {}
     header = response.get("header") or {}
@@ -234,14 +262,15 @@ def parse_vilage_fcst_payload(payload: dict[str, Any], *, region: str = "jeju_ci
     items = (((response.get("body") or {}).get("items") or {}).get("item") or [])
     if not isinstance(items, list):
         items = [items]
-    values = _first_forecast_values(items)
+    values = _first_forecast_values(items, target_start=target_start, target_days=target_days)
     if not values:
+        target_label = f"{target_start.isoformat()}부터 {target_days}일" if target_start else "현재 이후"
         return {
             "available": False,
             "provider": "kma_vilage_fcst",
             "reason": "no future forecast items",
             "labels": ["날씨 판단 보류"],
-            "summary": "기상청 단기예보에서 현재 이후 시간대 예보를 찾지 못했습니다. 출발 전 최신 예보를 확인해 주세요.",
+            "summary": f"기상청 단기예보에서 {target_label}에 해당하는 예보를 찾지 못했습니다. 출발 전 최신 예보를 확인해 주세요.",
         }
 
     sky = SKY_LABELS.get(values.get("SKY", ""), "하늘상태 확인 중")
@@ -322,7 +351,14 @@ def _build_vilage_url(key: str, *, region: str) -> str:
     return f"{KMA_VILAGE_FCST_ENDPOINT}?serviceKey={quote(key, safe='%')}&{query}"
 
 
-def _fetch_vilage_fcst(region: str, key: str, key_name: str) -> dict[str, Any]:
+def _fetch_vilage_fcst(
+    region: str,
+    key: str,
+    key_name: str,
+    *,
+    target_start: date | None = None,
+    target_days: int = 1,
+) -> dict[str, Any]:
     url = _build_vilage_url(key, region=region)
     req = Request(url, headers={"User-Agent": "pack-your-jeju/0.1"})
     try:
@@ -360,7 +396,12 @@ def _fetch_vilage_fcst(region: str, key: str, key_name: str) -> dict[str, Any]:
             "provider": "kma_vilage_fcst",
             "error_sample": _decode_kma_body(raw)[:240],
         }
-    parsed = parse_vilage_fcst_payload(payload, region=region)
+    parsed = parse_vilage_fcst_payload(
+        payload,
+        region=region,
+        target_start=target_start,
+        target_days=target_days,
+    )
     parsed.update(
         {
             "key_configured": True,
@@ -372,10 +413,21 @@ def _fetch_vilage_fcst(region: str, key: str, key_name: str) -> dict[str, Any]:
     return parsed
 
 
-def smoke_kma_nowcast(region: str = "jeju_city") -> dict[str, Any]:
+def smoke_kma_nowcast(
+    region: str = "jeju_city",
+    *,
+    target_start: date | None = None,
+    target_days: int = 1,
+) -> dict[str, Any]:
     key, key_name = _vilage_fcst_service_key()
     if key:
-        return _fetch_vilage_fcst(region, key, key_name)
+        return _fetch_vilage_fcst(
+            region,
+            key,
+            key_name,
+            target_start=target_start,
+            target_days=target_days,
+        )
 
     key, key_name = _api_hub_service_key()
     if not key:

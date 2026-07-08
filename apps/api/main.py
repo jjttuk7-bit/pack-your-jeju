@@ -242,7 +242,11 @@ def pack(body: PackBody) -> dict[str, Any]:
 
     section_objs: list[trust_mod.Section] = []
     with measure_latency() as lat:
-        weather_snapshot = weather_mod.smoke_kma_nowcast(req.regions[0] if req.regions else "jeju_city")
+        weather_snapshot = weather_mod.smoke_kma_nowcast(
+            req.regions[0] if req.regions else "jeju_city",
+            target_start=req.start_date,
+            target_days=req.days,
+        )
         for mf in f.per_moment:
             section = trust_mod.judge_section(mf, weather_snapshot=weather_snapshot)
             section_objs.append(section)
@@ -302,7 +306,11 @@ def pack_pdf(body: PackBody) -> Response:
 
     section_objs: list[trust_mod.Section] = []
     sections: list[dict] = []
-    weather_snapshot = weather_mod.smoke_kma_nowcast(req.regions[0] if req.regions else "jeju_city")
+    weather_snapshot = weather_mod.smoke_kma_nowcast(
+        req.regions[0] if req.regions else "jeju_city",
+        target_start=req.start_date,
+        target_days=req.days,
+    )
     for mf in f.per_moment:
         s = trust_mod.judge_section(mf, weather_snapshot=weather_snapshot)
         section_objs.append(s)

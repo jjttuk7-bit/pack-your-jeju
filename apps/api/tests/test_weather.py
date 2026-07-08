@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from apps.api.engine.weather import parse_kma_api_hub_forecast, parse_vilage_fcst_payload
 
 
@@ -89,3 +91,37 @@ def test_parse_vilage_fcst_payload_builds_travel_weather_summary():
     assert "강수확률 70%" in parsed["summary"]
     assert "기온 25도" in parsed["summary"]
     assert "풍속 4.3m/s" in parsed["summary"]
+
+
+def test_parse_vilage_fcst_payload_prefers_trip_dates_over_current_day():
+    payload = {
+        "response": {
+            "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+            "body": {
+                "items": {
+                    "item": [
+                        {"fcstDate": "20990708", "fcstTime": "1500", "category": "SKY", "fcstValue": "1"},
+                        {"fcstDate": "20990708", "fcstTime": "1500", "category": "POP", "fcstValue": "0"},
+                        {"fcstDate": "20990708", "fcstTime": "1500", "category": "TMP", "fcstValue": "28"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "SKY", "fcstValue": "4"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "PTY", "fcstValue": "1"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "POP", "fcstValue": "70"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "TMP", "fcstValue": "24"},
+                        {"fcstDate": "20990709", "fcstTime": "1200", "category": "WSD", "fcstValue": "4.3"},
+                    ]
+                }
+            },
+        }
+    }
+
+    parsed = parse_vilage_fcst_payload(
+        payload,
+        region="udo",
+        target_start=date(2099, 7, 9),
+        target_days=3,
+    )
+
+    assert parsed["available"] is True
+    assert "7월 9일 12시 예보" in parsed["summary"]
+    assert "강수확률 70%" in parsed["summary"]
+    assert parsed["forecast"]["fcst_date"] == "20990709"
