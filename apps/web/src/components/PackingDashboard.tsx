@@ -507,7 +507,7 @@ export default function PackingDashboard(props: Props) {
                       {suggestion.item}
                     </span>
                     <span className={`mt-1 block text-[10.5px] leading-relaxed ${checked ? 'text-stone-400' : 'text-basalt-2/72'}`}>
-                      이건 이런 일정 때문에 필요해요. {suggestion.reason}
+                      {suggestion.reason}
                     </span>
                   </span>
                 </button>
