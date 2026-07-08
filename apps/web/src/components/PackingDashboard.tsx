@@ -85,15 +85,52 @@ const BASIC_CHECKLIST: string[] = [
   '방수 지퍼백 (해수욕장·감귤 체험 대비)',
 ];
 
-const PLAN_PACKING_ITEMS: Record<string, string[]> = {
-  beach_walk: ['모래 털기 쉬운 샌들', '작은 수건', '선글라스'],
-  oreum: ['미끄럽지 않은 운동화', '500ml 이상 물', '가벼운 바람막이'],
-  gotjawal: ['긴 바지 또는 레깅스', '벌레 기피제', '작은 손전등'],
-  sunset: ['해 질 무렵 걸칠 겉옷', '보조배터리', '사진용 거치대'],
-  local_market: ['접이식 장바구니', '현금 또는 지역화폐', '물티슈'],
-  local_food: ['소화제', '입가심용 물', '예약 확인 메모'],
-  quiet_cafe: ['읽을 책이나 이어폰', '충전 케이블', '노트 앱 메모'],
-  citrus: ['얼룩이 덜 보이는 옷', '손 세정 티슈', '사진 저장 공간'],
+type PlanPackingSuggestion = {
+  item: string;
+  reason: string;
+};
+
+const PLAN_PACKING_ITEMS: Record<string, PlanPackingSuggestion[]> = {
+  beach_walk: [
+    { item: '모래 털기 쉬운 샌들', reason: '바다 산책 뒤 모래와 물기를 빠르게 털어내기 좋아요.' },
+    { item: '작은 수건', reason: '해변에서 손·발을 닦거나 바람이 찰 때 가볍게 쓰기 좋아요.' },
+    { item: '선글라스', reason: '해안 반사광이 강한 시간대에 눈부심을 줄여줘요.' },
+  ],
+  oreum: [
+    { item: '미끄럽지 않은 운동화', reason: '오름 길은 흙길·경사 구간이 있어 접지력이 중요해요.' },
+    { item: '500ml 이상 물', reason: '오름 코스는 그늘이 적은 구간이 있어 수분 보충이 필요해요.' },
+    { item: '가벼운 바람막이', reason: '능선 위에서는 바람이 더 세게 느껴질 수 있어요.' },
+  ],
+  gotjawal: [
+    { item: '긴 바지 또는 레깅스', reason: '곶자왈 숲길의 풀·가지 스침을 줄여줘요.' },
+    { item: '벌레 기피제', reason: '숲 산책 일정에서는 벌레 노출이 늘어날 수 있어요.' },
+    { item: '작은 손전등', reason: '숲길 그늘이나 늦은 시간 이동 때 확인용으로 좋아요.' },
+  ],
+  sunset: [
+    { item: '해 질 무렵 걸칠 겉옷', reason: '노을 시간에는 해안 바람과 체감온도가 내려갈 수 있어요.' },
+    { item: '보조배터리', reason: '사진과 지도 확인이 늘어나는 일정이라 배터리 여유가 필요해요.' },
+    { item: '사진용 거치대', reason: '노을 감상이나 함께 찍는 사진을 안정적으로 남기기 좋아요.' },
+  ],
+  local_market: [
+    { item: '접이식 장바구니', reason: '시장 투어에서 간식·기념품을 담기 편해요.' },
+    { item: '현금 또는 지역화폐', reason: '소규모 노점이나 시장 결제 상황에 대비할 수 있어요.' },
+    { item: '물티슈', reason: '길거리 음식이나 손에 묻는 간식 뒤 정리하기 좋아요.' },
+  ],
+  local_food: [
+    { item: '소화제', reason: '맛집 동선이 이어질 때 속을 편하게 관리하기 좋아요.' },
+    { item: '입가심용 물', reason: '이동 중 음식점 간 텀이 길어질 때 유용해요.' },
+    { item: '예약 확인 메모', reason: '식당 운영 정보가 바뀔 수 있어 방문 전 확인을 돕습니다.' },
+  ],
+  quiet_cafe: [
+    { item: '읽을 책이나 이어폰', reason: '조용한 카페 일정에서 혼자 쉬는 시간을 더 잘 쓰게 해줘요.' },
+    { item: '충전 케이블', reason: '카페 체류 시간이 길어질 때 휴대폰 배터리를 보완해요.' },
+    { item: '노트 앱 메모', reason: '여행 중 찾은 장소나 수정할 정보를 바로 기록하기 좋아요.' },
+  ],
+  citrus: [
+    { item: '얼룩이 덜 보이는 옷', reason: '감귤 체험 중 과즙이나 흙이 묻을 수 있어요.' },
+    { item: '손 세정 티슈', reason: '체험 후 손을 바로 정리하기 좋아요.' },
+    { item: '사진 저장 공간', reason: '체험형 일정은 사진을 많이 남기게 되기 쉬워요.' },
+  ],
 };
 
 export default function PackingDashboard(props: Props) {
@@ -439,27 +476,36 @@ export default function PackingDashboard(props: Props) {
           <div>
             <h2 className="text-[14.5px] font-bold text-stone-900 tracking-tight">내 플랜 맞춤 짐</h2>
             <p className="text-[10.5px] text-stone-500 mt-0.5">
-              플랜에 담은 장소 유형을 기준으로 챙길 것을 제안합니다.
+              플랜에 담은 장소 유형과 이유를 함께 보여드립니다.
             </p>
           </div>
-          <div className="space-y-1">
-            {planPackingItems.map((item, idx) => {
-              const id = `plan-pack-${idx}-${item}`;
+          <div className="space-y-2">
+            {planPackingItems.map((suggestion, idx) => {
+              const id = `plan-pack-${idx}-${suggestion.item}`;
               const checked = checkedItemIds.includes(id);
               return (
                 <button
                   key={id}
                   type="button"
                   onClick={() => onToggleItem(id)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/70 transition text-left"
+                  className={`w-full flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition ${
+                    checked
+                      ? 'border-mint/25 bg-white/70'
+                      : 'border-mint/10 bg-white/55 hover:bg-white/85'
+                  }`}
                 >
                   {checked ? (
-                    <CheckSquare className="w-4 h-4 text-mint shrink-0" />
+                    <CheckSquare className="mt-0.5 w-4 h-4 text-mint shrink-0" />
                   ) : (
-                    <Square className="w-4 h-4 text-stone-300 shrink-0" />
+                    <Square className="mt-0.5 w-4 h-4 text-stone-300 shrink-0" />
                   )}
-                  <span className={`text-[12.5px] ${checked ? 'line-through text-stone-400' : 'text-stone-700'}`}>
-                    {item}
+                  <span className="min-w-0">
+                    <span className={`block text-[12.5px] font-bold ${checked ? 'line-through text-stone-400' : 'text-stone-800'}`}>
+                      {suggestion.item}
+                    </span>
+                    <span className={`mt-1 block text-[10.5px] leading-relaxed ${checked ? 'text-stone-400' : 'text-basalt-2/72'}`}>
+                      이건 이런 일정 때문에 필요해요. {suggestion.reason}
+                    </span>
                   </span>
                 </button>
               );
@@ -588,12 +634,21 @@ function WorkbenchMetric({
   );
 }
 
-function buildPlanPackingItems(planItems: TravelPlanItem[]): string[] {
-  const seen = new Set<string>();
+function buildPlanPackingItems(planItems: TravelPlanItem[]): PlanPackingSuggestion[] {
+  const seen = new Map<string, string[]>();
   planItems.forEach((item) => {
-    (PLAN_PACKING_ITEMS[item.moment] ?? []).forEach((packingItem) => seen.add(packingItem));
+    (PLAN_PACKING_ITEMS[item.moment] ?? []).forEach((packingItem) => {
+      const reasons = seen.get(packingItem.item) ?? [];
+      if (!reasons.includes(packingItem.reason)) {
+        reasons.push(packingItem.reason);
+      }
+      seen.set(packingItem.item, reasons);
+    });
   });
-  return Array.from(seen).slice(0, 12);
+  return Array.from(seen.entries()).map(([item, reasons]) => ({
+    item,
+    reason: reasons.slice(0, 2).join(' '),
+  })).slice(0, 12);
 }
 
 function toPlanItem(item: PackItemDto | ItineraryItemDto, day?: ItineraryDayDto): TravelPlanItem {
@@ -1159,6 +1214,11 @@ function buildShareText(
   const planLines = planItems.length > 0
     ? buildSelectedPlanLines(planItems, visitChecks)
     : buildItineraryShareLines(packResp);
+  const packingLines = planItems.length > 0
+    ? buildPlanPackingItems(planItems).slice(0, 8).map((suggestion) => (
+      `- ${suggestion.item}: ${suggestion.reason}`
+    ))
+    : [];
   const gapLines = collectUnavailableCombos(packResp).slice(0, 5);
   const url = typeof window !== 'undefined' ? window.location.href : 'https://pack-your-jeju.vercel.app/';
   return [
@@ -1174,6 +1234,7 @@ function buildShareText(
     '',
     'Day별 여행플랜',
     ...(planLines.length > 0 ? planLines : ['아직 내 여행플랜에 담은 장소가 없습니다.']),
+    ...(packingLines.length > 0 ? ['', '내 플랜 맞춤 짐', ...packingLines] : []),
     ...(gapLines.length > 0 ? ['', '데이터가 부족한 조합 메모', ...gapLines.map((x) => `- ${x}`)] : []),
     '',
     '장소별 근거와 주의 신호는 제주를 담다에서 확인할 수 있어요.',
