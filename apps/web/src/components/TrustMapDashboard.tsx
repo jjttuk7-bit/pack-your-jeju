@@ -124,8 +124,8 @@ export default function TrustMapDashboard({
   initialMoments,
 }: TrustMapDashboardProps) {
   const [selectedRegions, setSelectedRegions] = useState<RegionId[]>(initialInfo?.regions ?? []);
-  const [activeRegion, setActiveRegion] = useState<RegionId>(
-    initialInfo?.regions?.[0] ?? 'seongsan',
+  const [activeRegion, setActiveRegion] = useState<RegionId | null>(
+    initialInfo?.regions?.[0] ?? null,
   );
   const [selectedMoments, setSelectedMoments] = useState<MomentId[]>(
     initialMoments?.length ? initialMoments : [],
@@ -165,8 +165,9 @@ export default function TrustMapDashboard({
   }, []);
 
   useEffect(() => {
-    if (selectedMoments.length === 0) {
+    if (!activeRegion || selectedMoments.length === 0) {
       setPackPreview(null);
+      setPackLoading(false);
       return;
     }
     let cancelled = false;
@@ -187,9 +188,13 @@ export default function TrustMapDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRegion, selectedMoments.join('|'), startDate, durationDays, companion, purpose, specialNotes]);
 
-  const activeEntry = REGIONS.find((region) => region.value === activeRegion) ?? REGIONS[0];
-  const activePreview = previews[activeRegion];
-  const activeTone = getRegionTone(activePreview, selectedMoments, previewLoading);
+  const activeEntry = activeRegion
+    ? REGIONS.find((region) => region.value === activeRegion)
+    : undefined;
+  const activePreview = activeRegion ? previews[activeRegion] : undefined;
+  const activeTone = activeRegion
+    ? getRegionTone(activePreview, selectedMoments, previewLoading)
+    : 'loading';
   const recommendedPlaces = collectRecommendedPlaces(packPreview);
   const selectedLabels = selectedRegions
     .map((id) => REGIONS.find((region) => region.value === id)?.label ?? id)
@@ -197,6 +202,10 @@ export default function TrustMapDashboard({
   const coverageSummary = useMemo(
     () => summarizeSelectedRegions(selectedRegions, previews),
     [selectedRegions, previews],
+  );
+  const dashboardSummary = useMemo(
+    () => summarizeDashboardPreviews(previews),
+    [previews],
   );
 
   function buildTravelInfo(regions: RegionId[] = selectedRegions): TravelInfo {
@@ -229,7 +238,8 @@ export default function TrustMapDashboard({
 
   const submitPlan = () => {
     if (selectedMoments.length === 0) return;
-    const regions = selectedRegions.length ? selectedRegions : [activeRegion];
+    const regions = selectedRegions.length ? selectedRegions : activeRegion ? [activeRegion] : [];
+    if (regions.length === 0) return;
     onSubmit(buildTravelInfo(regions), selectedMoments);
   };
 
@@ -342,20 +352,28 @@ export default function TrustMapDashboard({
           </main>
 
           <aside className="border-t border-earth bg-white/82 p-4 sm:p-5 lg:border-l lg:border-t-0">
-            <RegionPanel
-              region={activeEntry}
-              preview={activePreview}
-              tone={activeTone}
-              previewLoading={previewLoading}
-              packLoading={packLoading}
-              recommendedPlaces={recommendedPlaces}
-              selected={selectedRegions.includes(activeRegion)}
-              selectedLabels={selectedLabels}
-              coverageSummary={coverageSummary}
-              canSubmit={selectedMoments.length > 0}
-              onToggle={() => toggleRegion(activeRegion)}
-              onSubmit={submitPlan}
-            />
+            {activeEntry && activeRegion ? (
+              <RegionPanel
+                region={activeEntry}
+                preview={activePreview}
+                tone={activeTone}
+                previewLoading={previewLoading}
+                packLoading={packLoading}
+                recommendedPlaces={recommendedPlaces}
+                selected={selectedRegions.includes(activeRegion)}
+                selectedLabels={selectedLabels}
+                coverageSummary={coverageSummary}
+                canSubmit={selectedMoments.length > 0}
+                onToggle={() => toggleRegion(activeRegion)}
+                onSubmit={submitPlan}
+              />
+            ) : (
+              <DashboardStartPanel
+                previewLoading={previewLoading}
+                summary={dashboardSummary}
+                selectedMomentCount={selectedMoments.length}
+              />
+            )}
           </aside>
         </div>
       </section>
@@ -372,7 +390,7 @@ function JejuSilhouetteMap({
   onInspect,
   onToggle,
 }: {
-  activeRegion: RegionId;
+  activeRegion: RegionId | null;
   selectedRegions: RegionId[];
   previews: Record<string, RegionCoveragePreview>;
   loading: boolean;
@@ -800,6 +818,116 @@ function RegionPanel({
   );
 }
 
+function DashboardStartPanel({
+  previewLoading,
+  summary,
+  selectedMomentCount,
+}: {
+  previewLoading: boolean;
+  summary: { totalPlaces: number; loadedRegions: number; strongMoments: string[]; weakMoments: string[] };
+  selectedMomentCount: number;
+}) {
+  const topStrong = summary.strongMoments.slice(0, 3);
+  const topWeak = summary.weakMoments.slice(0, 3);
+
+  return (
+    <div className="flex h-full flex-col">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-citrus-2">
+          지역 선택 전
+        </p>
+        <h2 className="mt-1 font-serif-kr text-[27px] font-bold leading-tight text-basalt">
+          지도를 누르면,
+          <br />
+          근거가 열립니다.
+        </h2>
+        <p className="mt-3 text-[12px] leading-relaxed text-basalt-2">
+          처음 화면에서는 특정 지역을 고정하지 않습니다. 지도에서 지역을 고르면 오른쪽에
+          확인 후보, 주의 신호, 데이터 공백을 나눠 보여드립니다.
+        </p>
+      </div>
+
+      <div className="mt-5 rounded-[24px] border border-mint/25 bg-gradient-to-br from-mint/10 via-white to-[#FFF8EC] p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-mint shadow-sm">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-serif-kr text-[15px] font-bold text-basalt">공공데이터 근거 미리보기</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">
+              후보를 억지로 채우지 않고, 확인된 것과 확인이 필요한 것을 분리합니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Metric
+          label="불러온 지역"
+          value={previewLoading ? '-' : `${summary.loadedRegions}곳`}
+          helper="지도 전체 기준"
+        />
+        <Metric
+          label="확인 후보"
+          value={previewLoading ? '-' : `${summary.totalPlaces.toLocaleString()}곳`}
+          helper="공공데이터 합산"
+        />
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <div className="rounded-2xl border border-earth bg-[#FFF9F0] p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-basalt-2">
+            선택 후 보이는 것
+          </p>
+          <div className="mt-3 space-y-2 text-[11px] leading-relaxed text-basalt-2">
+            <GuideStep index="01" title="지역 근거 요약" body="선택한 지역의 확인 후보 수와 강한 순간을 먼저 보여드립니다." />
+            <GuideStep index="02" title="확인 필요 항목" body="주의 표시는 이유를 함께 보여주고, 부족한 근거는 그대로 분리합니다." />
+            <GuideStep index="03" title="플랜 후보 담기" body="지역과 순간을 고른 뒤에만 제주팩 생성으로 이어집니다." />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-citrus/15 bg-citrus/7 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-citrus-2">
+            지금 고른 순간
+          </p>
+          <p className="mt-1 font-serif-kr text-[18px] font-bold text-basalt">
+            {selectedMomentCount > 0 ? `${selectedMomentCount}개 담김` : '아직 없음'}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">
+            순간을 먼저 골라도 괜찮습니다. 지역을 클릭하면 해당 조합의 근거만 오른쪽에 열립니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-auto pt-5">
+        <div className="rounded-2xl border border-dashed border-earth bg-white/70 p-4 text-center text-[11px] leading-relaxed text-basalt-2">
+          지도에서 제주 지역을 한 번 눌러보세요. 선택한 지역의 근거 패널이 이 자리에 나타납니다.
+        </div>
+      </div>
+
+      {(topStrong.length > 0 || topWeak.length > 0) && (
+        <div className="sr-only">
+          강점 {topStrong.join(', ')} / 확인 필요 {topWeak.join(', ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GuideStep({ index, title, body }: { index: string; title: string; body: string }) {
+  return (
+    <div className="flex gap-2.5">
+      <span className="mt-0.5 flex h-5 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[9px] font-bold text-citrus-2">
+        {index}
+      </span>
+      <span>
+        <b className="text-basalt">{title}</b>
+        <span className="block">{body}</span>
+      </span>
+    </div>
+  );
+}
+
 function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
@@ -943,4 +1071,29 @@ function summarizeSelectedRegions(
     ),
   )) as string[];
   return { totalPlaces, strongMoments, weakMoments };
+}
+
+function summarizeDashboardPreviews(previews: Record<string, RegionCoveragePreview>) {
+  const loadedPreviews = Object.values(previews);
+  const totalPlaces = loadedPreviews.reduce((sum, preview) => sum + preview.total_places, 0);
+  const strongMoments = Array.from(new Set(
+    loadedPreviews.flatMap((preview) =>
+      preview.recommended_moments
+        .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+        .filter(Boolean),
+    ),
+  )) as string[];
+  const weakMoments = Array.from(new Set(
+    loadedPreviews.flatMap((preview) =>
+      preview.weak_moments
+        .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
+        .filter(Boolean),
+    ),
+  )) as string[];
+  return {
+    loadedRegions: loadedPreviews.length,
+    totalPlaces,
+    strongMoments,
+    weakMoments,
+  };
 }
