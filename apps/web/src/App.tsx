@@ -122,6 +122,7 @@ export default function App() {
       localStorage.setItem(GATE_STORAGE_KEY, 'true');
     } catch {}
     setAuthenticated(true);
+    setState(prev => ({ ...prev, step: 'setup' }));
     setShowLanding(false);
   };
 
