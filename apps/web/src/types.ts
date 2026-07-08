@@ -132,6 +132,8 @@ export interface PackItemDto {
   // 상세 확장 UI용 (선택 필드; 결측이면 프론트에서 '미확인' 표기)
   address?: string | null;
   category?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   amenities?: Record<string, unknown> | null;
   hygiene_grade?: string | null;
   region?: string;

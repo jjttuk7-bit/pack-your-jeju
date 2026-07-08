@@ -196,6 +196,10 @@ export default function PackingDashboard(props: Props) {
     [info.purpose]
   );
   const packItems = useMemo(() => collectPackItems(packResp), [packResp]);
+  const mapPlanItems = useMemo(
+    () => enrichPlanItemsWithCoordinates(selectedPlanItems, packItems),
+    [selectedPlanItems, packItems],
+  );
   const selectedPlanIds = useMemo(
     () => new Set(selectedPlanItems.map((item) => item.id)),
     [selectedPlanItems],
@@ -364,9 +368,9 @@ export default function PackingDashboard(props: Props) {
 
       {packResp && !loading && !error && (
         <TripMapCard
-          items={selectedPlanItems.length > 0 ? selectedPlanItems : packItems}
+          items={mapPlanItems.length > 0 ? mapPlanItems : packItems}
           regions={info.regions}
-          isPlanMap={selectedPlanItems.length > 0}
+          isPlanMap={mapPlanItems.length > 0}
         />
       )}
 
@@ -574,6 +578,34 @@ function collectPackItems(packResp: PackResponse | null): PackItemDto[] {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
+  });
+}
+
+function enrichPlanItemsWithCoordinates(
+  planItems: TravelPlanItem[],
+  packItems: PackItemDto[],
+): TravelPlanItem[] {
+  if (planItems.length === 0) return [];
+
+  const byExternalId = new Map<string, PackItemDto>();
+  const byName = new Map<string, PackItemDto>();
+  packItems.forEach((item) => {
+    if (item.external_id) byExternalId.set(item.external_id, item);
+    byName.set(item.name, item);
+  });
+
+  return planItems.map((item) => {
+    if (resolveItemCoordinate(item)) return item;
+    const source =
+      (item.external_id ? byExternalId.get(item.external_id) : null) ??
+      byName.get(item.name);
+    const coord = source ? resolveItemCoordinate(source) : null;
+    if (!coord) return item;
+    return {
+      ...item,
+      latitude: coord.lat,
+      longitude: coord.lng,
+    };
   });
 }
 

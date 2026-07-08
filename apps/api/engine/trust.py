@@ -46,6 +46,8 @@ class BadgedItem:
     # 상세 확장 UI에서 노출 — 근거 있는 값만. 결측은 None으로 두어 프론트가 '미확인' 표기.
     address: str | None = None
     category: str = ""
+    lat: float | None = None
+    lng: float | None = None
     amenities: dict = field(default_factory=dict)
     hygiene_grade: str | None = None
     trust_score: int = 0
@@ -166,6 +168,8 @@ def badge_item(
         region_normalized=hit.region_normalized or "",
         address=hit.address,
         category=hit.category,
+        lat=hit.lat,
+        lng=hit.lng,
         amenities=hit.amenities if isinstance(hit.amenities, dict) else {},
         hygiene_grade=hit.hygiene_grade,
         trust_score=profile.score,

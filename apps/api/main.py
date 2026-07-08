@@ -513,6 +513,8 @@ def _serialize_section(section: trust_mod.Section) -> dict:
                 # 상세 확장 UI용 (근거 있는 값만; 결측은 그대로 전달해 프론트가 '미확인' 표기)
                 "address": it.address,
                 "category": it.category,
+                "latitude": it.lat,
+                "longitude": it.lng,
                 "amenities": it.amenities,
                 "hygiene_grade": it.hygiene_grade,
                 "region": it.region_normalized,
