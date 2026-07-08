@@ -8,13 +8,10 @@ import {
   RefreshCcw,
   ShieldCheck,
   AlertTriangle,
-  Database,
   Compass,
   ListChecks,
   Plus,
-  Route,
   PackageCheck,
-  ClipboardCheck,
 } from 'lucide-react';
 import HarubangMark from './marks/HarubangMark';
 import type {
@@ -491,46 +488,14 @@ function IntroBlock({
         </div>
       </div>
 
-      {/* 에이전트 브리핑 */}
-      <div className="rounded-2xl border border-earth bg-white/80 p-3 shadow-sm space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-citrus-2 uppercase tracking-wider">
-            <Compass className="w-3 h-3" />
-            Agent Briefing
-          </div>
-          <span className="text-[10px] text-basalt-2/60">
-            선택 조건 기준
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <BriefingMetric
-            icon={<Database className="w-3 h-3" />}
-            label="확인 후보"
-            value={`${intro.coverage.total}곳`}
-            tone="verified"
-          />
-          <BriefingMetric
-            icon={<ShieldCheck className="w-3 h-3" />}
-            label="신뢰 신호"
-            value={`${intro.coverage.verified}`}
-            tone="verified"
-          />
-          <BriefingMetric
-            icon={<AlertTriangle className="w-3 h-3" />}
-            label="데이터 부족"
-            value={`${intro.coverage.gap_combos}`}
-            tone={intro.coverage.gap_combos > 0 ? 'gap' : 'quiet'}
-          />
-        </div>
-        <p className="text-[11.5px] text-basalt-2 leading-relaxed">
-          하루방은 장소를 다시 나열하지 않고, 현재 플랜에서 비어 있는 순간과 다음 행동을 정리합니다.
-        </p>
-      </div>
-
-      <AgentPlannerPanel
+      <AgentDecisionPanel
+        intro={intro}
         state={agentState}
         onAddHighlightToPlan={onAddHighlightToPlan}
         onOpenVerify={onOpenVerify}
+        onShowGaps={() => {
+          setShowAllGaps(true);
+        }}
       />
 
       {/* 데이터 부족 조합: 접힌 브리핑 형태로 노출 */}
@@ -591,36 +556,6 @@ function IntroBlock({
   );
 }
 
-function BriefingMetric({
-  icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  tone: 'verified' | 'gap' | 'quiet';
-}) {
-  const toneClass = {
-    verified: 'border-mint/30 bg-mint/10 text-mint',
-    gap: 'border-amber-200 bg-amber-50 text-amber-800',
-    quiet: 'border-earth bg-[#FDF6EA] text-basalt-2',
-  }[tone];
-
-  return (
-    <div className={`rounded-xl border px-2 py-2 ${toneClass}`}>
-      <div className="flex items-center gap-1 text-[10px] font-semibold opacity-90">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-0.5 font-serif-kr text-[14px] font-bold leading-none">
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function groupGapsByRegion(gaps: import('../api').HarubanIntroGap[]) {
   const grouped = new Map<string, { region: string; regionLabel: string; moments: string[] }>();
   gaps.forEach((gap) => {
@@ -646,6 +581,8 @@ interface AgentState {
   changedCount: number;
   recommendedHighlight: import('../api').HarubanIntroHighlight | null;
   recommendedAlreadyInPlan: boolean;
+  strongMomentLabels: string[];
+  weakMomentLabels: string[];
 }
 
 function buildAgentState(
@@ -666,6 +603,12 @@ function buildAgentState(
     const planId = `public-${highlight.external_id}-${highlight.moment}`;
     return !selectedPlanItems.some((item) => item.id === planId);
   }) ?? null;
+  const strongMomentLabels = Array.from(
+    new Set(intro.highlights.map((highlight) => highlight.moment_label)),
+  ).slice(0, 3);
+  const weakMomentLabels = Array.from(
+    new Set(intro.gaps.map((gap) => gap.moment_label)),
+  ).slice(0, 3);
 
   return {
     planCount: selectedPlanItems.length,
@@ -682,6 +625,8 @@ function buildAgentState(
     recommendedAlreadyInPlan: recommendedHighlight
       ? selectedPlanItems.some((item) => item.id === `public-${recommendedHighlight.external_id}-${recommendedHighlight.moment}`)
       : false,
+    strongMomentLabels,
+    weakMomentLabels,
   };
 }
 
@@ -701,49 +646,67 @@ function planItemFromHighlight(highlight: import('../api').HarubanIntroHighlight
   };
 }
 
-function AgentPlannerPanel({
+function AgentDecisionPanel({
+  intro,
   state,
   onAddHighlightToPlan,
   onOpenVerify,
+  onShowGaps,
 }: {
+  intro: HarubanIntroResponse;
   state: AgentState;
   onAddHighlightToPlan: (highlight: import('../api').HarubanIntroHighlight) => void;
   onOpenVerify: () => void;
+  onShowGaps: () => void;
 }) {
+  const judgement = buildAgentJudgement(intro, state);
+  const planHint = buildPlanHint(state);
+  const nextAction = state.recommendedHighlight
+    ? `${state.recommendedHighlight.moment_label} 후보 1곳을 먼저 담아보세요.`
+    : state.missingMomentLabels.length > 0
+      ? `${state.missingMomentLabels[0]} 후보를 하나 더 확인하면 플랜 균형이 좋아집니다.`
+      : '이제 Day별 순서와 짐 목록을 맞추면 됩니다.';
+
   return (
-    <div className="rounded-2xl border border-basalt/10 bg-gradient-to-br from-[#FDFBF7] to-[#F4FBF8] p-3 shadow-sm space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-basalt uppercase tracking-wider">
-          <Route className="w-3 h-3 text-citrus-2" />
-          Plan Coach
+    <div className="rounded-2xl border border-basalt/10 bg-gradient-to-br from-[#FFF9ED] via-white to-[#F3FBF7] p-3 shadow-sm space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-citrus-2 uppercase tracking-[0.14em]">
+            <Compass className="w-3 h-3" />
+            하루방 판단
+          </div>
+          <p className="mt-1 font-serif-kr text-[15px] font-bold leading-snug text-basalt">
+            {judgement.title}
+          </p>
         </div>
-        <span className="rounded-full bg-white border border-earth px-2 py-0.5 text-[10px] font-bold text-basalt-2">
+        <span className="shrink-0 rounded-full bg-white border border-earth px-2 py-0.5 text-[10px] font-bold text-basalt-2">
           플랜 {state.planCount}개
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5">
-        <CoachMetric label="공공 후보" value={`${state.publicPlanCount}`} tone="mint" />
-        <CoachMetric label="사용자 메모" value={`${state.userAddedCount}`} tone="amber" />
-        <CoachMetric label="확인 완료" value={`${state.matchedCount}`} tone="stone" />
-      </div>
+      <p className="rounded-xl border border-earth/80 bg-white/80 px-3 py-2.5 text-[12px] leading-relaxed text-basalt">
+        {judgement.body}
+      </p>
 
-      <div className="rounded-xl border border-earth bg-white/75 p-2.5">
-        <div className="flex items-start gap-2">
-          <ClipboardCheck className="w-4 h-4 text-citrus-2 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <p className="text-[12px] font-bold text-basalt">
-              {state.missingMomentLabels.length > 0
-                ? '아직 플랜에 비어 있는 순간이 있어요.'
-                : '선택한 순간이 플랜에 들어오기 시작했어요.'}
-            </p>
-            <p className="mt-0.5 text-[11px] text-basalt-2 leading-relaxed">
-              {state.missingMomentLabels.length > 0
-                ? state.missingMomentLabels.slice(0, 3).join(' · ')
-                : '이제 Day별 균형과 짐 목록을 함께 맞추면 됩니다.'}
-            </p>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-1.5">
+        <InsightLine
+          icon={<ShieldCheck className="w-3.5 h-3.5" />}
+          label="좋은 점"
+          text={planHint.good}
+          tone="good"
+        />
+        <InsightLine
+          icon={<AlertTriangle className="w-3.5 h-3.5" />}
+          label="보완점"
+          text={planHint.gap}
+          tone="warn"
+        />
+        <InsightLine
+          icon={<PackageCheck className="w-3.5 h-3.5" />}
+          label="다음 행동"
+          text={nextAction}
+          tone="next"
+        />
       </div>
 
       {state.changedCount > 0 && (
@@ -756,10 +719,18 @@ function AgentPlannerPanel({
         {state.recommendedHighlight && (
           <ActionButton
             icon={<Plus className="w-3.5 h-3.5" />}
-            title={`${state.recommendedHighlight.name} 담기`}
-            desc={`${state.recommendedHighlight.region_label} · ${state.recommendedHighlight.moment_label} 후보를 내 플랜에 바로 추가`}
+            title={`${state.recommendedHighlight.name} 먼저 담기`}
+            desc={`${state.recommendedHighlight.region_label}의 ${state.recommendedHighlight.moment_label} 후보라 현재 조건을 보완합니다`}
             disabled={state.recommendedAlreadyInPlan}
             onClick={() => onAddHighlightToPlan(state.recommendedHighlight!)}
+          />
+        )}
+        {state.weakMomentLabels.length > 0 && (
+          <ActionButton
+            icon={<AlertTriangle className="w-3.5 h-3.5" />}
+            title="확인 근거 약한 순간 보기"
+            desc={`${state.weakMomentLabels.join(' · ')}은 담기 전 확인이 필요합니다`}
+            onClick={onShowGaps}
           />
         )}
         {state.userAddedCount > 0 && (
@@ -770,36 +741,80 @@ function AgentPlannerPanel({
             onClick={onOpenVerify}
           />
         )}
-        <ActionButton
-          icon={<PackageCheck className="w-3.5 h-3.5" />}
-          title="짐 목록은 플랜 기준으로 보기"
-          desc="중앙의 내 플랜 맞춤 짐 섹션에 선택한 장소 유형이 반영됩니다"
-          disabled
-          onClick={() => {}}
-        />
       </div>
     </div>
   );
 }
 
-function CoachMetric({
+function buildAgentJudgement(
+  intro: HarubanIntroResponse,
+  state: AgentState,
+): { title: string; body: string } {
+  const strong = state.strongMomentLabels.join(' · ') || '선택한 순간';
+  const weak = state.weakMomentLabels.join(' · ');
+
+  if (intro.coverage.total <= 0) {
+    return {
+      title: '아직은 조건을 조금 좁혀야 해요.',
+      body: '제주를 담다가 확인한 공공데이터 기준으로는 현재 조합에서 바로 추천할 후보가 약합니다. 지역이나 순간을 하나만 더 구체화하면 확인 가능한 후보를 다시 찾을 수 있어요.',
+    };
+  }
+
+  if (weak) {
+    return {
+      title: `${strong}은 괜찮고, ${weak}은 확인이 필요해요.`,
+      body: `현재 조건에서는 확인 후보 ${intro.coverage.total}곳이 잡혔지만, ${weak}은 근거가 약한 편입니다. 무리해서 채우기보다 확인된 후보부터 담고 부족한 순간만 따로 보는 흐름이 좋아요.`,
+    };
+  }
+
+  return {
+    title: `${strong} 중심으로 플랜을 짜기 좋아요.`,
+    body: `현재 조건에서는 확인 후보 ${intro.coverage.total}곳이 잡혔고, 선택한 순간을 플랜으로 옮기기 좋은 상태입니다. 이제 동선이 가까운 후보부터 1~2곳만 담아도 여행팩의 뼈대가 생겨요.`,
+  };
+}
+
+function buildPlanHint(state: AgentState): { good: string; gap: string } {
+  const good = state.publicPlanCount > 0
+    ? `확인된 공공데이터 후보 ${state.publicPlanCount}곳이 이미 플랜에 들어왔어요.`
+    : state.strongMomentLabels.length > 0
+      ? `${state.strongMomentLabels.join(' · ')} 쪽은 후보를 고르기 좋은 상태예요.`
+      : '먼저 지역과 순간을 기준으로 확인 후보를 잡을 수 있어요.';
+
+  const gap = state.missingMomentLabels.length > 0
+    ? `${state.missingMomentLabels.slice(0, 3).join(' · ')}은 아직 플랜에 비어 있어요.`
+    : state.weakMomentLabels.length > 0
+      ? `${state.weakMomentLabels.join(' · ')}은 담기 전 확인 근거를 더 보는 게 좋아요.`
+      : '선택한 순간은 채워졌으니 날씨와 동선 기준으로 순서를 맞추면 좋아요.';
+
+  return { good, gap };
+}
+
+function InsightLine({
+  icon,
   label,
-  value,
+  text,
   tone,
 }: {
+  icon: React.ReactNode;
   label: string;
-  value: string;
-  tone: 'mint' | 'amber' | 'stone';
+  text: string;
+  tone: 'good' | 'warn' | 'next';
 }) {
   const toneClass = {
-    mint: 'text-mint bg-mint/10 border-mint/20',
-    amber: 'text-amber-800 bg-amber-50 border-amber-100',
-    stone: 'text-basalt-2 bg-white border-earth',
+    good: 'border-mint/20 bg-mint/10 text-mint',
+    warn: 'border-amber-200 bg-amber-50/80 text-amber-900',
+    next: 'border-citrus/20 bg-citrus/10 text-citrus-2',
   }[tone];
+
   return (
-    <div className={`rounded-xl border px-2 py-2 ${toneClass}`}>
-      <div className="text-[9.5px] font-semibold opacity-80">{label}</div>
-      <div className="font-serif-kr text-[15px] font-bold leading-none mt-0.5">{value}</div>
+    <div className={`rounded-xl border px-3 py-2 ${toneClass}`}>
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 shrink-0">{icon}</span>
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold">{label}</div>
+          <div className="mt-0.5 text-[11.5px] leading-snug text-basalt">{text}</div>
+        </div>
+      </div>
     </div>
   );
 }
