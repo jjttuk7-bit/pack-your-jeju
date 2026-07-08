@@ -5,7 +5,7 @@ import type { BadgeKind } from '../types';
 /**
  * 신뢰 배지 4종 (TRUST_ENGINE.md §3, DECISIONS D-07).
  * - verified 🔵: 확인됨
- * - caution ⚠️: 주의 (수정요청 이력·정보 결측 등) — 사유를 라벨에 통합해 노출
+ * - caution ⚠️: 확인 필요 (수정요청 이력·정보 결측 등) — 사유를 라벨에 통합해 노출
  * - contradicted ×: 반증 존재 (폐업 확인)
  * - reference 🟠: 참고 (공공데이터 검증 아님)
  *
@@ -16,7 +16,7 @@ import type { BadgeKind } from '../types';
 // caution note 원문 → 짧은 라벨 매핑 (배지 안에 들어갈 헤드라인).
 // 백엔드 trust.py:_AMENITY_KO 라벨과 정합해야 한다.
 // 우선순위 순으로 위에서 아래로 첫 매칭 사용 (수정요청 이력 > amenity 결측 > 유효기간).
-// 매칭 실패 시 기본 "주의"로 폴백.
+// 매칭 실패 시 기본 "확인 필요"로 폴백.
 const CAUTION_LABEL_MAP: Array<{ needle: string; label: string; footnote?: string }> = [
   { needle: '수정요청', label: '수정요청 이력', footnote: '1,686건 중 하나' },
   { needle: '아이 동반', label: '아이 동반 정보 미확인' },
@@ -27,11 +27,11 @@ const CAUTION_LABEL_MAP: Array<{ needle: string; label: string; footnote?: strin
 ];
 
 function pickCautionLabel(note?: string | null): { label: string; footnote?: string } {
-  if (!note) return { label: '주의' };
+  if (!note) return { label: '확인 필요' };
   for (const m of CAUTION_LABEL_MAP) {
     if (note.includes(m.needle)) return { label: m.label, footnote: m.footnote };
   }
-  return { label: '주의' };
+  return { label: '확인 필요' };
 }
 
 export default function Badge({
@@ -55,7 +55,7 @@ export default function Badge({
       border: 'border-emerald-200',
     },
     caution: {
-      label: cautionResolved?.label ?? '주의',
+      label: cautionResolved?.label ?? '확인 필요',
       icon: <AlertTriangle className="w-3.5 h-3.5" />,
       bg: 'bg-amber-50',
       text: 'text-amber-700',

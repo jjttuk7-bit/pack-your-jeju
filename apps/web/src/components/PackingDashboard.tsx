@@ -685,7 +685,12 @@ function CandidateWorkbenchHeader({
         </div>
         <div className="grid grid-cols-3 gap-2 sm:min-w-[390px]">
           <WorkbenchMetric label={sourceLabel} value={`${signals.total}곳`} tone="base" />
-          <WorkbenchMetric label="확인 후보" value={`${signals.verified}곳`} tone="mint" />
+          <WorkbenchMetric
+            label="공공데이터 확인 후보"
+            value={`${signals.verified}곳`}
+            tone="mint"
+            caption="장소명·주소 확인"
+          />
           <WorkbenchMetric label="내 플랜" value={`${planCount}곳`} tone="citrus" />
         </div>
       </div>
@@ -697,10 +702,12 @@ function WorkbenchMetric({
   label,
   value,
   tone,
+  caption,
 }: {
   label: string;
   value: string;
   tone: 'base' | 'mint' | 'citrus';
+  caption?: string;
 }) {
   const toneClass = {
     base: 'border-earth bg-[#FDF6EA] text-basalt',
@@ -711,6 +718,7 @@ function WorkbenchMetric({
     <div className={`rounded-2xl border px-3.5 py-3 ${toneClass}`}>
       <div className="text-[9.5px] font-bold uppercase tracking-wider opacity-70">{label}</div>
       <div className="mt-0.5 font-serif-kr text-[18px] font-bold leading-none">{value}</div>
+      {caption && <div className="mt-1 text-[9.5px] leading-snug opacity-70">{caption}</div>}
     </div>
   );
 }

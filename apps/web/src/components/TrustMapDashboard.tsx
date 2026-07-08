@@ -17,6 +17,7 @@ import type {
   RegionCoveragePreview,
   RegionId,
   TravelInfo,
+  BadgeKind,
 } from '../types';
 import { COMPANIONS, MOMENTS, PURPOSES, REGIONS } from '../data';
 import { requestPack, requestRegionCoveragePreview } from '../api';
@@ -127,7 +128,7 @@ export default function TrustMapDashboard({
     initialInfo?.regions?.[0] ?? 'seongsan',
   );
   const [selectedMoments, setSelectedMoments] = useState<MomentId[]>(
-    initialMoments?.length ? initialMoments : DEFAULT_MOMENTS,
+    initialMoments?.length ? initialMoments : [],
   );
   const [startDate, setStartDate] = useState(
     normalizeTripStartDate(initialInfo?.startDate),
@@ -227,9 +228,9 @@ export default function TrustMapDashboard({
   };
 
   const submitPlan = () => {
+    if (selectedMoments.length === 0) return;
     const regions = selectedRegions.length ? selectedRegions : [activeRegion];
-    const moments = selectedMoments.length ? selectedMoments : DEFAULT_MOMENTS;
-    onSubmit(buildTravelInfo(regions), moments);
+    onSubmit(buildTravelInfo(regions), selectedMoments);
   };
 
   return (
@@ -303,10 +304,17 @@ export default function TrustMapDashboard({
 
             <div className="mt-4 rounded-[24px] border border-earth bg-white/72 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
-                  담고 싶은 순간
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
+                    담고 싶은 순간
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-basalt-2">
+                    1개 이상 고르면 제주팩을 만들 수 있어요.
+                  </p>
+                </div>
+                <p className="rounded-full border border-earth bg-[#FFF9F0] px-2 py-1 text-[10px] font-bold text-basalt-2">
+                  {selectedMoments.length > 0 ? `현재 ${selectedMoments.length}개 담김` : '1개 이상 선택'}
                 </p>
-                <p className="text-[10px] text-basalt-2">{selectedMoments.length}개 선택</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-4">
                 {MOMENTS.map((moment) => {
@@ -344,6 +352,7 @@ export default function TrustMapDashboard({
               selected={selectedRegions.includes(activeRegion)}
               selectedLabels={selectedLabels}
               coverageSummary={coverageSummary}
+              canSubmit={selectedMoments.length > 0}
               onToggle={() => toggleRegion(activeRegion)}
               onSubmit={submitPlan}
             />
@@ -618,6 +627,7 @@ function RegionPanel({
   selected,
   selectedLabels,
   coverageSummary,
+  canSubmit,
   onToggle,
   onSubmit,
 }: {
@@ -626,10 +636,11 @@ function RegionPanel({
   tone: RegionTone;
   previewLoading: boolean;
   packLoading: boolean;
-  recommendedPlaces: Array<{ name: string; badge: string; note: string | null; source: string }>;
+  recommendedPlaces: RegionCandidateSummary[];
   selected: boolean;
   selectedLabels: string;
   coverageSummary: { totalPlaces: number; strongMoments: string[]; weakMoments: string[] };
+  canSubmit: boolean;
   onToggle: () => void;
   onSubmit: () => void;
 }) {
@@ -666,8 +677,16 @@ function RegionPanel({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Metric label="확인 후보" value={preview ? preview.total_places.toLocaleString() : '-'} />
-        <Metric label="선택 후보" value={selected ? '담김' : '미선택'} />
+        <Metric
+          label="공공데이터 확인 후보"
+          value={preview ? preview.total_places.toLocaleString() : '-'}
+          helper="장소명·주소 조회"
+        />
+        <Metric
+          label="선택 후보"
+          value={selected ? '담김' : '미선택'}
+          helper={selected ? '제주팩에 포함' : '아직 미포함'}
+        />
       </div>
 
       <div className="mt-5">
@@ -705,9 +724,14 @@ function RegionPanel({
 
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
-            실제 후보
-          </p>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
+              실제 후보
+            </p>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-basalt-2/80">
+              조회된 장소와 방문 전 확인할 내용을 함께 봅니다.
+            </p>
+          </div>
           {packLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-citrus-2" />}
         </div>
         <div className="space-y-2">
@@ -717,10 +741,18 @@ function RegionPanel({
                 <div>
                   <p className="font-serif-kr text-[13px] font-bold text-basalt">{place.name}</p>
                   <p className="mt-1 text-[10.5px] leading-relaxed text-basalt-2">
-                    {place.note || place.source}
+                    근거: {place.source}
                   </p>
                 </div>
-                <Badge kind={place.badge as any} />
+                <Badge kind={place.badge} note={place.note} />
+              </div>
+              <div className={`mt-2 rounded-xl border px-2.5 py-2 text-[10.5px] leading-relaxed ${
+                place.badge === 'verified'
+                  ? 'border-mint/20 bg-mint/7 text-mint'
+                  : 'border-amber-100 bg-amber-50/70 text-amber-900'
+              }`}>
+                <p className="font-bold">{place.badge === 'verified' ? '확인된 내용' : '확인할 내용'}</p>
+                <p className="mt-0.5">{candidateReasonText(place)}</p>
               </div>
             </div>
           )) : (
@@ -757,9 +789,10 @@ function RegionPanel({
         <button
           type="button"
           onClick={onSubmit}
-          className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-citrus px-4 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
+          disabled={!canSubmit}
+          className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-citrus px-4 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-white/80 disabled:shadow-none"
         >
-          {selectedLabels || region.label} 제주팩 받기
+          {canSubmit ? `${selectedLabels || region.label} 제주팩 받기` : '순간을 1개 이상 골라주세요'}
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -767,11 +800,12 @@ function RegionPanel({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-2xl border border-earth bg-[#FFF9F0] px-3 py-2">
       <p className="text-[10px] text-basalt-2">{label}</p>
       <p className="mt-0.5 font-serif-kr text-[20px] font-bold text-basalt">{value}</p>
+      {helper && <p className="mt-1 text-[9.5px] leading-snug text-basalt-2/75">{helper}</p>}
     </div>
   );
 }
@@ -821,7 +855,15 @@ function panelToneClass(tone: RegionTone): string {
   return 'border-citrus/20 bg-citrus/8 text-basalt';
 }
 
-function collectRecommendedPlaces(pack: PackResponse | null) {
+type RegionCandidateSummary = {
+  name: string;
+  badge: BadgeKind;
+  note: string | null;
+  source: string;
+  checkRequired: string[];
+};
+
+function collectRecommendedPlaces(pack: PackResponse | null): RegionCandidateSummary[] {
   if (!pack) return [];
   const seen = new Set<string>();
   const items = pack.sections.flatMap((section) => section.items);
@@ -838,7 +880,44 @@ function collectRecommendedPlaces(pack: PackResponse | null) {
       badge: item.badge,
       note: item.note,
       source: item.sources?.[0]?.name ?? '공공데이터 근거',
+      checkRequired: item.check_required ?? [],
     }));
+}
+
+const CHECK_REQUIRED_LABELS: Record<string, string> = {
+  public_data: '공공데이터 반증 여부',
+  weather: '날씨 영향',
+  movement: '이동·주차 조건',
+  feedback: '방문 피드백',
+  visit_signal: '방문 피드백',
+  operating: '운영 정보',
+};
+
+function formatCheckRequired(checks: string[]): string {
+  return checks
+    .map((key) => CHECK_REQUIRED_LABELS[key] ?? key)
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function candidateReasonText(place: RegionCandidateSummary): string {
+  const checks = formatCheckRequired(place.checkRequired);
+  if (place.badge === 'verified') {
+    return `공공데이터에서 장소명·주소가 조회된 후보입니다.${checks ? ` 방문 전 ${checks}만 확인하면 좋아요.` : ''}`;
+  }
+  if (place.badge === 'contradicted') {
+    return '공공데이터에서 폐업 또는 변경 신호가 확인되어 플랜에 담기 전 대체 후보 확인이 필요합니다.';
+  }
+  if (place.note?.includes('수정요청')) {
+    return `이용자 정보 수정요청 이력이 있어 방문 전 위치·운영 정보를 확인하세요.${checks ? ` 함께 볼 항목: ${checks}.` : ''}`;
+  }
+  if (place.note) {
+    return `${place.note} 항목이 있어 방문 전 확인하세요.${checks ? ` 함께 볼 항목: ${checks}.` : ''}`;
+  }
+  if (checks) {
+    return `${checks}을(를) 방문 전 확인하면 더 안전하게 담을 수 있습니다.`;
+  }
+  return '일부 근거가 충분하지 않아 방문 전 최신 정보를 한 번 더 확인하세요.';
 }
 
 function summarizeSelectedRegions(
