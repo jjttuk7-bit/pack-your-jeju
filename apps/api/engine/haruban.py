@@ -543,6 +543,8 @@ def _infer_category_from_text(text_in: str, form_state: dict | None = None) -> s
         return "food"
     if re.search(r"카페|커피|차|글쓰기", text_in):
         return "cafe"
+    if re.search(r"바다|바닷가|해변|해수욕장|해안|비치", text_in):
+        return "beach"
     if re.search(r"오름|산책|걷|트레킹", text_in):
         return "oreum"
     if re.search(r"시장|오일장|로컬", text_in):
@@ -582,7 +584,7 @@ def _infer_limit_from_text(text_in: str) -> int:
 
 def _is_search_like_text(text_in: str) -> bool:
     return bool(re.search(
-        r"추천|맛집|식당|카페|오름|해산물|해물|점심|저녁|어디|몇\s*개|몇\s*곳|리스트|알려줘|후보|한\s*곳|한곳",
+        r"추천|맛집|식당|카페|오름|바다|바닷가|해변|해수욕장|해산물|해물|점심|저녁|어디|몇\s*개|몇\s*곳|리스트|후보|한\s*곳|한곳",
         text_in,
     ))
 
@@ -621,7 +623,10 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
         if key and key in normalized_user:
             return candidate
 
-    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|정보|위치|주소|알려줘|알려줘요|하\.*", last_user))
+    if _is_general_advice_text(last_user) or _is_region_category_query(last_user):
+        return ""
+
+    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|위치|주소|하\.*", last_user))
     asks_list = bool(re.search(r"추천|리스트|몇\s*개|몇\s*곳|후보|어디|맛집들|식당들", last_user))
     if not asks_detail or asks_list:
         return ""
@@ -636,6 +641,58 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
     if len(_normalize_place_name(cleaned)) < 2:
         return ""
     return cleaned
+
+
+def _is_general_advice_text(text_in: str) -> bool:
+    return bool(re.search(r"처음|여행계획|계획|코스|일정|어떻게|세우|준비|팁|방법", text_in))
+
+
+def _is_region_category_query(text_in: str) -> bool:
+    has_region = bool(_infer_regions_from_text(text_in, {}))
+    has_category = bool(_infer_category_from_text(text_in, {}))
+    return has_region and has_category
+
+
+def _should_answer_without_search(messages_in: list[dict]) -> bool:
+    conv = [
+        {"role": m.get("role"), "content": m.get("content") or ""}
+        for m in messages_in
+        if m.get("role") in {"user", "assistant"}
+    ]
+    last_user = _latest_user_text(conv)
+    if not last_user:
+        return False
+    if _infer_place_detail_query(conv):
+        return False
+    if _is_region_category_query(last_user):
+        return False
+    if re.search(r"맛집|식당|카페|오름|바다|바닷가|해변|해수욕장|해산물|몇\s*곳|몇\s*개|리스트", last_user):
+        return False
+    return bool(re.search(r"처음|여행계획|계획|코스|일정|어떻게|세우|준비|팁|방법|어떤\s*곳|가보면\s*좋", last_user))
+
+
+def _free_advice_user_text(messages_in: list[dict]) -> str:
+    return "\n".join(
+        f"{m.get('role')}: {m.get('content') or ''}"
+        for m in messages_in[-6:]
+        if m.get("role") in {"user", "assistant"}
+    )
+
+
+def _template_free_advice(last_user: str) -> str:
+    if "제주시" in last_user:
+        return (
+            "제주시는 처음 여행에서 동선을 잡기 좋은 출발점이에요. "
+            "먼저 공항에서 가까운 권역, 바다 산책, 오름 산책, 로컬 시장, 조용한 카페처럼 "
+            "원하는 순간을 1~2개만 고른 뒤 지도에서 지역을 선택해 보세요. "
+            "구체적인 장소명은 공공데이터로 확인되는 후보만 따로 좁혀드릴게요."
+        )
+    return (
+        "제주가 처음이라면 지역을 먼저 넓게 나누고, 하루에 한 권역만 잡는 방식이 좋아요. "
+        "첫째 날은 도착 시간에 맞춰 가벼운 산책이나 카페, 둘째 날은 오름·바다·시장 중 핵심 순간, "
+        "마지막 날은 공항 이동을 고려한 짧은 코스로 잡아보세요. "
+        "지도에서 지역과 담고 싶은 순간을 고르면 확인된 후보만 근거와 함께 좁혀드릴게요."
+    )
 
 
 def _category_label(category: str | None) -> str:
@@ -938,6 +995,33 @@ def chat_turn(
     llm.complete_with_tools는 단일 system/user만 받아서, 여기서는 openai 클라이언트를
     직접 사용해 conv 배열 통째로 전달하고 도구 실행 루프를 돌린다. 모델·키 규칙은 유지.
     """
+    if _should_answer_without_search(messages_in):
+        last_user = next(
+            (m.get("content") or "" for m in reversed(messages_in) if m.get("role") == "user"),
+            "",
+        )
+        if llm.is_available():
+            system = (
+                "너는 하루방 에이전트다. 사용자의 제주 여행 계획 상담에 답한다. "
+                "이 경로에서는 도구 검색 없이 gpt-5-mini의 일반 추론으로 답하되, "
+                "구체적인 장소명·주소·영업시간·수치처럼 사실 확인이 필요한 정보는 지어내지 않는다. "
+                "장소 추천이 필요하면 지역과 순간을 선택하면 공공데이터 기준으로 좁혀드리겠다고 안내한다. "
+                "답변은 한국어 존댓말 3~5문장으로, 바로 실행할 수 있는 계획 방식 중심으로 말한다."
+            )
+            resp = llm.complete(
+                system=system + _form_context_block(form_state),
+                user=_free_advice_user_text(messages_in),
+                max_completion_tokens=500,
+                temperature=0.7,
+            )
+            if resp.available and resp.text:
+                return HarubanTurn(available=True, reply_text=resp.text)
+        return HarubanTurn(
+            available=True,
+            reply_text=_template_free_advice(last_user),
+            reason="free advice template fallback",
+        )
+
     system_prompt = _BASE_SYSTEM_PROMPT + _form_context_block(form_state)
     search_pool = _build_search_pool_context(messages_in, form_state)
 

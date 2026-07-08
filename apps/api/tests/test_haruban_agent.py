@@ -140,6 +140,52 @@ def test_haruban_builds_search_pool_args_for_one_seafood_lunch():
     assert "해산물" in args["keywords"]
 
 
+def test_haruban_does_not_treat_general_planning_as_place_detail():
+    conv = [
+        {"role": "user", "content": "제주는 처음인데 어떻게 여행계획을 세우면 좋을지 알려줘"},
+    ]
+
+    assert haruban._infer_place_detail_query(conv) == ""
+    assert haruban._build_search_pool_context(conv, {}) is None
+
+
+def test_haruban_does_not_treat_region_category_query_as_place_detail():
+    conv = [
+        {"role": "user", "content": "제주시에 있는 오름 정보를 알려줘"},
+    ]
+
+    assert haruban._infer_place_detail_query(conv) == ""
+    args = haruban._infer_search_places_args(conv, {})
+    assert args["regions"] == ["jeju_city"]
+    assert args["category"] == "oreum"
+
+
+def test_haruban_infers_beach_category_from_user_text():
+    conv = [
+        {"role": "user", "content": "제주시에 있는 바닷가 알려줘"},
+    ]
+
+    assert haruban._infer_place_detail_query(conv) == ""
+    args = haruban._infer_search_places_args(conv, {})
+    assert args["regions"] == ["jeju_city"]
+    assert args["category"] == "beach"
+
+
+def test_haruban_routes_broad_advice_to_free_gpt_path():
+    assert haruban._should_answer_without_search([
+        {"role": "user", "content": "제주는 처음인데 어떻게 여행계획을 세우면 좋을지 알려줘"},
+    ])
+    assert haruban._should_answer_without_search([
+        {"role": "user", "content": "제주시는 어떤곳을 가보면 좋은지 알려줘"},
+    ])
+    assert not haruban._should_answer_without_search([
+        {"role": "user", "content": "제주시에 있는 오름 정보를 알려줘"},
+    ])
+    assert not haruban._should_answer_without_search([
+        {"role": "user", "content": "소심한이층에 관해 자세히 알려줘"},
+    ])
+
+
 def test_haruban_extracts_previous_candidates_for_more_requests():
     conv = [
         {
