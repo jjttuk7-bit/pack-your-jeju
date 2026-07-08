@@ -98,7 +98,7 @@ function formStateForApi(snap: FormStateSnapshot): Record<string, unknown> {
  * 하루방 챗 위젯 — 우측 하단 플로팅.
  *
  * 새 흐름 (실서비스 톤):
- *  - 폼에서 지역+순간이 최초로 하나 이상씩 채워지면 하루방이 스스로 팝업 + 인사.
+ *  - 폼에서 지역+순간이 최초로 하나 이상씩 채워지면 하루방이 인사 내용을 준비한다.
  *  - 인사에는 저희 데이터로 확인된 하이라이트 카드 리스트가 붙는다 (배지·주소·근거 URL).
  *  - 이후 폼이 바뀌면 채팅창 하단에 "다시 물어볼까요?" 재요청 인라인 버튼.
  *  - 사용자 자유 발화는 기존 /agent/chat 도구 루프로 유지.
@@ -123,7 +123,7 @@ export default function HarubanChat({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 임계 도달 1회 트리거 관리.
-  //  - hasTriggeredRef: 임계 첫 충족 후 자동 팝업/인사를 이미 한 번 냈는지.
+  //  - hasTriggeredRef: 임계 첫 충족 후 인사 준비를 이미 한 번 했는지.
   //  - lastIntroSnapshotRef: 마지막 intro 요청 당시의 폼 스냅샷 (변경 감지용).
   const hasTriggeredRef = useRef(false);
   const lastIntroSnapshotRef = useRef<FormStateSnapshot | null>(null);
@@ -147,7 +147,7 @@ export default function HarubanChat({
     }
   }, [entries, pendingSuggestion, loading, introLoading]);
 
-  // 임계 최초 도달 시 하루방 자동 인사.
+  // 임계 최초 도달 시 하루방 인사를 미리 준비하되, 창은 사용자가 직접 열 때만 보여준다.
   useEffect(() => {
     if (!isThresholdMet) {
       // 폼이 미달로 돌아가면 다음 도달 시 다시 자동 인사할 수 있게 flag 리셋.
@@ -157,7 +157,7 @@ export default function HarubanChat({
     }
     if (hasTriggeredRef.current) return;
     hasTriggeredRef.current = true;
-    void fetchIntro(currentSnapshot, { autoOpen: true });
+    void fetchIntro(currentSnapshot, { autoOpen: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isThresholdMet]);
 
