@@ -1,3 +1,5 @@
+import json
+
 from apps.api.engine import haruban
 
 
@@ -18,3 +20,27 @@ def test_search_places_tool_supports_count_questions():
     assert "몇 개" in description
     assert "총 개수" in description
     assert "공공데이터 근거" in description
+
+
+def test_haruban_fallback_reply_from_search_tool_is_user_facing():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {
+            "role": "tool",
+            "name": "search_places",
+            "content": json.dumps({
+                "total_count": 3,
+                "regions": ["hallim"],
+                "category": "place",
+                "items": [
+                    {"name": "금오름", "address": "제주시 한림읍"},
+                    {"name": "느지리오름", "address": "제주시 한림읍"},
+                ],
+            }, ensure_ascii=False),
+        }
+    ])
+
+    assert "한림" in reply
+    assert "3곳" in reply
+    assert "금오름" in reply
+    assert "공공데이터 기준" in reply
+    assert "DB/RAG" not in reply

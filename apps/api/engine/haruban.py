@@ -251,6 +251,69 @@ TOOL_RUNNERS = {
 }
 
 
+def _category_label(category: str | None) -> str:
+    if not category:
+        return "선택한 순간"
+    for moment, mapped_category in filters_mod.MOMENT_TO_CATEGORY.items():
+        if mapped_category == category:
+            return MOMENT_LABEL_KO.get(moment, category)
+    return category
+
+
+def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
+    """LLM이 도구 호출 뒤 최종 문장을 비우는 경우를 위한 사용자용 안전 답변."""
+    for message in reversed(conv):
+        if message.get("role") != "tool":
+            continue
+        try:
+            payload = json.loads(message.get("content") or "{}")
+        except json.JSONDecodeError:
+            continue
+
+        name = message.get("name")
+        if name == "search_places":
+            total = int(payload.get("total_count") or 0)
+            regions = payload.get("regions") or []
+            region_text = " · ".join(REGION_LABEL_KO.get(r, r) for r in regions) or "선택한 지역"
+            category_text = _category_label(payload.get("category"))
+            items = payload.get("items") or []
+            item_names = [item.get("name") for item in items[:3] if item.get("name")]
+
+            if total <= 0:
+                return (
+                    f"{region_text}의 {category_text} 후보는 제주를 담다가 확인한 공공데이터 기준으로 "
+                    "아직 확인되지 않았습니다. 지역이나 순간을 조금 바꾸면 다시 찾아볼게요."
+                )
+
+            if item_names:
+                examples = ", ".join(item_names)
+                return (
+                    f"{region_text}에서 {category_text} 후보는 공공데이터 기준으로 {total}곳 확인됩니다. "
+                    f"먼저 {examples} 같은 후보를 볼 수 있어요. 동선이나 날씨 기준으로 더 좁혀드릴까요?"
+                )
+
+            return (
+                f"{region_text}에서 {category_text} 후보는 공공데이터 기준으로 {total}곳 확인됩니다. "
+                "후보를 더 좁히려면 동행자나 원하는 분위기를 하나만 더 알려주세요."
+            )
+
+        if name == "verify_claim":
+            claims = payload.get("claims") or []
+            if not claims:
+                return "검증할 문장을 찾지 못했어요. 리뷰나 안내 문장을 그대로 붙여주시면 공공데이터 기준으로 다시 확인해드릴게요."
+            verified = sum(1 for claim in claims if claim.get("verdict") == "verified")
+            gaps = sum(1 for claim in claims if claim.get("verdict") == "coverage_gap")
+            return (
+                f"보내주신 내용은 공공데이터 기준으로 {verified}건 확인했고, {gaps}건은 근거가 부족합니다. "
+                "확인되지 않은 항목은 여행팩에 바로 넣기보다 한 번 더 확인하는 편이 좋아요."
+            )
+
+        if name == "suggest_form_update":
+            return "폼에 반영할 제안을 준비했어요. 아래 제안 카드를 보고 괜찮으면 반영해 주세요."
+
+    return "지금 질문은 바로 단정하기보다 조건을 조금 더 확인해야 해요. 지역, 음식 종류, 동행자 중 하나만 더 알려주시면 공공데이터 기준으로 다시 좁혀드릴게요."
+
+
 # ─── 시스템 프롬프트 ───
 
 _BASE_SYSTEM_PROMPT = (
@@ -400,6 +463,8 @@ def _chat_turn_raw(
 
         if not tool_calls:
             # 최종 응답. 반환.
+            if not text_reply:
+                text_reply = _fallback_reply_from_tool_messages(conv)
             return HarubanTurn(
                 available=True,
                 reply_text=text_reply,
@@ -460,7 +525,7 @@ def _chat_turn_raw(
     )
     return HarubanTurn(
         available=True,
-        reply_text=(last_assistant.get("content") if last_assistant else "") or "",
+        reply_text=(last_assistant.get("content") if last_assistant else "") or _fallback_reply_from_tool_messages(conv),
         form_suggestion=form_suggestion,
         tool_trace=trace,
         reason=f"max iterations ({max_iterations}) reached",
