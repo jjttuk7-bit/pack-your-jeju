@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   Calendar,
   ChevronRight,
   Compass,
@@ -12,17 +11,14 @@ import {
 import type {
   CompanionValue,
   MomentId,
-  PackResponse,
   PurposeValue,
   RegionCoveragePreview,
   RegionId,
   TravelInfo,
-  BadgeKind,
 } from '../types';
 import { COMPANIONS, MOMENTS, PURPOSES, REGIONS } from '../data';
-import { requestPack, requestRegionCoveragePreview } from '../api';
+import { requestRegionCoveragePreview } from '../api';
 import { normalizeTripStartDate } from '../date';
-import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 
 interface TrustMapDashboardProps {
@@ -42,6 +38,80 @@ interface RegionShape {
 
 const DEFAULT_MOMENTS: MomentId[] = ['oreum', 'beach_walk', 'local_food'];
 const NOTES_MAX = 300;
+
+const REGION_INTROS: Record<RegionId, { title: string; body: string; moods: string[] }> = {
+  hallim: {
+    title: '바다와 마을 산책을 느슨하게 엮기 좋은 서쪽 권역',
+    body: '한림은 해안 산책, 조용한 카페, 마을 풍경을 천천히 담기 좋은 지역입니다. 일정 첫날이나 마지막 날에 부담 없이 넣기 좋습니다.',
+    moods: ['서쪽 바다', '카페', '느린 동선'],
+  },
+  aewol: {
+    title: '해안 드라이브와 카페 동선이 자연스럽게 이어지는 권역',
+    body: '애월은 바다를 보며 쉬는 일정과 카페 시간을 함께 잡기 좋습니다. 사람이 많은 시간대는 피하고 여유 시간을 넉넉히 두는 편이 좋습니다.',
+    moods: ['해안 풍경', '카페', '가벼운 산책'],
+  },
+  jeju_city: {
+    title: '공항 접근성과 도심 편의가 좋은 시작점',
+    body: '제주시는 도착 직후나 출발 전 일정에 넣기 좋습니다. 식사, 시장, 짧은 산책처럼 이동 부담이 낮은 순간을 조합하기 쉽습니다.',
+    moods: ['공항 접근', '도심 편의', '시장'],
+  },
+  jocheon: {
+    title: '동쪽으로 넘어가기 전 숲과 바다를 고르기 좋은 권역',
+    body: '조천은 조용한 카페, 바다 산책, 숲길을 함께 보기 좋은 지역입니다. 동쪽 일정으로 이동하기 전 완충 지점으로 쓰기 좋습니다.',
+    moods: ['동쪽 초입', '숲길', '바다'],
+  },
+  gujwa: {
+    title: '오름과 해안 풍경을 함께 담기 좋은 동북쪽 권역',
+    body: '구좌는 오름, 바다 산책, 조용한 마을 풍경을 엮기 좋습니다. 날씨와 바람에 따라 실내 쉬는 시간을 같이 잡으면 안정적입니다.',
+    moods: ['오름', '해안', '마을'],
+  },
+  udo: {
+    title: '섬 안에서 바다와 걷는 시간을 크게 느끼는 권역',
+    body: '우도는 이동 자체가 일정의 일부가 됩니다. 배편과 날씨 영향을 먼저 보고, 하루 중 무리하지 않는 범위로 담는 편이 좋습니다.',
+    moods: ['섬 여행', '바다', '이동 확인'],
+  },
+  seongsan: {
+    title: '동쪽 대표 풍경과 바다 일정을 압축하기 좋은 권역',
+    body: '성산은 바다 풍경, 오름, 현지 식사를 함께 담기 좋습니다. 일정이 짧다면 동쪽 하루의 중심지로 잡기 쉽습니다.',
+    moods: ['동쪽 풍경', '오름', '바다'],
+  },
+  pyoseon: {
+    title: '해안과 조용한 마을 분위기를 넓게 쓰기 좋은 남동쪽 권역',
+    body: '표선은 바다 산책과 조용한 시간을 담기 좋습니다. 사람 많은 동선보다 여백 있는 하루를 만들 때 잘 어울립니다.',
+    moods: ['남동 해안', '조용한 산책', '여백'],
+  },
+  namwon: {
+    title: '한라산 남쪽 숲과 바다가 가까운 조용한 권역',
+    body: '남원은 큰 관광지를 빠르게 찍기보다 숲길, 해안 산책, 감귤 마을, 조용한 카페를 느슨하게 엮기 좋습니다. “제주에 머문다”는 느낌을 만들기 좋은 지역입니다.',
+    moods: ['숲길', '바다 산책', '감귤'],
+  },
+  seogwipo: {
+    title: '남쪽 도심 편의와 자연 풍경을 함께 쓰는 권역',
+    body: '서귀포는 식사, 카페, 해안 산책, 짧은 자연 코스를 함께 잡기 좋습니다. 숙소가 남쪽이라면 하루의 기준점으로 쓰기 쉽습니다.',
+    moods: ['남쪽 중심', '식사', '자연'],
+  },
+  andeok: {
+    title: '차분한 남서쪽 풍경과 쉬는 시간을 만들기 좋은 권역',
+    body: '안덕은 조용한 카페, 바다, 산책을 여유 있게 조합하기 좋습니다. 일정의 밀도를 낮추고 싶을 때 잘 맞습니다.',
+    moods: ['남서쪽', '카페', '휴식'],
+  },
+  daejeong: {
+    title: '제주 서남쪽의 넓은 바다와 마을 풍경을 담는 권역',
+    body: '대정은 바다 산책과 마을 분위기를 함께 보기 좋습니다. 서쪽 끝 동선이라 이동 시간을 먼저 확인하고 넣는 편이 안정적입니다.',
+    moods: ['서남쪽 바다', '마을', '동선 확인'],
+  },
+};
+
+const MOMENT_REGION_STORIES: Record<MomentId, string> = {
+  oreum: '오름을 고르면 한 곳을 깊게 보는 일정이 좋습니다. 날씨와 바람을 확인하고, 이동 뒤 쉬는 시간을 함께 남겨두세요.',
+  beach_walk: '바다 산책은 바람과 햇빛의 영향을 많이 받습니다. 오전이나 늦은 오후처럼 걷기 편한 시간대로 잡으면 좋습니다.',
+  sunset: '노을은 시간이 정해진 순간이라 이동 여유가 중요합니다. 후보를 너무 많이 넣기보다 한 지점에 머무는 편이 좋습니다.',
+  local_market: '로컬 시장은 식사와 기념품, 현지 분위기를 한 번에 담기 좋습니다. 비가 오거나 바람이 강한 날의 대체 일정으로도 좋습니다.',
+  local_food: '현지 맛집은 이동 동선과 함께 보는 게 좋습니다. 점심 또는 저녁 한 끼를 기준으로 주변 산책 후보를 같이 붙이면 자연스럽습니다.',
+  quiet_cafe: '조용한 카페는 일정 사이의 쉼표 역할을 합니다. 혼자 여행이거나 긴 이동 뒤라면 체력을 회복하는 시간으로 넣기 좋습니다.',
+  gotjawal: '숲 산책은 신발과 날씨가 중요합니다. 비 온 뒤에는 길 상태를 확인하고, 가벼운 바람막이를 챙기면 안정적입니다.',
+  citrus: '감귤 체험은 계절과 운영 여부 확인이 필요합니다. 체험형 일정이라 예약과 방문 가능 시간을 먼저 보는 편이 좋습니다.',
+};
 
 const REGION_SHAPES: RegionShape[] = [
   {
@@ -133,14 +203,12 @@ export default function TrustMapDashboard({
   const [startDate, setStartDate] = useState(
     normalizeTripStartDate(initialInfo?.startDate),
   );
-  const [durationDays, setDurationDays] = useState(initialInfo?.durationDays ?? 3);
+  const [durationDays, setDurationDays] = useState(initialInfo?.durationDays ?? 2);
   const [companion, setCompanion] = useState<CompanionValue>(initialInfo?.companion ?? 'solo');
   const [purpose, setPurpose] = useState<PurposeValue>(initialInfo?.purpose ?? 'healing');
   const [specialNotes, setSpecialNotes] = useState(initialInfo?.specialNotes ?? '');
   const [previews, setPreviews] = useState<Record<string, RegionCoveragePreview>>({});
   const [previewLoading, setPreviewLoading] = useState(true);
-  const [packPreview, setPackPreview] = useState<PackResponse | null>(null);
-  const [packLoading, setPackLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,30 +232,6 @@ export default function TrustMapDashboard({
     };
   }, []);
 
-  useEffect(() => {
-    if (!activeRegion || selectedMoments.length === 0) {
-      setPackPreview(null);
-      setPackLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setPackLoading(true);
-    requestPack(buildTravelInfo([activeRegion]), selectedMoments)
-      .then((resp) => {
-        if (!cancelled) setPackPreview(resp);
-      })
-      .catch(() => {
-        if (!cancelled) setPackPreview(null);
-      })
-      .finally(() => {
-        if (!cancelled) setPackLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRegion, selectedMoments.join('|'), startDate, durationDays, companion, purpose, specialNotes]);
-
   const activeEntry = activeRegion
     ? REGIONS.find((region) => region.value === activeRegion)
     : undefined;
@@ -195,7 +239,6 @@ export default function TrustMapDashboard({
   const activeTone = activeRegion
     ? getRegionTone(activePreview, selectedMoments, previewLoading)
     : 'loading';
-  const recommendedPlaces = collectRecommendedPlaces(packPreview);
   const selectedLabels = selectedRegions
     .map((id) => REGIONS.find((region) => region.value === id)?.label ?? id)
     .join(' · ');
@@ -358,8 +401,7 @@ export default function TrustMapDashboard({
                 preview={activePreview}
                 tone={activeTone}
                 previewLoading={previewLoading}
-                packLoading={packLoading}
-                recommendedPlaces={recommendedPlaces}
+                selectedMoments={selectedMoments}
                 selected={selectedRegions.includes(activeRegion)}
                 selectedLabels={selectedLabels}
                 coverageSummary={coverageSummary}
@@ -640,8 +682,7 @@ function RegionPanel({
   preview,
   tone,
   previewLoading,
-  packLoading,
-  recommendedPlaces,
+  selectedMoments,
   selected,
   selectedLabels,
   coverageSummary,
@@ -653,8 +694,7 @@ function RegionPanel({
   preview?: RegionCoveragePreview;
   tone: RegionTone;
   previewLoading: boolean;
-  packLoading: boolean;
-  recommendedPlaces: RegionCandidateSummary[];
+  selectedMoments: MomentId[];
   selected: boolean;
   selectedLabels: string;
   coverageSummary: { totalPlaces: number; strongMoments: string[]; weakMoments: string[] };
@@ -666,11 +706,20 @@ function RegionPanel({
     .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
     .filter(Boolean)
     .slice(0, 4) ?? [];
-  const weak = preview?.weak_moments
-    .map((id) => preview.moments.find((m) => m.moment === id)?.moment_label)
-    .filter(Boolean)
-    .slice(0, 3) ?? [];
   const regionObjectLabel = withObjectParticle(region.label);
+  const intro = REGION_INTROS[region.value];
+  const momentStories = selectedMoments
+    .map((id) => {
+      const moment = MOMENTS.find((item) => item.id === id);
+      if (!moment) return null;
+      return {
+        id,
+        title: moment.title,
+        body: MOMENT_REGION_STORIES[id],
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4) as { id: MomentId; title: string; body: string }[];
 
   return (
     <div className="flex h-full flex-col">
@@ -723,20 +772,18 @@ function RegionPanel({
 
       <div className="mt-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
-          확인 필요 항목
+          {region.label} 소개
         </p>
-        <div className="mt-2 space-y-1.5">
-          {weak.length ? weak.map((label) => (
-            <div key={label} className="flex items-start gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>{label}은 저희가 참조하는 공공데이터 기준으로 확인되지 않습니다.</span>
-            </div>
-          )) : (
-            <div className="flex items-center gap-1.5 rounded-xl border border-mint/20 bg-mint/7 px-2.5 py-2 text-[11px] text-mint">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              선택 지역에서 큰 데이터 공백이 낮게 관측됩니다.
-            </div>
-          )}
+        <div className="mt-2 rounded-2xl border border-mint/20 bg-mint/7 p-3">
+          <p className="font-serif-kr text-[14px] font-bold leading-snug text-basalt">{intro.title}</p>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-basalt-2">{intro.body}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {intro.moods.map((mood) => (
+              <span key={mood} className="rounded-full border border-mint/20 bg-white/80 px-2 py-1 text-[10px] font-bold text-mint">
+                {mood}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -744,38 +791,29 @@ function RegionPanel({
         <div className="mb-2 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-basalt-2">
-              실제 후보
+              선택한 순간으로 보기
             </p>
             <p className="mt-0.5 text-[10px] leading-relaxed text-basalt-2/80">
-              조회된 장소와 방문 전 확인할 내용을 함께 봅니다.
+              자세한 장소 후보와 확인 이력은 다음 팩 만들기에서 봅니다.
             </p>
           </div>
-          {packLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-citrus-2" />}
         </div>
         <div className="space-y-2">
-          {recommendedPlaces.length ? recommendedPlaces.map((place) => (
-            <div key={place.name} className="rounded-2xl border border-earth bg-[#FFF9F0] p-3">
-              <div className="flex items-start justify-between gap-2">
+          {momentStories.length ? momentStories.map((story) => (
+            <div key={story.id} className="rounded-2xl border border-earth bg-[#FFF9F0] p-3">
+              <div className="flex gap-2.5">
+                <MomentIcon id={story.id} className="h-8 w-8 shrink-0" />
                 <div>
-                  <p className="font-serif-kr text-[13px] font-bold text-basalt">{place.name}</p>
-                  <p className="mt-1 text-[10.5px] leading-relaxed text-basalt-2">
-                    근거: {place.source}
+                  <p className="font-serif-kr text-[13px] font-bold text-basalt">
+                    {region.label}에서 {story.title}
                   </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">{story.body}</p>
                 </div>
-                <Badge kind={place.badge} note={place.note} />
-              </div>
-              <div className={`mt-2 rounded-xl border px-2.5 py-2 text-[10.5px] leading-relaxed ${
-                place.badge === 'verified'
-                  ? 'border-mint/20 bg-mint/7 text-mint'
-                  : 'border-amber-100 bg-amber-50/70 text-amber-900'
-              }`}>
-                <p className="font-bold">{place.badge === 'verified' ? '확인된 내용' : '확인할 내용'}</p>
-                <p className="mt-0.5">{candidateReasonText(place)}</p>
               </div>
             </div>
           )) : (
             <div className="rounded-2xl border border-dashed border-earth bg-[#FFF9F0] p-4 text-center text-[11px] leading-relaxed text-basalt-2">
-              선택한 순간과 지역으로 실제 후보를 조회하는 중입니다.
+              아래에서 담고 싶은 순간을 고르면, 이 지역에서 어떤 여행감으로 볼 수 있는지 먼저 정리해드립니다.
             </div>
           )}
         </div>
@@ -981,71 +1019,6 @@ function panelToneClass(tone: RegionTone): string {
   if (tone === 'caution') return 'border-amber-100 bg-amber-50/70 text-amber-900';
   if (tone === 'gap') return 'border-stone-200 bg-stone-50 text-stone-700';
   return 'border-citrus/20 bg-citrus/8 text-basalt';
-}
-
-type RegionCandidateSummary = {
-  name: string;
-  badge: BadgeKind;
-  note: string | null;
-  source: string;
-  checkRequired: string[];
-};
-
-function collectRecommendedPlaces(pack: PackResponse | null): RegionCandidateSummary[] {
-  if (!pack) return [];
-  const seen = new Set<string>();
-  const items = pack.sections.flatMap((section) => section.items);
-  return items
-    .filter((item) => {
-      const key = item.external_id || item.name;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 3)
-    .map((item) => ({
-      name: item.name,
-      badge: item.badge,
-      note: item.note,
-      source: item.sources?.[0]?.name ?? '공공데이터 근거',
-      checkRequired: item.check_required ?? [],
-    }));
-}
-
-const CHECK_REQUIRED_LABELS: Record<string, string> = {
-  public_data: '공공데이터 반증 여부',
-  weather: '날씨 영향',
-  movement: '이동·주차 조건',
-  feedback: '방문 피드백',
-  visit_signal: '방문 피드백',
-  operating: '운영 정보',
-};
-
-function formatCheckRequired(checks: string[]): string {
-  return checks
-    .map((key) => CHECK_REQUIRED_LABELS[key] ?? key)
-    .filter(Boolean)
-    .join(' · ');
-}
-
-function candidateReasonText(place: RegionCandidateSummary): string {
-  const checks = formatCheckRequired(place.checkRequired);
-  if (place.badge === 'verified') {
-    return `공공데이터에서 장소명·주소가 조회된 후보입니다.${checks ? ` 방문 전 ${checks}만 확인하면 좋아요.` : ''}`;
-  }
-  if (place.badge === 'contradicted') {
-    return '공공데이터에서 폐업 또는 변경 신호가 확인되어 플랜에 담기 전 대체 후보 확인이 필요합니다.';
-  }
-  if (place.note?.includes('수정요청')) {
-    return `이용자 정보 수정요청 이력이 있어 방문 전 위치·운영 정보를 확인하세요.${checks ? ` 함께 볼 항목: ${checks}.` : ''}`;
-  }
-  if (place.note) {
-    return `${place.note} 항목이 있어 방문 전 확인하세요.${checks ? ` 함께 볼 항목: ${checks}.` : ''}`;
-  }
-  if (checks) {
-    return `${checks}을(를) 방문 전 확인하면 더 안전하게 담을 수 있습니다.`;
-  }
-  return '일부 근거가 충분하지 않아 방문 전 최신 정보를 한 번 더 확인하세요.';
 }
 
 function summarizeSelectedRegions(

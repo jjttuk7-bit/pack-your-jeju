@@ -21,7 +21,7 @@ const defaultState: SavedTravel = {
   info: {
     regions: [],
     startDate: todayInJeju(),
-    durationDays: 3,
+    durationDays: 2,
     companion: 'solo',
     purpose: 'healing',
   },
