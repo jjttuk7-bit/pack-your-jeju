@@ -118,6 +118,7 @@ export default function HarubanChat({
   const [pendingSuggestion, setPendingSuggestion] =
     useState<HarubanFormSuggestion | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const introRequestSeqRef = useRef(0);
 
   // 임계 도달 1회 트리거 관리.
   //  - hasTriggeredRef: 임계 첫 충족 후 인사 준비를 이미 한 번 했는지.
@@ -128,6 +129,10 @@ export default function HarubanChat({
   const currentSnapshot = useMemo(
     () => snapshotForm(info, selectedMomentIds),
     [info, selectedMomentIds],
+  );
+  const currentSnapshotKey = useMemo(
+    () => JSON.stringify(currentSnapshot),
+    [currentSnapshot],
   );
 
   const isThresholdMet =
@@ -150,22 +155,36 @@ export default function HarubanChat({
       // 폼이 미달로 돌아가면 다음 도달 시 다시 자동 인사할 수 있게 flag 리셋.
       hasTriggeredRef.current = false;
       lastIntroSnapshotRef.current = null;
+      setEntries([]);
+      setPendingSuggestion(null);
+      setError(null);
       return;
     }
-    if (hasTriggeredRef.current) return;
+    if (hasTriggeredRef.current) {
+      const lastSnapshot = lastIntroSnapshotRef.current;
+      if (!lastSnapshot || !isDifferentSnapshot(currentSnapshot, lastSnapshot)) return;
+
+      setEntries([]);
+      setPendingSuggestion(null);
+      setError(null);
+      void fetchIntro(currentSnapshot, { autoOpen: false });
+      return;
+    }
     hasTriggeredRef.current = true;
     void fetchIntro(currentSnapshot, { autoOpen: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isThresholdMet]);
+  }, [isThresholdMet, currentSnapshotKey]);
 
   const fetchIntro = async (
     snap: FormStateSnapshot,
     { autoOpen }: { autoOpen: boolean },
   ) => {
+    const requestSeq = ++introRequestSeqRef.current;
     setError(null);
     setIntroLoading(true);
     try {
       const resp = await requestHarubanIntro(formStateForApi(snap));
+      if (requestSeq !== introRequestSeqRef.current) return;
       lastIntroSnapshotRef.current = snap;
       if (!resp.available) {
         setError(
@@ -181,9 +200,12 @@ export default function HarubanChat({
       ]);
       if (autoOpen) setOpen(true);
     } catch (e: any) {
+      if (requestSeq !== introRequestSeqRef.current) return;
       setError(e?.message || String(e));
     } finally {
-      setIntroLoading(false);
+      if (requestSeq === introRequestSeqRef.current) {
+        setIntroLoading(false);
+      }
     }
   };
 
