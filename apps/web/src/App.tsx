@@ -37,10 +37,30 @@ const defaultState: SavedTravel = {
   visitChecks: {},
 };
 
+function createFreshState(): SavedTravel {
+  return {
+    ...defaultState,
+    info: {
+      ...defaultState.info,
+      regions: [],
+      startDate: todayInJeju(),
+    },
+    selectedMomentIds: [],
+    checkedItemIds: [],
+    checkedMemoryIds: [],
+    customBasicItems: [],
+    customMomentItems: {} as Record<MomentId, string[]>,
+    step: 'setup',
+    customMemories: [],
+    selectedPlanItems: [],
+    visitChecks: {},
+  };
+}
+
 // legacy 상태(단일 region)에서 다중 regions로 마이그레이션.
 // 이전 앱 사용자의 localStorage에는 info.region이 문자열로 저장돼 있을 수 있다.
 function migrateSavedTravel(saved: any): SavedTravel {
-  if (!saved || typeof saved !== 'object') return defaultState;
+  if (!saved || typeof saved !== 'object') return createFreshState();
   const info = saved.info ?? {};
   const validRegions = new Set(REGIONS.map((region) => region.value));
   const validMoments = new Set(MOMENTS.map((moment) => moment.id));
@@ -102,7 +122,7 @@ export default function App() {
     } catch (e) {
       console.error('Failed to load state from localStorage:', e);
     }
-    return defaultState;
+    return createFreshState();
   });
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -124,10 +144,12 @@ export default function App() {
   const handleEnter = () => {
     try {
       localStorage.setItem(GATE_STORAGE_KEY, 'true');
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
       sessionStorage.setItem(CITRUS_ROLL_PENDING_KEY, 'true');
     } catch {}
     setAuthenticated(true);
-    setState(prev => ({ ...prev, step: 'setup' }));
+    setState(createFreshState());
+    setHarubanSessionKey((key) => key + 1);
     setShowLanding(false);
   };
 
@@ -560,7 +582,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setState(defaultState);
+                    setState(createFreshState());
                     setHarubanSessionKey((key) => key + 1);
                     setShowResetConfirm(false);
                   }}
