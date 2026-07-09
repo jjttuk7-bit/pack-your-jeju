@@ -16,6 +16,8 @@ import { normalizeTripStartDate, todayInJeju } from './date';
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
 const GATE_STORAGE_KEY = 'pack_your_jeju_gate_v1';
+const CITRUS_ROLL_STORAGE_KEY = 'pack_your_jeju_citrus_roll_once_v1';
+const CITRUS_ROLL_PENDING_KEY = 'pack_your_jeju_citrus_roll_pending_v1';
 
 const defaultState: SavedTravel = {
   info: {
@@ -106,6 +108,7 @@ export default function App() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [harubanSessionKey, setHarubanSessionKey] = useState(0);
+  const [playCitrusRoll, setPlayCitrusRoll] = useState(false);
 
   // 시연용 문지기 상태. 초대 코드 통과 여부만 localStorage에 저장한다.
   const [authenticated, setAuthenticated] = useState<boolean>(() => {
@@ -122,6 +125,9 @@ export default function App() {
   const handleEnter = () => {
     try {
       localStorage.setItem(GATE_STORAGE_KEY, 'true');
+      if (sessionStorage.getItem(CITRUS_ROLL_STORAGE_KEY) !== 'true') {
+        sessionStorage.setItem(CITRUS_ROLL_PENDING_KEY, 'true');
+      }
     } catch {}
     setAuthenticated(true);
     setState(prev => ({ ...prev, step: 'setup' }));
@@ -142,6 +148,22 @@ export default function App() {
       console.error('Failed to save state to localStorage:', e);
     }
   }, [state]);
+
+  useEffect(() => {
+    if (!authenticated || showLanding) return;
+    try {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const shouldPlay =
+        sessionStorage.getItem(CITRUS_ROLL_PENDING_KEY) === 'true' &&
+        sessionStorage.getItem(CITRUS_ROLL_STORAGE_KEY) !== 'true' &&
+        !reduceMotion;
+      sessionStorage.removeItem(CITRUS_ROLL_PENDING_KEY);
+      sessionStorage.setItem(CITRUS_ROLL_STORAGE_KEY, 'true');
+      if (shouldPlay) setPlayCitrusRoll(true);
+    } catch {
+      setPlayCitrusRoll(false);
+    }
+  }, [authenticated, showLanding]);
 
   // 게이트 미통과 또는 홈 복귀 상태에서는 랜딩만 렌더 — 하루방 위젯 · 상단 헤더 모두 감춤.
   if (!authenticated || showLanding) {
@@ -331,6 +353,10 @@ export default function App() {
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
         <header className="relative overflow-hidden pt-2 pb-8" id="app-header">
           <HeaderHallasanScene />
+          <CitrusRollTransition
+            play={playCitrusRoll}
+            onComplete={() => setPlayCitrusRoll(false)}
+          />
           <div className="relative z-10 flex items-start gap-4 mb-2">
             {/* 마스코트 클릭 = 처음 화면 (관례상 로고=홈). */}
             <motion.button
@@ -568,6 +594,40 @@ export default function App() {
       )}
 
     </div>
+  );
+}
+
+function CitrusRollTransition({
+  play,
+  onComplete,
+}: {
+  play: boolean;
+  onComplete: () => void;
+}) {
+  if (!play) return null;
+
+  return (
+    <motion.div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-[4px] top-[36px] z-30 hidden h-14 w-14 sm:block"
+      initial={{ x: 0, y: 0, rotate: -8, opacity: 0, scale: 0.82 }}
+      animate={{
+        x: ['0vw', '12vw', '34vw', '57vw', '72vw'],
+        y: [0, 22, 34, 30, 18],
+        rotate: [-8, 130, 390, 650, 850],
+        opacity: [0, 1, 1, 0.92, 0],
+        scale: [0.82, 0.98, 1, 0.96, 0.86],
+      }}
+      transition={{
+        duration: 1.75,
+        ease: [0.22, 1, 0.36, 1],
+        times: [0, 0.18, 0.52, 0.82, 1],
+      }}
+      onAnimationComplete={onComplete}
+    >
+      <div className="absolute left-2 top-[42px] h-2 w-10 rounded-full bg-basalt/15 blur-[6px]" />
+      <CitrusMark className="relative h-14 w-14 drop-shadow-[0_10px_14px_rgba(185,78,30,0.22)]" />
+    </motion.div>
   );
 }
 
