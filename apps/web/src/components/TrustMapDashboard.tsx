@@ -12,6 +12,7 @@ import type {
   CompanionValue,
   MomentId,
   PurposeValue,
+  RegionCoverageMomentDto,
   RegionCoveragePreview,
   RegionId,
   TravelInfo,
@@ -102,15 +103,47 @@ const REGION_INTROS: Record<RegionId, { title: string; body: string; moods: stri
   },
 };
 
-const MOMENT_REGION_STORIES: Record<MomentId, string> = {
-  oreum: '오름을 고르면 한 곳을 깊게 보는 일정이 좋습니다. 날씨와 바람을 확인하고, 이동 뒤 쉬는 시간을 함께 남겨두세요.',
-  beach_walk: '바다 산책은 바람과 햇빛의 영향을 많이 받습니다. 오전이나 늦은 오후처럼 걷기 편한 시간대로 잡으면 좋습니다.',
-  sunset: '노을은 시간이 정해진 순간이라 이동 여유가 중요합니다. 후보를 너무 많이 넣기보다 한 지점에 머무는 편이 좋습니다.',
-  local_market: '로컬 시장은 식사와 기념품, 현지 분위기를 한 번에 담기 좋습니다. 비가 오거나 바람이 강한 날의 대체 일정으로도 좋습니다.',
-  local_food: '현지 맛집은 이동 동선과 함께 보는 게 좋습니다. 점심 또는 저녁 한 끼를 기준으로 주변 산책 후보를 같이 붙이면 자연스럽습니다.',
-  quiet_cafe: '조용한 카페는 일정 사이의 쉼표 역할을 합니다. 혼자 여행이거나 긴 이동 뒤라면 체력을 회복하는 시간으로 넣기 좋습니다.',
-  gotjawal: '숲 산책은 신발과 날씨가 중요합니다. 비 온 뒤에는 길 상태를 확인하고, 가벼운 바람막이를 챙기면 안정적입니다.',
-  citrus: '감귤 체험은 계절과 운영 여부 확인이 필요합니다. 체험형 일정이라 예약과 방문 가능 시간을 먼저 보는 편이 좋습니다.',
+const MOMENT_REGION_GUIDES: Record<MomentId, { focus: string; tip: string; check: string }> = {
+  oreum: {
+    focus: '높낮이와 바람을 함께 보는 순간',
+    tip: '한 곳을 깊게 보고 내려온 뒤 쉬는 시간을 붙이면 일정이 안정적입니다.',
+    check: '풍속, 주차·정류장 접근성',
+  },
+  beach_walk: {
+    focus: '해안선과 걷기 시간을 함께 보는 순간',
+    tip: '오전이나 늦은 오후처럼 햇빛과 바람 부담이 낮은 시간대로 잡으면 좋습니다.',
+    check: '바람, 해안 접근성',
+  },
+  sunset: {
+    focus: '시간이 정해진 풍경을 기다리는 순간',
+    tip: '후보를 많이 넣기보다 한 지점에 머물 여유를 남기는 편이 좋습니다.',
+    check: '일몰 전 이동 여유, 날씨',
+  },
+  local_market: {
+    focus: '먹거리와 현지 리듬을 한 번에 보는 순간',
+    tip: '식사와 기념품, 짧은 산책을 묶어 비 오는 날 대체 일정으로도 쓰기 좋습니다.',
+    check: '운영일, 주차·정류장',
+  },
+  local_food: {
+    focus: '한 끼를 기준으로 주변 동선을 붙이는 순간',
+    tip: '점심 또는 저녁 한 끼를 먼저 정하고 가까운 산책 후보를 붙이면 자연스럽습니다.',
+    check: '주소 확인, 수정요청 이력',
+  },
+  quiet_cafe: {
+    focus: '일정 사이 체력을 회복하는 순간',
+    tip: '혼자 여행이거나 긴 이동 뒤라면 다음 일정 전 완충 시간으로 넣기 좋습니다.',
+    check: '영업 정보, 혼잡 시간',
+  },
+  gotjawal: {
+    focus: '숲길 상태와 날씨를 함께 보는 순간',
+    tip: '비 온 뒤에는 길 상태를 확인하고 가벼운 바람막이와 걷기 편한 신발을 챙기면 좋습니다.',
+    check: '강수, 탐방로 상태',
+  },
+  citrus: {
+    focus: '계절과 운영 여부가 중요한 체험 순간',
+    tip: '체험형 일정이라 예약 가능 시간과 계절 적합성을 먼저 보는 편이 안전합니다.',
+    check: '운영 기간, 예약 필요 여부',
+  },
 };
 
 const REGION_SHAPES: RegionShape[] = [
@@ -712,14 +745,16 @@ function RegionPanel({
     .map((id) => {
       const moment = MOMENTS.find((item) => item.id === id);
       if (!moment) return null;
+      const momentStat = preview?.moments.find((item) => item.moment === id);
       return {
         id,
         title: moment.title,
-        body: MOMENT_REGION_STORIES[id],
+        body: buildRegionMomentStory(region, id, momentStat),
+        meta: buildRegionMomentMeta(momentStat),
       };
     })
     .filter(Boolean)
-    .slice(0, 4) as { id: MomentId; title: string; body: string }[];
+    .slice(0, 4) as { id: MomentId; title: string; body: string; meta: string }[];
 
   return (
     <div className="flex h-full flex-col">
@@ -808,6 +843,9 @@ function RegionPanel({
                     {region.label}에서 {story.title}
                   </p>
                   <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">{story.body}</p>
+                  <p className="mt-2 text-[10px] font-bold leading-relaxed text-mint">
+                    {story.meta}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1012,6 +1050,34 @@ function withObjectParticle(label: string): string {
   if (code < hangulStart || code > hangulEnd) return `${label}를`;
   const hasFinalConsonant = (code - hangulStart) % 28 !== 0;
   return `${label}${hasFinalConsonant ? '을' : '를'}`;
+}
+
+function buildRegionMomentStory(
+  region: (typeof REGIONS)[number],
+  momentId: MomentId,
+  stat?: RegionCoverageMomentDto,
+): string {
+  const guide = MOMENT_REGION_GUIDES[momentId];
+  const landmarks = region.landmarks.slice(0, 2).join('·');
+  const coverage = stat
+    ? stat.coverage_gap
+      ? '아직 확인 후보가 약한 편이라 다음 화면에서 실제 후보를 꼭 확인해야 합니다.'
+      : `공공데이터 기준 확인 후보 ${stat.verified.toLocaleString()}곳을 먼저 비교할 수 있습니다.`
+    : '선택한 조건으로 후보를 확인하는 중입니다.';
+
+  return `${region.label}은 ${landmarks} 같은 지역 힌트를 기준으로 동선을 잡기 좋습니다. ${guide.focus}이라 ${coverage} ${guide.tip}`;
+}
+
+function buildRegionMomentMeta(stat?: RegionCoverageMomentDto): string {
+  const guide = stat
+    ? MOMENT_REGION_GUIDES[stat.moment as MomentId]
+    : undefined;
+  const countLabel = stat
+    ? stat.coverage_gap
+      ? '확인 후보 부족'
+      : `확인 후보 ${stat.verified.toLocaleString()}곳`
+    : '후보 확인 중';
+  return `${countLabel} · 먼저 볼 것: ${guide?.check ?? '근거 확인'}`;
 }
 
 function panelToneClass(tone: RegionTone): string {
