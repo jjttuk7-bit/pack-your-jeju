@@ -1213,11 +1213,28 @@ function TrustFeedbackLoopCard({
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-mint">
               Recent Signals
             </p>
-            <span className="rounded-full border border-mint/20 bg-white/80 px-2 py-0.5 text-[9.5px] font-bold text-mint">
-              내부 대시보드 기록
-            </span>
+            <div className="flex flex-wrap justify-end gap-1.5">
+              <span className="rounded-full border border-mint/20 bg-white/80 px-2 py-0.5 text-[9.5px] font-bold text-mint">
+                내부 대시보드 기록
+              </span>
+              <button
+                type="button"
+                onClick={() => downloadFeedbackDashboard(dashboard, 'csv')}
+                className="inline-flex items-center gap-1 rounded-full border border-mint/20 bg-white/90 px-2 py-0.5 text-[9.5px] font-bold text-mint transition hover:bg-mint/10"
+              >
+                <Download className="h-3 w-3" />
+                CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadFeedbackDashboard(dashboard, 'json')}
+                className="inline-flex items-center gap-1 rounded-full border border-mint/20 bg-white/90 px-2 py-0.5 text-[9.5px] font-bold text-mint transition hover:bg-mint/10"
+              >
+                JSON
+              </button>
+            </div>
           </div>
-          {dashboard.entries.map((entry) => (
+          {dashboard.entries.slice(0, 4).map((entry) => (
             <div
               key={`${entry.itemId}-${entry.updatedAt}`}
               className="rounded-2xl border border-mint/15 bg-white/78 px-3 py-2.5"
@@ -1391,8 +1408,66 @@ function buildFeedbackDashboard(
     queued: entries.filter((entry) => entry.queued).length,
     changed: entries.filter((entry) => changedStatuses.has(entry.status)).length,
     scoreDelta: Object.values(visitChecks).reduce((sum, check) => sum + (check.trustDelta ?? 0), 0),
-    entries: entries.slice(0, 4),
+    entries,
   };
+}
+
+function downloadFeedbackDashboard(
+  dashboard: FeedbackDashboardSummary,
+  format: 'csv' | 'json',
+) {
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const filename = `jeju-damda-feedback-dashboard-${stamp}.${format}`;
+  const content = format === 'csv'
+    ? buildFeedbackDashboardCsv(dashboard)
+    : JSON.stringify({
+        exported_at: new Date().toISOString(),
+        summary: {
+          total: dashboard.total,
+          queued: dashboard.queued,
+          changed: dashboard.changed,
+          score_delta: dashboard.scoreDelta,
+        },
+        entries: dashboard.entries,
+      }, null, 2);
+  const mime = format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8';
+  const blob = new Blob([format === 'csv' ? `\uFEFF${content}` : content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildFeedbackDashboardCsv(dashboard: FeedbackDashboardSummary): string {
+  const header = [
+    'place_name',
+    'visit_status',
+    'feedback_memo',
+    'trust_score_change',
+    'public_data_queue_status',
+    'queued',
+    'updated_at',
+  ];
+  const rows = dashboard.entries.map((entry) => [
+    entry.name,
+    entry.statusLabel,
+    entry.memo ?? '',
+    entry.scoreLabel ?? '',
+    entry.queueLabel ?? '로컬 기록',
+    entry.queued ? 'Y' : 'N',
+    entry.updatedAt,
+  ]);
+  return [header, ...rows]
+    .map((row) => row.map(csvCell).join(','))
+    .join('\n');
+}
+
+function csvCell(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 function infoTypeLabel(infoType: string): string {
