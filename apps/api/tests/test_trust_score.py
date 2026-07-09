@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from apps.api.engine.filters import MomentFilter
 from apps.api.engine.search import PlaceHit, TransitCheck
-from apps.api.engine.trust import compute_trust_profile
+from apps.api.engine.trust import compute_trust_profile, judge_section
 
 
 def _mf(required_amenities: tuple[str, ...] = ("kids",)) -> MomentFilter:
@@ -38,6 +38,38 @@ def _hit(**overrides) -> PlaceHit:
     }
     data.update(overrides)
     return PlaceHit(**data)
+
+
+def test_judge_section_tops_up_strict_results_with_relaxed_until_limit():
+    strict_hits = [
+        _hit(external_id=f"s{i}", name=f"정확후보{i}", region_normalized="seongsan")
+        for i in range(1, 4)
+    ]
+    relaxed_hits = [
+        strict_hits[0],
+        strict_hits[1],
+        strict_hits[2],
+        _hit(external_id="r1", name="인근후보1", region_normalized="pyoseon"),
+        _hit(external_id="r2", name="인근후보2", region_normalized="gujwa"),
+        _hit(external_id="r3", name="인근후보3", region_normalized="namwon"),
+    ]
+
+    section = judge_section(
+        _mf(required_amenities=()),
+        limit=5,
+        strict_fn=lambda _mf, _limit: strict_hits,
+        relaxed_fn=lambda _mf, _limit: relaxed_hits,
+    )
+
+    assert [item.name for item in section.items] == [
+        "정확후보1",
+        "정확후보2",
+        "정확후보3",
+        "인근후보1",
+        "인근후보2",
+    ]
+    assert section.observed_reasons == ["retrieval_miss"]
+    assert section.items[3].note == "인근 지역 결과"
 
 
 def test_trust_profile_scores_verified_item_with_breakdown():

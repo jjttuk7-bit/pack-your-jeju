@@ -22,6 +22,14 @@ def test_search_places_tool_supports_count_questions():
     assert "공공데이터 근거" in description
 
 
+def test_haruban_infers_visitjeju_expanded_categories():
+    assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
+    assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"
+    assert haruban._infer_category_from_text("비 오는 날 실내 전시 알려줘") == "culture"
+    assert haruban._infer_category_from_text("기념품 쇼핑 알려줘") == "shopping"
+    assert haruban._infer_category_from_text("감귤 체험 알려줘") == "experience"
+
+
 def test_haruban_fallback_reply_from_search_tool_is_user_facing():
     reply = haruban._fallback_reply_from_tool_messages([
         {
@@ -140,6 +148,30 @@ def test_haruban_builds_search_pool_args_for_one_seafood_lunch():
     assert "해산물" in args["keywords"]
 
 
+def test_haruban_one_pick_request_overrides_previous_three_count():
+    conv = [
+        {"role": "user", "content": "성산의 맛집들을 3곳을 알려줘"},
+        {"role": "assistant", "content": "먼저 해오름, WORLD CLASS FISH&CHIPS, 소심한이층 같은 후보를 볼 수 있어요."},
+        {"role": "user", "content": "2박3일 일정인데 성산에서는 점심을 먹을 예정이야, 한곳을 추천해준다면?"},
+    ]
+
+    args = haruban._infer_search_places_args(conv, {})
+
+    assert args["regions"] == ["seongsan"]
+    assert args["category"] == "food"
+    assert args["intent"] == "recommend"
+    assert args["limit"] == 1
+
+
+def test_haruban_detects_detail_query_from_plain_previous_candidate_list():
+    conv = [
+        {"role": "assistant", "content": "해오름, WORLD CLASS FISH&CHIPS, 소심한이층 후보가 있어요."},
+        {"role": "user", "content": "소심한 이층에 관해 자세히 알려줘"},
+    ]
+
+    assert haruban._infer_place_detail_query(conv) == "소심한이층"
+
+
 def test_haruban_does_not_treat_general_planning_as_place_detail():
     conv = [
         {"role": "user", "content": "제주는 처음인데 어떻게 여행계획을 세우면 좋을지 알려줘"},
@@ -229,3 +261,144 @@ def test_haruban_fallback_answers_repetition_question():
     assert "이전 후보" in reply
     assert "제외" in reply
     assert "다시" in reply
+
+
+def test_haruban_fallback_mentions_excluded_candidates():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "다인숯불갈비, 용담밭담은 제외하고 3곳 더 알려줘"},
+        {
+            "role": "tool",
+            "name": "search_places",
+            "content": json.dumps({
+                "intent": "list",
+                "total_count": 493,
+                "regions": ["jeju_city"],
+                "category": "food",
+                "excluded_names": ["다인숯불갈비", "용담밭담"],
+                "items": [
+                    {"name": "명당양과", "address": "제주시"},
+                    {"name": "제주올레면옥 제주공항본점", "address": "제주시"},
+                    {"name": "해오름", "address": "제주시"},
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "다인숯불갈비" in reply
+    assert "용담밭담" in reply
+    assert "빼고" in reply
+    assert "명당양과" in reply
+    assert "더 좁혀드릴까요" not in reply
+
+
+def test_haruban_routes_fix_request_question_to_place_detail():
+    conv = [{"role": "user", "content": "느지리오름 수정요청내역은 어떤거야?"}]
+
+    assert haruban._infer_place_detail_query(conv) == "느지리오름"
+
+
+def test_haruban_fallback_answers_fix_request_detail_honestly():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "느지리오름 수정요청내역은 어떤거야?"},
+        {
+            "role": "tool",
+            "name": "get_place_detail",
+            "content": json.dumps({
+                "query": "느지리오름",
+                "items": [
+                    {
+                        "name": "느지리오름",
+                        "region_label": "한림",
+                        "category_label": "오름 산책",
+                        "has_fix_request": True,
+                        "fix_request": {
+                            "status": "확인 필요",
+                            "summary": "이용자 정보 수정요청 이력이 있어 방문 전 재확인이 필요한 후보입니다.",
+                            "known_detail": "현재 연결된 공공데이터에는 수정요청의 세부 사유가 별도 필드로 분리되어 있지 않습니다.",
+                            "check_items": ["운영시간", "주소/위치", "휴무·폐업 여부", "이동·주차 가능 여부"],
+                        },
+                    }
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "느지리오름" in reply
+    assert "수정요청 이력" in reply
+    assert "세부 사유" in reply
+    assert "운영시간" in reply
+    assert "후보는 공공데이터 기준" not in reply
+
+
+def test_haruban_fallback_answers_transit_detail_from_place_detail():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "금능포구 주차장이나 정류소는 어때?"},
+        {
+            "role": "tool",
+            "name": "get_place_detail",
+            "content": json.dumps({
+                "query": "금능포구",
+                "items": [
+                    {
+                        "name": "금능포구",
+                        "region_label": "한림",
+                        "category_label": "바다 산책",
+                        "address": "제주시 한림읍",
+                        "has_fix_request": False,
+                        "transit": {
+                            "parking": True,
+                            "parking_count": 2,
+                            "bus_walkable": True,
+                            "parking_radius_km": 1.0,
+                            "busstop_radius_km": 0.5,
+                        },
+                    }
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "금능포구" in reply
+    assert "주차장 2곳" in reply
+    assert "정류소" in reply
+    assert "좌표 기준" in reply
+
+
+def test_haruban_fallback_answers_weather_signal_by_trip_days():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "여행 기간 날씨는 어때?"},
+        {
+            "role": "tool",
+            "name": "weather_signal",
+            "content": json.dumps({
+                "region_label": "한림",
+                "available": True,
+                "labels": ["흐림", "바람 확인"],
+                "daily_forecasts": [
+                    {
+                        "date_label": "7월 10일",
+                        "forecast": {
+                            "sky": "흐림",
+                            "precipitation_probability": 30,
+                            "temperature": 28,
+                            "wind_speed": 4.8,
+                        },
+                    },
+                    {
+                        "date_label": "7월 11일",
+                        "forecast": {
+                            "sky": "맑음",
+                            "precipitation_probability": 0,
+                            "temperature": 29,
+                            "wind_speed": 2.0,
+                        },
+                    },
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "한림" in reply
+    assert "7월 10일" in reply
+    assert "강수확률 30%" in reply
+    assert "풍속 4.8m/s" in reply

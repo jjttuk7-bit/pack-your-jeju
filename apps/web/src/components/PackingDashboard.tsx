@@ -2199,6 +2199,7 @@ function PackItemCard({
             className="overflow-hidden"
           >
             <div className="px-3.5 pb-3.5 pt-1 border-t border-stone-100">
+              <FixRequestEvidence fixRequest={it.fix_request} />
               <PlaceDetail
                 externalId={it.external_id}
                 address={it.address}
@@ -2215,6 +2216,54 @@ function PackItemCard({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function FixRequestEvidence({ fixRequest }: { fixRequest?: PackItemDto['fix_request'] }) {
+  const requests = fixRequest?.requests?.filter(Boolean) ?? [];
+  if (!fixRequest || requests.length === 0) return null;
+
+  return (
+    <details className="mb-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-950">
+      <summary className="cursor-pointer font-bold text-amber-900">
+        수정요청 내용 보기 · 총 {fixRequest.count}건 중 최근 {requests.length}건
+      </summary>
+      <div className="mt-2 space-y-2">
+        {requests.map((request, idx) => (
+          <div key={`${request.request_id ?? idx}`} className="rounded-lg bg-white/70 border border-amber-100 p-2">
+            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                {request.change_type_label ?? '수정요청'}
+              </span>
+              {request.request_id && (
+                <span className="text-[10px] text-amber-800/70">요청 #{request.request_id}</span>
+              )}
+            </div>
+            {request.before_text && (
+              <p className="leading-relaxed">
+                <span className="font-bold">기존/표기 내용: </span>
+                {request.before_text}
+              </p>
+            )}
+            {request.after_text && (
+              <p className="leading-relaxed">
+                <span className="font-bold">요청된 수정 내용: </span>
+                {request.after_text}
+              </p>
+            )}
+            {!request.before_text && !request.after_text && request.display_text && (
+              <p className="leading-relaxed">
+                <span className="font-bold">요청 내용: </span>
+                {request.display_text}
+              </p>
+            )}
+            <p className="mt-1 text-[10px] leading-relaxed text-amber-800/80">
+              수정요청은 확정 변경이 아니라 방문 전 확인이 필요한 공공데이터 신호입니다.
+            </p>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

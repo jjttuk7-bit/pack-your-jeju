@@ -27,7 +27,7 @@ from sqlalchemy.engine import Connection
 from apps.api import db
 from apps.api.engine.filters import MomentFilter
 
-DEFAULT_LIMIT = 3               # moment당 3개까지 노출
+DEFAULT_LIMIT = 5               # moment당 5개까지 노출
 PARKING_RADIUS_KM = 1.0
 BUSSTOP_RADIUS_KM = 0.5
 

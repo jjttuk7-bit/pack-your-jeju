@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS place (
   id BIGSERIAL PRIMARY KEY,
   external_id TEXT UNIQUE,                    -- visitjeju contentsid
   name TEXT NOT NULL,
-  category TEXT NOT NULL,                     -- oreum|beach|cafe|food|market|forest|experience|viewpoint|other
+  category TEXT NOT NULL,                     -- oreum|beach|cafe|food|market|forest|experience|viewpoint|culture|festival|shopping|accommodation|other
   region_normalized TEXT NOT NULL,            -- 지역 선택 UI 12값
   address TEXT,
   lat DOUBLE PRECISION,
@@ -41,6 +41,27 @@ CREATE TABLE IF NOT EXISTS place (
 CREATE INDEX IF NOT EXISTS place_search_tsv_idx ON place USING gin (search_tsv);
 CREATE INDEX IF NOT EXISTS place_name_trgm_idx ON place USING gin (name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS place_region_category_idx ON place (region_normalized, category);
+
+CREATE TABLE IF NOT EXISTS fix_request_detail (
+  id BIGSERIAL PRIMARY KEY,
+  request_id TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  title TEXT,
+  address TEXT,
+  road_address TEXT,
+  intro TEXT,
+  change_text TEXT NOT NULL,
+  change_type TEXT NOT NULL DEFAULT 'general',
+  before_text TEXT,
+  after_text TEXT,
+  display_text TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (request_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS fix_request_detail_external_id_idx
+  ON fix_request_detail (external_id, id DESC);
+CREATE INDEX IF NOT EXISTS fix_request_detail_change_type_idx
+  ON fix_request_detail (change_type);
 
 CREATE TABLE IF NOT EXISTS transit_point (
   id BIGSERIAL PRIMARY KEY,

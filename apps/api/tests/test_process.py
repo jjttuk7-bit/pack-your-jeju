@@ -97,15 +97,24 @@ def test_c2_market_becomes_market():
     assert proc.classify_category(it) == "market"
 
 
-def test_c2_non_market_becomes_other():
+def test_c2_non_market_becomes_shopping():
     it = _base(contentscd={"value": "c2", "label": "쇼핑"}, title="면세점", tag="쇼핑")
-    assert proc.classify_category(it) == "other"
+    assert proc.classify_category(it) == "shopping"
 
 
-def test_c5_festival_held_returns_none():
-    # Q2 결정: c5는 place에 넣지 않음
+def test_c3_accommodation_becomes_accommodation():
+    it = _base(contentscd={"value": "c3", "label": "숙박"}, title="제주 호텔")
+    assert proc.classify_category(it) == "accommodation"
+
+
+def test_c5_festival_becomes_festival():
     it = _base(contentscd={"value": "c5", "label": "축제/행사"}, title="어느축제")
-    assert proc.classify_category(it) is None
+    assert proc.classify_category(it) == "festival"
+
+
+def test_c5_culture_keyword_becomes_culture():
+    it = _base(contentscd={"value": "c5", "label": "축제/행사"}, title="제주 전시회", tag="전시")
+    assert proc.classify_category(it) == "culture"
 
 
 def test_c6_citrus_becomes_experience():
@@ -113,9 +122,9 @@ def test_c6_citrus_becomes_experience():
     assert proc.classify_category(it) == "experience"
 
 
-def test_c6_non_citrus_becomes_other():
+def test_c6_non_citrus_experience_keyword_becomes_experience():
     it = _base(contentscd={"value": "c6", "label": "테마여행"}, title="승마 체험", tag="")
-    assert proc.classify_category(it) == "other"
+    assert proc.classify_category(it) == "experience"
 
 
 # ---- 좌표 bbox ----
@@ -136,10 +145,12 @@ def test_coords_missing_are_none():
 
 # ---- process_item 통합 ----
 
-def test_process_item_c5_returns_none():
+def test_process_item_c5_returns_festival_place():
     fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
     it = _base(contentscd={"value": "c5", "label": "축제/행사"})
-    assert proc.process_item(it, fetched_at=fetched_at) is None
+    p = proc.process_item(it, fetched_at=fetched_at)
+    assert p is not None
+    assert p.category == "festival"
 
 
 def test_process_item_ok_returns_processed_place():

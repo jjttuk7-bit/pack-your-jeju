@@ -23,6 +23,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from apps.api import db
+from apps.api.engine import fix_requests
 
 FIX_REQUEST_ID_CANDIDATES: tuple[str, ...] = (
     "contentsid", "CONTENTS_ID", "contents_id",
@@ -61,21 +62,48 @@ def _open_csv_autodetect(csv_path: Path):
 
 
 def ingest_fix_request_csv(csv_path: Path) -> tuple[int, int]:
-    """CSV의 contentsid 목록을 place.has_fix_request=true로 UPDATE.
+    """CSV의 수정요청 상세를 저장하고 place.has_fix_request=true로 UPDATE.
     반환: (input_rows, updated_places)"""
     if not csv_path.exists():
         raise FileNotFoundError(csv_path)
 
     ids: list[str] = []
+    details: list[dict] = []
     with _open_csv_autodetect(csv_path) as f:
         reader = csv.DictReader(f)
         for row in reader:
             eid = _pick_first(row, FIX_REQUEST_ID_CANDIDATES)
             if eid:
                 ids.append(eid)
+            detail = fix_requests.normalize_fix_request_row(row)
+            if detail:
+                details.append(detail)
 
     engine = db.get_engine()
     with engine.begin() as conn:
+        if details:
+            conn.execute(
+                text(
+                    "INSERT INTO fix_request_detail ("
+                    "request_id, external_id, title, address, road_address, intro, "
+                    "change_text, change_type, before_text, after_text, display_text"
+                    ") VALUES ("
+                    ":request_id, :external_id, :title, :address, :road_address, :intro, "
+                    ":change_text, :change_type, :before_text, :after_text, :display_text"
+                    ") "
+                    "ON CONFLICT (request_id, external_id) DO UPDATE SET "
+                    "title = EXCLUDED.title, "
+                    "address = EXCLUDED.address, "
+                    "road_address = EXCLUDED.road_address, "
+                    "intro = EXCLUDED.intro, "
+                    "change_text = EXCLUDED.change_text, "
+                    "change_type = EXCLUDED.change_type, "
+                    "before_text = EXCLUDED.before_text, "
+                    "after_text = EXCLUDED.after_text, "
+                    "display_text = EXCLUDED.display_text"
+                ),
+                details,
+            )
         result = conn.execute(
             text("UPDATE place SET has_fix_request=true WHERE external_id = ANY(:ids)"),
             {"ids": ids},

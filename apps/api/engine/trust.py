@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
 
-from apps.api.engine import visit_signals
+from apps.api.engine import fix_requests, visit_signals
 from apps.api.engine.filters import MomentFilter
 from apps.api.engine.search import (
     PlaceHit,
@@ -53,6 +53,7 @@ class BadgedItem:
     trust_score: int = 0
     score_breakdown: dict = field(default_factory=dict)
     check_required: list[str] = field(default_factory=list)
+    fix_request: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -175,6 +176,7 @@ def badge_item(
         trust_score=profile.score,
         score_breakdown=profile.breakdown,
         check_required=profile.check_required,
+        fix_request=fix_requests.fetch_fix_request_summary(hit.external_id) if hit.has_fix_request else None,
     )
 
 
@@ -382,7 +384,7 @@ def compute_trust_profile(
 def judge_section(
     mf: MomentFilter,
     *,
-    limit: int = 3,
+    limit: int = 5,
     strict_fn: Callable[[MomentFilter, int], list[PlaceHit]] = None,
     relaxed_fn: Callable[[MomentFilter, int], list[PlaceHit]] = None,
     weather_snapshot: dict | None = None,
@@ -392,7 +394,24 @@ def judge_section(
 
     if strict:
         items = [badge_item(h, mf, now=now, weather_snapshot=weather_snapshot) for h in strict]
-        return Section(moment=mf.moment, items=items, fallback=None, observed_reasons=[])
+        observed_reasons: list[str] = []
+        if len(items) < limit:
+            relaxed = (relaxed_fn or _relaxed_default)(mf, limit)
+            seen = {h.external_id for h in strict}
+            topups = [h for h in relaxed if h.external_id not in seen]
+            if topups:
+                observed_reasons.append("retrieval_miss")
+                items.extend(
+                    badge_item(
+                        h,
+                        mf,
+                        now=now,
+                        note="인근 지역 결과",
+                        weather_snapshot=weather_snapshot,
+                    )
+                    for h in topups[: max(0, limit - len(items))]
+                )
+        return Section(moment=mf.moment, items=items, fallback=None, observed_reasons=observed_reasons)
 
     # strict 실패 → relaxed 재시도 (retrieval_miss 관측용 기록)
     relaxed = (relaxed_fn or _relaxed_default)(mf, limit)

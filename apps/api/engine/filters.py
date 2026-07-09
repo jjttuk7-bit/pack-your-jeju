@@ -39,12 +39,17 @@ MOMENT_TO_CATEGORY: dict[CardId, Category] = {
 # purpose는 카드 선택을 보완하는 완화 시그널.
 # 강한 라우팅이 아니라 "카드가 커버하지 못하는 축에서의 취향 힌트"로만 쓴다.
 PURPOSE_TO_CATEGORIES: dict[Purpose, tuple[Category, ...]] = {
-    "healing":     ("forest", "cafe", "viewpoint", "beach"),
-    "sightseeing": ("oreum", "beach", "viewpoint", "market", "forest"),
-    "food":        ("food", "market"),
-    "activity":    ("oreum", "beach", "experience"),
-    "hocance":     ("cafe", "viewpoint"),
+    "healing":     ("forest", "cafe", "viewpoint", "beach", "culture"),
+    "sightseeing": ("oreum", "beach", "viewpoint", "market", "forest", "culture", "festival"),
+    "food":        ("food", "market", "shopping"),
+    "activity":    ("oreum", "beach", "experience", "festival"),
+    "hocance":     ("cafe", "viewpoint", "culture"),
 }
+
+SEARCHABLE_CATEGORIES: tuple[Category, ...] = (
+    "oreum", "beach", "cafe", "food", "market", "forest", "experience",
+    "viewpoint", "culture", "festival", "shopping", "accommodation", "other",
+)
 
 # companion → 항목별 배지 판정 시 결측이면 caution ⚠️로 하향할 amenity 키.
 # 요구 amenity가 없다고 "조용히 빼지 않는다" (MOMENT_CARDS §동행자 규칙).

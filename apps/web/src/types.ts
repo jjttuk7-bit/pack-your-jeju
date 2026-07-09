@@ -121,6 +121,23 @@ export interface SavedTravel {
 
 export type BadgeKind = 'verified' | 'caution' | 'contradicted' | 'reference';
 
+export interface FixRequestDetailDto {
+  count: number;
+  requests: Array<{
+    request_id?: string | null;
+    title?: string | null;
+    address?: string | null;
+    road_address?: string | null;
+    intro?: string | null;
+    change_type?: string;
+    change_type_label?: string;
+    change_text?: string | null;
+    before_text?: string | null;
+    after_text?: string | null;
+    display_text?: string | null;
+  }>;
+}
+
 export interface PackItemDto {
   name: string;
   badge: BadgeKind;
@@ -140,6 +157,7 @@ export interface PackItemDto {
   trust_score?: number;
   score_breakdown?: TrustScoreBreakdown;
   check_required?: string[];
+  fix_request?: FixRequestDetailDto | null;
 }
 
 export type TrustScoreBreakdown = Record<

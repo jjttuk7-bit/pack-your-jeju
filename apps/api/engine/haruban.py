@@ -21,11 +21,13 @@ from typing import Any
 from sqlalchemy import text
 
 from apps.api import db
+from apps.api.engine import fix_requests
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import llm
 from apps.api.engine import search as search_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
+from apps.api.engine import weather as weather_mod
 
 
 # ─── 한글 라벨 (하이라이트 문구 조립용) ───
@@ -73,6 +75,22 @@ PURPOSE_LABEL_KO: dict[str, str] = {
     "hocance":     "호캉스",
 }
 
+CATEGORY_LABEL_KO: dict[str, str] = {
+    "oreum": "오름 산책",
+    "beach": "바다 산책",
+    "cafe": "조용한 카페",
+    "food": "현지 맛집",
+    "market": "로컬 시장",
+    "forest": "곶자왈 숲길",
+    "experience": "체험관광",
+    "viewpoint": "전망·노을",
+    "culture": "문화시설·전시",
+    "festival": "축제·행사",
+    "shopping": "쇼핑",
+    "accommodation": "숙박시설",
+    "other": "기타 관광정보",
+}
+
 
 # ─── 하루방 도구 정의 ───
 
@@ -96,7 +114,7 @@ TOOLS: list[dict] = [
                     },
                     "category": {
                         "type": "string",
-                        "enum": list(set(filters_mod.MOMENT_TO_CATEGORY.values())),
+                        "enum": list(filters_mod.SEARCHABLE_CATEGORIES),
                     },
                     "limit": {"type": "integer", "minimum": 1, "maximum": 10},
                     "exclude_names": {
@@ -288,7 +306,7 @@ def _run_search_places(args: dict) -> dict:
         rows = conn.execute(
             text(
                 "SELECT external_id, name, category, region_normalized, address, "
-                "       info_type, valid_until, has_fix_request, source_url "
+                "       lat, lng, info_type, valid_until, has_fix_request, source_url "
                 "FROM place "
                 "WHERE tombstoned=false "
                 "  AND region_normalized = ANY(:regions) "
@@ -406,10 +424,55 @@ def _run_get_place_detail(args: dict) -> dict:
     }
 
 
+def _fix_request_summary(has_fix_request: bool, external_id: str | None = None) -> dict[str, Any] | None:
+    if not has_fix_request:
+        return None
+    detail = fix_requests.fetch_fix_request_summary(external_id or "") if external_id else None
+    if detail and detail.get("requests"):
+        requests = detail["requests"]
+        labels = sorted({r.get("change_type_label") or "수정요청" for r in requests})
+        return {
+            "status": "확인 필요",
+            "summary": f"콘텐츠 수정요청 {detail.get('count', len(requests))}건이 연결되어 있습니다.",
+            "known_detail": " · ".join(labels),
+            "check_items": _fix_request_check_items(requests),
+            "requests": requests,
+            "count": detail.get("count", len(requests)),
+        }
+    return {
+        "status": "확인 필요",
+        "summary": "이용자 정보 수정요청 이력이 있어 방문 전 재확인이 필요한 후보입니다.",
+        "known_detail": (
+            "현재 연결된 공공데이터에는 수정요청의 세부 사유가 별도 필드로 분리되어 있지 않습니다."
+        ),
+        "check_items": ["운영시간", "주소/위치", "휴무·폐업 여부", "이동·주차 가능 여부"],
+    }
+
+
+def _fix_request_check_items(requests: list[dict[str, Any]]) -> list[str]:
+    labels: list[str] = []
+    for request in requests:
+        change_type = request.get("change_type")
+        if change_type == "operating_hours":
+            labels.append("운영시간")
+        elif change_type == "address_location":
+            labels.append("주소/위치")
+        elif change_type == "fee":
+            labels.append("요금")
+        elif change_type == "contact":
+            labels.append("연락처")
+        elif change_type == "closure_status":
+            labels.append("운영 상태")
+        else:
+            labels.append("상세정보")
+    return list(dict.fromkeys(labels)) or ["공공데이터 상세정보"]
+
+
 def _detail_row_to_payload(row: Any) -> dict[str, Any]:
     check_required: list[str] = ["operating", "public_data"]
     if bool(row.has_fix_request):
         check_required.insert(0, "feedback")
+    transit = search_mod.transit_check(row.lat, row.lng)
     return {
         "external_id": row.external_id,
         "name": row.name,
@@ -423,6 +486,14 @@ def _detail_row_to_payload(row: Any) -> dict[str, Any]:
         "info_type": row.info_type,
         "valid_until": row.valid_until.isoformat() if row.valid_until else None,
         "has_fix_request": bool(row.has_fix_request),
+        "fix_request": _fix_request_summary(bool(row.has_fix_request), row.external_id),
+        "transit": {
+            "parking": transit.parking,
+            "parking_count": transit.parking_count,
+            "bus_walkable": transit.bus_walkable,
+            "parking_radius_km": search_mod.PARKING_RADIUS_KM,
+            "busstop_radius_km": search_mod.BUSSTOP_RADIUS_KM,
+        },
         "note": "이용자 정보 수정요청 이력" if bool(row.has_fix_request) else None,
         "check_required": check_required,
     }
@@ -483,6 +554,7 @@ def _unique_preserve_order(values: list[str]) -> list[str]:
 
 def _extract_candidate_names_from_assistant_text(text_in: str) -> list[str]:
     matches = re.findall(r"먼저\s+(.+?)(?:\s+같은 후보|\s+후보를|\s+볼 수|\s+확인)", text_in)
+    matches.extend(re.findall(r"([\w가-힣&().\s,·ㆍ]+?)\s+후보가\s+있", text_in))
     names: list[str] = []
     for match in matches:
         names.extend(re.split(r"\s*,\s*|\s*·\s*|\s*ㆍ\s*", match))
@@ -539,6 +611,16 @@ def _infer_regions_from_text(text_in: str, form_state: dict | None = None) -> li
 
 
 def _infer_category_from_text(text_in: str, form_state: dict | None = None) -> str:
+    if re.search(r"숙박|숙소|호텔|펜션|리조트|게스트하우스", text_in):
+        return "accommodation"
+    if re.search(r"축제|행사|공연|이벤트", text_in):
+        return "festival"
+    if re.search(r"문화|전시|전시관|미술관|박물관|실내|비\s*오는\s*날", text_in):
+        return "culture"
+    if re.search(r"쇼핑|기념품|선물|면세|소품샵|특산품", text_in):
+        return "shopping"
+    if re.search(r"체험|감귤|액티비티|승마|요트|공방|클래스", text_in):
+        return "experience"
     if re.search(r"맛집|식당|점심|저녁|아침|해산물|해물|횟집|먹|음식|한식|갈치|고등어|전복|우럭", text_in):
         return "food"
     if re.search(r"카페|커피|차|글쓰기", text_in):
@@ -582,11 +664,76 @@ def _infer_limit_from_text(text_in: str) -> int:
     return 3
 
 
+def _infer_limit_from_conversation(last_user: str, text_all: str) -> int:
+    if re.search(r"한\s*곳|한곳|하나|1\s*곳|한\s*군데|한군데|추천해준다면", last_user):
+        return 1
+    if re.search(r"\d+\s*곳", last_user):
+        return _infer_limit_from_text(last_user)
+    if re.search(r"한\s*곳|한곳|하나|1\s*곳|한\s*군데|한군데|추천해준다면", text_all):
+        return 1
+    return _infer_limit_from_text(text_all if text_all else last_user)
+
+
 def _is_search_like_text(text_in: str) -> bool:
     return bool(re.search(
         r"추천|맛집|식당|카페|오름|바다|바닷가|해변|해수욕장|해산물|해물|점심|저녁|어디|몇\s*개|몇\s*곳|리스트|후보|한\s*곳|한곳",
         text_in,
     ))
+
+
+def _is_fix_request_question(text_in: str) -> bool:
+    return bool(re.search(r"수정\s*요청|수정\s*이력|수정요청내역|주의\s*내용|뭐.*주의|무엇.*주의", text_in))
+
+
+def _is_transit_question(text_in: str) -> bool:
+    return bool(re.search(r"주차|주차장|정류소|버스\s*정류|대중교통|교통|이동", text_in))
+
+
+def _is_weather_question(text_in: str) -> bool:
+    return bool(re.search(r"날씨|기상|비|강수|바람|풍속|기온|덥|더워|추워|춥|우산", text_in))
+
+
+def _parse_form_date(value: Any) -> date | None:
+    if isinstance(value, date):
+        return value
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _run_weather_signal(form_state: dict) -> dict:
+    raw_regions = form_state.get("regions") or ["jeju_city"]
+    if isinstance(raw_regions, str):
+        raw_regions = [raw_regions]
+    region = next((r for r in raw_regions if r in filters_mod.REGIONS), "jeju_city")
+    target_start = _parse_form_date(form_state.get("start_date") or form_state.get("startDate"))
+    try:
+        target_days = int(form_state.get("days") or form_state.get("durationDays") or 1)
+    except (TypeError, ValueError):
+        target_days = 1
+    target_days = max(1, min(3, target_days))
+    snapshot = weather_mod.smoke_kma_nowcast(
+        region,
+        target_start=target_start,
+        target_days=target_days,
+    )
+    return {
+        "region": region,
+        "region_label": REGION_LABEL_KO.get(region, region),
+        "target_start": target_start.isoformat() if target_start else None,
+        "target_days": target_days,
+        "available": bool(snapshot.get("available")),
+        "provider": snapshot.get("provider"),
+        "risk_level": snapshot.get("risk_level"),
+        "labels": list(snapshot.get("labels") or []),
+        "summary": snapshot.get("summary"),
+        "daily_forecasts": list(snapshot.get("daily_forecasts") or []),
+        "reason": snapshot.get("reason"),
+        "source": snapshot.get("source"),
+    }
 
 
 def _infer_search_places_args(conv: list[dict], form_state: dict | None = None) -> dict:
@@ -601,7 +748,7 @@ def _infer_search_places_args(conv: list[dict], form_state: dict | None = None) 
     return {
         "regions": _infer_regions_from_text(text_all, form_state),
         "category": _infer_category_from_text(text_all, form_state),
-        "limit": _infer_limit_from_text(text_all if text_all else last_user),
+        "limit": _infer_limit_from_conversation(last_user, text_all),
         "intent": intent,
         "keywords": _infer_keywords_from_text(text_all),
         "exclude_names": _conversation_exclude_names(conv),
@@ -626,25 +773,27 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
     if _is_general_advice_text(last_user) or _is_region_category_query(last_user):
         return ""
 
-    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|위치|주소|하\.*", last_user))
+    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|어떤|위치|주소|하\.*", last_user))
+    asks_detail = asks_detail or _is_fix_request_question(last_user) or _is_transit_question(last_user)
     asks_list = bool(re.search(r"추천|리스트|몇\s*개|몇\s*곳|후보|어디|맛집들|식당들", last_user))
     if not asks_detail or asks_list:
         return ""
 
     cleaned = re.sub(
-        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|하\.*)",
+        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|어떤거야|어떤가요|수정\s*요청\s*내역|수정요청내역|수정\s*요청|수정\s*이력|주의\s*내용|주차장|주차|정류소|버스\s*정류장?|대중교통|교통|있어|있나요|가능|하\.*)",
         " ",
         last_user,
     )
     cleaned = re.sub(r"[?？！!~…]+", " ", cleaned)
     cleaned = cleaned.strip(" \t\n\r,，.。·ㆍ")
+    cleaned = re.sub(r"\s+(은|는|이|가|을|를)$", "", cleaned).strip()
     if len(_normalize_place_name(cleaned)) < 2:
         return ""
     return cleaned
 
 
 def _is_general_advice_text(text_in: str) -> bool:
-    return bool(re.search(r"처음|여행계획|계획|코스|일정|어떻게|세우|준비|팁|방법", text_in))
+    return bool(re.search(r"처음|여행계획|계획|코스|일정|어떻게|세우|준비|팁|방법|어떤\s*곳|가보면\s*좋", text_in))
 
 
 def _is_region_category_query(text_in: str) -> bool:
@@ -663,6 +812,8 @@ def _should_answer_without_search(messages_in: list[dict]) -> bool:
     if not last_user:
         return False
     if _infer_place_detail_query(conv):
+        return False
+    if _is_fix_request_question(last_user) or _is_transit_question(last_user) or _is_weather_question(last_user):
         return False
     if _is_region_category_query(last_user):
         return False
@@ -698,6 +849,8 @@ def _template_free_advice(last_user: str) -> str:
 def _category_label(category: str | None) -> str:
     if not category:
         return "선택한 순간"
+    if category in CATEGORY_LABEL_KO:
+        return CATEGORY_LABEL_KO[category]
     for moment, mapped_category in filters_mod.MOMENT_TO_CATEGORY.items():
         if mapped_category == category:
             return MOMENT_LABEL_KO.get(moment, category)
@@ -772,6 +925,13 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
     if not last_user:
         return None
 
+    if _is_weather_question(last_user) and not _infer_place_detail_query(conv):
+        try:
+            result = _run_weather_signal(form_state)
+        except Exception as e:
+            result = {"available": False, "error": f"{type(e).__name__}: {e}"}
+        return {"tool": "weather_signal", "args": {}, "result": result}
+
     detail_query = _infer_place_detail_query(conv)
     if detail_query:
         args = {"query": detail_query}
@@ -821,6 +981,41 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             continue
 
         name = message.get("name")
+        if name == "weather_signal":
+            region_text = payload.get("region_label") or "선택한 지역"
+            if not payload.get("available"):
+                reason = payload.get("reason") or payload.get("error") or "기상청 예보를 확인하지 못했습니다"
+                return (
+                    f"{region_text}의 여행 기간 날씨는 지금 바로 확정해서 말하기 어렵습니다. "
+                    f"기상청 예보 연결 결과: {reason}. "
+                    "그래서 야외 일정은 바람·비를 한 번 더 확인한 뒤 넣는 편이 안전합니다."
+                )
+            daily = payload.get("daily_forecasts") or []
+            labels = payload.get("labels") or []
+            label_text = ", ".join(labels[:3]) if labels else "특이 신호 없음"
+            if daily:
+                lines = []
+                for day in daily[:3]:
+                    forecast = day.get("forecast") or {}
+                    parts = [
+                        day.get("date_label") or day.get("date") or "여행일",
+                        str(forecast.get("sky") or "날씨 확인"),
+                    ]
+                    if forecast.get("precipitation_probability") is not None:
+                        parts.append(f"강수확률 {forecast['precipitation_probability']}%")
+                    if forecast.get("temperature") is not None:
+                        parts.append(f"기온 {forecast['temperature']:g}도")
+                    if forecast.get("wind_speed") is not None:
+                        parts.append(f"풍속 {forecast['wind_speed']:g}m/s")
+                    lines.append(" · ".join(parts))
+                return (
+                    f"{region_text}의 여행 기간 예보는 {label_text}로 볼 수 있습니다. "
+                    + " / ".join(lines)
+                    + " 야외 오름·바다 일정은 비와 바람 신호가 있는 날을 피해서 배치하면 좋습니다."
+                )
+            summary = payload.get("summary") or "기상청 예보가 확인되었습니다."
+            return f"{region_text} 날씨는 {summary} 주요 신호는 {label_text}입니다."
+
         if name == "search_places":
             total = int(payload.get("total_count") or 0)
             regions = payload.get("regions") or []
@@ -829,6 +1024,11 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             items = payload.get("items") or []
             item_names = [item.get("name") for item in items[:3] if item.get("name")]
             intent = payload.get("intent") or "list"
+            excluded_names = payload.get("excluded_names") or []
+            excluded_note = ""
+            if excluded_names:
+                shown_excluded = ", ".join(str(name) for name in excluded_names[:3])
+                excluded_note = f" 제외 요청하신 {shown_excluded}은(는) 빼고 봤습니다."
             wants_one = intent == "recommend" or bool(re.search(r"한\s*곳|한곳|하나|추천해준다면", last_user))
 
             if total <= 0:
@@ -851,6 +1051,7 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
                     f"한 곳만 고르면 {place_name}을 먼저 보겠습니다. "
                     f"{region_text}의 {category_text} 후보는 공공데이터 기준으로 {total}곳 확인되고, "
                     f"이 후보는 그중 {reason}입니다."
+                    f"{excluded_note}"
                     f"{address_text}"
                     f"{seafood_note} 영업시간은 저희가 참조하는 공공데이터 기준으로 확인되지 않아 방문 전 확인이 필요합니다."
                 )
@@ -859,7 +1060,8 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
                 examples = ", ".join(item_names)
                 return (
                     f"{region_text}에서 {category_text} 후보는 공공데이터 기준으로 {total}곳 확인됩니다. "
-                    f"먼저 {examples} 같은 후보를 볼 수 있어요. 동선이나 날씨 기준으로 더 좁혀드릴까요?"
+                    f"{excluded_note}먼저 {examples} 같은 후보를 볼 수 있어요. "
+                    "이 중에서 하나를 고르면 주소와 확인 필요 항목을 기준으로 더 자세히 정리해드릴게요."
                 )
 
             return (
@@ -881,6 +1083,53 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             category_text = item.get("category_label") or _category_label(item.get("category"))
             address = item.get("address")
             source = item.get("source") or "공공데이터 근거"
+            if _is_fix_request_question(last_user):
+                fix = item.get("fix_request")
+                if fix:
+                    requests = fix.get("requests") or []
+                    if requests:
+                        first = requests[0]
+                        parts = [
+                            f"{place_name}은(는) 콘텐츠 수정요청 {fix.get('count', len(requests))}건이 연결되어 있습니다.",
+                            f"최근 요청 유형은 {first.get('change_type_label') or '수정요청'}입니다.",
+                        ]
+                        if first.get("before_text"):
+                            parts.append(f"기존/표기 내용은 {first.get('before_text')}입니다.")
+                        if first.get("after_text"):
+                            parts.append(f"요청된 수정 내용은 {first.get('after_text')}입니다.")
+                        if not first.get("before_text") and not first.get("after_text") and first.get("display_text"):
+                            parts.append(f"요청 내용은 {first.get('display_text')}입니다.")
+                        parts.append("다만 수정요청은 확정 변경이 아니라 방문 전 확인이 필요한 공공데이터 신호로 보는 게 안전합니다.")
+                        return " ".join(parts)
+                    checks = ", ".join(fix.get("check_items") or [])
+                    return (
+                        f"{place_name}은(는) 수정요청 이력이 있는 후보입니다. "
+                        f"{fix.get('summary')} "
+                        f"다만 {fix.get('known_detail')} "
+                        f"그래서 방문 전 확인할 항목은 {checks}입니다."
+                    )
+                return (
+                    f"{place_name}은(는) 제주를 담다가 참조하는 공공데이터 기준으로 수정요청 이력이 확인되지 않았습니다. "
+                    "다만 운영시간·휴무처럼 실시간으로 바뀌는 정보는 방문 전 한 번 더 확인하는 편이 좋습니다."
+                )
+            if _is_transit_question(last_user):
+                transit = item.get("transit") or {}
+                parking_count = int(transit.get("parking_count") or 0)
+                parking_text = (
+                    f"반경 {transit.get('parking_radius_km', 1)}km 안에 주차장 {parking_count}곳이 확인됩니다"
+                    if parking_count > 0
+                    else f"반경 {transit.get('parking_radius_km', 1)}km 안의 주차장 정보는 확인되지 않았습니다"
+                )
+                bus_text = (
+                    f"반경 {transit.get('busstop_radius_km', 0.5)}km 안에 정류소 접근 신호가 있습니다"
+                    if transit.get("bus_walkable")
+                    else f"반경 {transit.get('busstop_radius_km', 0.5)}km 안의 정류소 접근 신호는 확인되지 않았습니다"
+                )
+                address_text = f" 주소는 {address}입니다." if address else ""
+                return (
+                    f"{place_name}의 이동 정보는 공공데이터 좌표 기준으로 보면, {parking_text}. "
+                    f"또 {bus_text}.{address_text} 실제 이동 전에는 지도 앱에서 마지막 동선을 한 번 더 확인해 주세요."
+                )
             caution = " 이용자 정보 수정요청 이력이 있어 방문 전 재확인이 필요합니다." if item.get("has_fix_request") else ""
             address_text = f" 주소: {address}." if address else " 주소는 저희 데이터에 없습니다."
             return (
@@ -924,6 +1173,10 @@ _BASE_SYSTEM_PROMPT = (
     "먼저 호출한 뒤 답한다.\n\n"
     "도구 사용 정책:\n"
     "- 사용자가 특정 장소명을 말하며 '자세히', '어때', '위치', '주소', '정보'를 물으면 get_place_detail을 먼저 호출한다.\n"
+    "- 사용자가 '수정요청내역', '수정이력', '주의 내용'을 물으면 get_place_detail 결과의 fix_request만 근거로 답한다. "
+    "상세 사유가 없으면 없다고 말하고 추정하지 않는다.\n"
+    "- 사용자가 '주차장', '정류소', '대중교통', '이동'을 특정 장소와 함께 물으면 get_place_detail 결과의 transit만 근거로 답한다.\n"
+    "- 사용자가 여행 기간 날씨를 물으면 기상청 예보 스냅샷만 근거로 날짜별로 답하고, 장소 카드마다 날씨를 반복하지 않는다.\n"
     "- 사용자가 '한 곳만', '하나만', '점심으로 한 곳 추천'을 말하면 search_places의 intent='recommend', limit=1을 사용한다.\n"
     "- 사용자가 '더', '이외에', '제외하고', '빼고'를 말하면 이미 보여준 후보와 사용자가 제외한 후보를 exclude_names에 넣는다.\n"
     "- '해산물', '조용한', '혼자', '점심' 같은 선호는 keywords로 넘긴다. 단, 메뉴·영업시간은 도구 결과에 없으면 말하지 않는다.\n\n"
@@ -945,7 +1198,11 @@ _BASE_SYSTEM_PROMPT = (
     "사용자 표현은 '제주를 담다가 확인한 공공데이터 기준'으로 통일한다.\n"
     "6) search_places 결과에 total_count가 있으면 개수 질문에 그 숫자를 먼저 답하고, "
     "items가 있으면 후보 2~3개를 예시로 제시하라.\n"
-    "7) 검색 풀 컨텍스트가 제공되면 그 안의 result만 사실 근거로 사용하고, 같은 질문을 다시 묻지 마라."
+    "7) 검색 풀 컨텍스트가 제공되면 그 안의 result만 사실 근거로 사용하고, 같은 질문을 다시 묻지 마라.\n"
+    "8) items가 1개 이상 있으면 '조건을 더 알려달라'로 답변을 끝내지 마라. "
+    "현재 후보 안에서 먼저 판단하고, 마지막에 선택적으로 더 좁힐 기준을 제안하라.\n"
+    "9) exclude_names가 있으면 그 후보를 절대 다시 추천하지 말고, 답변에 '제외한 후보는 빼고 봤다'는 취지를 짧게 포함하라.\n"
+    "10) 사용자가 불만이나 답답함을 표현하면 사과보다 먼저 문제를 인정하고, 이전 후보 반복·조건 누락을 바로잡아 다시 제안하라."
 )
 
 

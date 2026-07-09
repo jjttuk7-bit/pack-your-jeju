@@ -521,6 +521,7 @@ def _serialize_section(section: trust_mod.Section) -> dict:
                 "trust_score": it.trust_score,
                 "score_breakdown": it.score_breakdown,
                 "check_required": it.check_required,
+                "fix_request": it.fix_request,
             }
             for it in section.items
         ],

@@ -10,6 +10,7 @@ from apps.api.engine.filters import (
     MOMENT_TO_CATEGORY,
     PURPOSE_TO_CATEGORIES,
     REGIONS,
+    SEARCHABLE_CATEGORIES,
     Filters,
     PackRequest,
     UnknownCompanion,
@@ -50,6 +51,13 @@ def test_purpose_to_categories_covers_prd_purposes():
     assert set(PURPOSE_TO_CATEGORIES) == {
         "healing", "sightseeing", "food", "activity", "hocance",
     }
+
+
+def test_searchable_categories_include_visitjeju_expansion():
+    assert {"culture", "festival", "shopping", "accommodation", "experience"} <= set(SEARCHABLE_CATEGORIES)
+    assert "festival" in PURPOSE_TO_CATEGORIES["sightseeing"]
+    assert "shopping" in PURPOSE_TO_CATEGORIES["food"]
+    assert "culture" in PURPOSE_TO_CATEGORIES["healing"]
 
 
 def test_companion_required_amenities_covers_prd_companions():

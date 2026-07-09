@@ -8,7 +8,7 @@ DATA_PIPELINE.md §3 요구사항:
 
 probe(2026-07-04)로 확인된 사실 (Day2 결정 반영):
   - contentscd/region1cd/region2cd 는 nested dict {value,label,refId}.
-  - 카테고리: c1 관광지 / c2 쇼핑 / c4 음식점 / c5 축제/행사(보류) / c6 테마여행.
+  - 카테고리: c1 관광지 / c2 쇼핑 / c3 숙박 / c4 음식점 / c5 축제·행사 / c6 테마여행.
   - 지역 미매핑 확장: 한경(14)→hallim / 중문(24)→andeok (인접 병합).
 """
 from __future__ import annotations
@@ -27,8 +27,6 @@ from apps.api import db
 
 STATIC_TTL = timedelta(days=90)               # DATA_PIPELINE §2 static 규칙
 JEJU_BBOX = (33.1, 33.6, 126.1, 127.0)        # lat_min, lat_max, lng_min, lng_max
-CATEGORY_C5_HELD = "축제/행사"                 # Day2 결정: c5는 보류
-
 # region2cd.value → region_normalized (filters.py REGIONS와 일치)
 REGION2CD_TO_NORMALIZED: dict[str, str] = {
     "11": "jeju_city",
@@ -76,15 +74,19 @@ C1_OREUM_KWS = ("오름",)
 C1_BEACH_KWS = ("해수욕장", "해변", "포구", "방파제")
 C1_FOREST_KWS = ("곶자왈", "숲길", "수목원", "치유의숲")
 C1_VIEWPOINT_KWS = ("전망대", "일몰", "노을", "선셋", "포토존")
+CULTURE_KWS = (
+    "박물관", "미술관", "전시", "전시관", "문화", "예술", "공연",
+    "기념관", "체험관", "센터", "아트", "갤러리",
+)
 
 # c4 내부: 카페 분기
 C4_CAFE_KWS = ("카페", "커피", "coffee", "cafe")
 
-# c2 내부: 시장/오일장만 채택, 나머지는 category='other'로 보존
+# c2 내부: 시장/오일장은 market, 나머지 쇼핑 정보는 shopping으로 보존
 C2_MARKET_KWS = ("시장", "오일장")
 
-# c6 (테마여행) 내부: 감귤 체험만 experience로 승격, 나머지는 other
-C6_EXPERIENCE_CITRUS_KWS = ("감귤",)
+# c6 (테마여행) 내부: 체험 신호를 experience로 보존
+C6_EXPERIENCE_KWS = ("감귤", "체험", "액티비티", "승마", "요트", "공방", "클래스", "투어")
 
 
 # ---- 정제 로직 ----
@@ -141,16 +143,12 @@ def classify_category(item: dict) -> str | None:
     """contentscd.value + title/tag 키워드로 내부 category 결정.
 
     반환값:
-      oreum|beach|cafe|food|market|forest|experience|viewpoint|other
-      None을 반환하면 place에서 아예 제외 (예: c5 축제 보류).
+      oreum|beach|cafe|food|market|forest|experience|viewpoint|culture|festival|shopping|accommodation|other
     """
     cd = _get_nested_value(item.get("contentscd"))
     title = str(item.get("title") or "")
     tag = str(item.get("tag") or "") + " " + str(item.get("alltag") or "")
     haystack = (title + " " + tag).lower()
-
-    if cd == "c5":
-        return None  # 축제/행사 보류 (Q2 결정)
 
     if cd == "c1":  # 관광지
         if _has_kw(title, C1_OREUM_KWS):
@@ -161,16 +159,24 @@ def classify_category(item: dict) -> str | None:
             return "forest"
         if _has_kw(haystack, C1_VIEWPOINT_KWS):
             return "viewpoint"
+        if _has_kw(haystack, CULTURE_KWS):
+            return "culture"
         return "other"  # 미분류 관광지도 보존 (verify에서 쓰일 수 있음)
+
+    if cd == "c3":  # 숙박
+        return "accommodation"
 
     if cd == "c4":  # 음식점 (카페 포함)
         return "cafe" if _has_kw(haystack, C4_CAFE_KWS) else "food"
 
-    if cd == "c2":  # 쇼핑 → 시장만 채택
-        return "market" if _has_kw(haystack, C2_MARKET_KWS) else "other"
+    if cd == "c2":  # 쇼핑
+        return "market" if _has_kw(haystack, C2_MARKET_KWS) else "shopping"
 
-    if cd == "c6":  # 테마여행 → 감귤 체험만 experience
-        return "experience" if _has_kw(haystack, C6_EXPERIENCE_CITRUS_KWS) else "other"
+    if cd == "c5":  # 축제/행사. 전시·공연 계열은 문화시설/행사로 검색 가능하게 culture로 보존.
+        return "culture" if _has_kw(haystack, CULTURE_KWS) else "festival"
+
+    if cd == "c6":  # 테마여행 → 체험관광
+        return "experience" if _has_kw(haystack, C6_EXPERIENCE_KWS) else "other"
 
     return "other"
 
