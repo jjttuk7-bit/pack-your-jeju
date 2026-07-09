@@ -16,7 +16,6 @@ import { normalizeTripStartDate, todayInJeju } from './date';
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
 const GATE_STORAGE_KEY = 'pack_your_jeju_gate_v1';
-const CITRUS_ROLL_STORAGE_KEY = 'pack_your_jeju_citrus_roll_once_v1';
 const CITRUS_ROLL_PENDING_KEY = 'pack_your_jeju_citrus_roll_pending_v1';
 
 const defaultState: SavedTravel = {
@@ -125,9 +124,7 @@ export default function App() {
   const handleEnter = () => {
     try {
       localStorage.setItem(GATE_STORAGE_KEY, 'true');
-      if (sessionStorage.getItem(CITRUS_ROLL_STORAGE_KEY) !== 'true') {
-        sessionStorage.setItem(CITRUS_ROLL_PENDING_KEY, 'true');
-      }
+      sessionStorage.setItem(CITRUS_ROLL_PENDING_KEY, 'true');
     } catch {}
     setAuthenticated(true);
     setState(prev => ({ ...prev, step: 'setup' }));
@@ -155,10 +152,8 @@ export default function App() {
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const shouldPlay =
         sessionStorage.getItem(CITRUS_ROLL_PENDING_KEY) === 'true' &&
-        sessionStorage.getItem(CITRUS_ROLL_STORAGE_KEY) !== 'true' &&
         !reduceMotion;
       sessionStorage.removeItem(CITRUS_ROLL_PENDING_KEY);
-      sessionStorage.setItem(CITRUS_ROLL_STORAGE_KEY, 'true');
       if (shouldPlay) setPlayCitrusRoll(true);
     } catch {
       setPlayCitrusRoll(false);
@@ -609,24 +604,24 @@ function CitrusRollTransition({
   return (
     <motion.div
       aria-hidden="true"
-      className="pointer-events-none absolute left-[4px] top-[36px] z-30 hidden h-14 w-14 sm:block"
-      initial={{ x: 0, y: 0, rotate: -8, opacity: 0, scale: 0.82 }}
+      className="pointer-events-none absolute left-[2px] top-[34px] z-30 hidden h-16 w-16 sm:block"
+      initial={{ x: 0, y: 0, rotate: -10, opacity: 0, scale: 0.78 }}
       animate={{
-        x: ['0vw', '12vw', '34vw', '57vw', '72vw'],
-        y: [0, 22, 34, 30, 18],
-        rotate: [-8, 130, 390, 650, 850],
-        opacity: [0, 1, 1, 0.92, 0],
-        scale: [0.82, 0.98, 1, 0.96, 0.86],
+        x: ['0vw', '9vw', '22vw', '39vw', '55vw', '67vw', '72vw', '72vw'],
+        y: [0, 16, 29, 36, 31, 22, 16, 16],
+        rotate: [-10, 105, 300, 560, 790, 1020, 1160, 1160],
+        opacity: [0, 1, 1, 1, 1, 1, 0.92, 0],
+        scale: [0.78, 0.95, 1, 1, 0.98, 0.96, 0.92, 0.9],
       }}
       transition={{
-        duration: 1.75,
+        duration: 3.05,
         ease: [0.22, 1, 0.36, 1],
-        times: [0, 0.18, 0.52, 0.82, 1],
+        times: [0, 0.12, 0.28, 0.48, 0.67, 0.84, 0.93, 1],
       }}
       onAnimationComplete={onComplete}
     >
-      <div className="absolute left-2 top-[42px] h-2 w-10 rounded-full bg-basalt/15 blur-[6px]" />
-      <CitrusMark className="relative h-14 w-14 drop-shadow-[0_10px_14px_rgba(185,78,30,0.22)]" />
+      <div className="absolute left-2 top-[48px] h-2.5 w-12 rounded-full bg-basalt/16 blur-[7px]" />
+      <CitrusMark className="relative h-16 w-16 drop-shadow-[0_12px_16px_rgba(185,78,30,0.24)]" />
     </motion.div>
   );
 }
