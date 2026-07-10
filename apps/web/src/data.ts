@@ -56,7 +56,7 @@ export const PURPOSES: { value: PurposeValue; label: string }[] = [
 ];
 
 // ─────────────────────────────────────────────────────
-// 제주 순간 카드 8종 (MOMENT_CARDS.md 스펙)
+// 제주 순간 카드 12종 (MOMENT_CARDS.md + VisitJeju 확장 카드)
 // ─────────────────────────────────────────────────────
 export const MOMENTS: TravelMoment[] = [
   {
@@ -165,5 +165,57 @@ export const MOMENTS: TravelMoment[] = [
       '체험장에서 알려주는 수확 시기(대체로 10~1월)를 미리 확인',
     ],
     wittyRecommendation: '감귤 향을 담아 갈 미니 유리병',
+  },
+  {
+    id: 'stay',
+    title: '숙소까지 같이 보기',
+    emoji: '🛏️',
+    description: '여행 동선의 기준점이 되는 숙박 후보를 지역 흐름 안에서 함께 살펴봐요.',
+    recommendations: [
+      '체크인 전 짐을 맡길 수 있는지 확인할 메모',
+      '숙소 주변 야간 이동을 위한 작은 손전등',
+      '콘센트 위치가 애매할 때 필요한 멀티 어댑터',
+      '잠자리가 바뀌어도 편안한 개인 수면 안대',
+    ],
+    wittyRecommendation: '숙소 도착 후 바로 신을 폭신한 실내 슬리퍼',
+  },
+  {
+    id: 'festival_event',
+    title: '축제·행사 맞춰가기',
+    emoji: '🎪',
+    description: '여행 날짜와 맞는 축제·공연·행사를 확인해 일정에 생동감을 더해요.',
+    recommendations: [
+      '현장 대기 시간을 버틸 보조배터리',
+      '야외 행사장 바람에 대비한 얇은 겉옷',
+      '입장권·예약 내역을 모아둘 캡처 폴더',
+      '사람 많은 곳에서도 손이 자유로운 크로스백',
+    ],
+    wittyRecommendation: '기념 스탬프나 티켓을 눌러 담을 작은 파일',
+  },
+  {
+    id: 'souvenir_shopping',
+    title: '특산물·기념품 쇼핑',
+    emoji: '🎁',
+    description: '제주 특산물과 로컬 소품을 둘러보며 돌아갈 사람들의 얼굴을 떠올려요.',
+    recommendations: [
+      '깨지기 쉬운 선물을 감쌀 완충 파우치',
+      '여분의 접이식 장바구니',
+      '수하물 무게를 가늠할 휴대용 저울',
+      '냉장이 필요한 먹거리를 위한 보냉백',
+    ],
+    wittyRecommendation: '누구에게 줄지 바로 적어두는 선물 라벨 스티커',
+  },
+  {
+    id: 'culture_stop',
+    title: '전시·문화 공간 들르기',
+    emoji: '🏛️',
+    description: '날씨와 상관없이 제주의 이야기와 작품을 만날 수 있는 실내외 문화 공간을 담아요.',
+    recommendations: [
+      '전시 메모를 남길 작은 노트',
+      '실내 냉방에 대비한 얇은 셔츠',
+      '조용한 관람을 위한 무음 카메라 설정',
+      '관람권과 리플릿을 구겨지지 않게 담을 납작 파우치',
+    ],
+    wittyRecommendation: '작품 앞에서 오래 서 있을 수 있는 편한 신발',
   },
 ];

@@ -34,6 +34,10 @@ MOMENT_TO_CATEGORY: dict[CardId, Category] = {
     "quiet_cafe": "cafe",
     "gotjawal": "forest",
     "citrus": "experience",
+    "stay": "accommodation",
+    "festival_event": "festival",
+    "souvenir_shopping": "shopping",
+    "culture_stop": "culture",
 }
 
 # purpose는 카드 선택을 보완하는 완화 시그널.

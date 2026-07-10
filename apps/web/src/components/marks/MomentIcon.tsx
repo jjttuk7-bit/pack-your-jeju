@@ -164,6 +164,55 @@ function Citrus() {
   );
 }
 
+function Stay() {
+  return (
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <rect x="5" y="14" width="22" height="10" rx="2" fill={MINT_LIGHT} />
+      <rect x="7" y="10" width="8" height="6" rx="1.5" fill="#FFFEFA" stroke={BASALT} strokeWidth="0.8" />
+      <path d="M 5 24 L 5 27 M 27 24 L 27 27" stroke={BASALT} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M 5 17 L 27 17" stroke={BASALT} strokeWidth="0.9" opacity="0.55" />
+      <circle cx="24" cy="9" r="3" fill={CITRUS_LIGHT} opacity="0.9" />
+    </svg>
+  );
+}
+
+function FestivalEvent() {
+  return (
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <path d="M 6 26 L 10 10 L 16 26 Z" fill={CITRUS_LIGHT} />
+      <path d="M 16 26 L 22 10 L 26 26 Z" fill={MINT_LIGHT} />
+      <path d="M 10 10 Q 16 5 22 10" stroke={BASALT} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      <path d="M 8 18 L 24 18" stroke={BASALT} strokeWidth="0.8" opacity="0.55" />
+      <circle cx="16" cy="14" r="2.2" fill={CITRUS} />
+      <path d="M 5 27 L 27 27" stroke={BASALT} strokeWidth="0.8" opacity="0.5" />
+    </svg>
+  );
+}
+
+function SouvenirShopping() {
+  return (
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <path d="M 8 12 L 24 12 L 26 27 L 6 27 Z" fill={EARTH} stroke={BASALT} strokeWidth="0.9" />
+      <path d="M 11 12 Q 11 7 16 7 Q 21 7 21 12" stroke={BASALT} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      <rect x="12" y="16" width="8" height="7" rx="1" fill={CITRUS_LIGHT} />
+      <path d="M 16 16 L 16 23 M 12 19.5 L 20 19.5" stroke={CITRUS_2} strokeWidth="0.8" />
+      <path d="M 22 15 Q 25 17 23 20" stroke={MINT} strokeWidth="1" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CultureStop() {
+  return (
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <path d="M 6 13 L 16 6 L 26 13 Z" fill={CITRUS_LIGHT} stroke={BASALT} strokeWidth="0.9" />
+      <path d="M 8 14 L 24 14" stroke={BASALT} strokeWidth="1" />
+      <path d="M 10 15 L 10 25 M 16 15 L 16 25 M 22 15 L 22 25" stroke={MINT} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M 7 26 L 25 26" stroke={BASALT} strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="16" cy="11" r="1.5" fill={CITRUS_2} />
+    </svg>
+  );
+}
+
 const MAP: Record<MomentId, () => ReactNode> = {
   oreum: Oreum,
   beach_walk: BeachWalk,
@@ -173,6 +222,10 @@ const MAP: Record<MomentId, () => ReactNode> = {
   quiet_cafe: QuietCafe,
   gotjawal: Gotjawal,
   citrus: Citrus,
+  stay: Stay,
+  festival_event: FestivalEvent,
+  souvenir_shopping: SouvenirShopping,
+  culture_stop: CultureStop,
 };
 
 export default function MomentIcon({ id, className = 'w-8 h-8' }: { id: MomentId; className?: string }) {

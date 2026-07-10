@@ -39,7 +39,11 @@ export type MomentId =
   | 'local_food'
   | 'quiet_cafe'
   | 'gotjawal'
-  | 'citrus';
+  | 'citrus'
+  | 'stay'
+  | 'festival_event'
+  | 'souvenir_shopping'
+  | 'culture_stop';
 
 export interface TravelMoment {
   id: MomentId;

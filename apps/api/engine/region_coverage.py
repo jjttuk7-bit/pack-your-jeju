@@ -37,6 +37,10 @@ MOMENT_LABEL_KO: dict[str, str] = {
     "quiet_cafe": "조용한 카페",
     "gotjawal": "곶자왈",
     "citrus": "감귤밭 체험",
+    "stay": "숙박시설",
+    "festival_event": "축제·행사",
+    "souvenir_shopping": "특산물·기념품",
+    "culture_stop": "전시·문화",
 }
 
 

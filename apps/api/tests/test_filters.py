@@ -41,10 +41,20 @@ def test_regions_has_12_jeju_values():
     assert "aewol" in REGIONS and "udo" in REGIONS
 
 
-def test_moment_to_category_covers_all_8_cards():
-    expected = {"oreum", "beach_walk", "sunset", "local_market",
-                "local_food", "quiet_cafe", "gotjawal", "citrus"}
+def test_moment_to_category_covers_all_12_cards():
+    expected = {
+        "oreum", "beach_walk", "sunset", "local_market",
+        "local_food", "quiet_cafe", "gotjawal", "citrus",
+        "stay", "festival_event", "souvenir_shopping", "culture_stop",
+    }
     assert set(MOMENT_TO_CATEGORY) == expected
+
+
+def test_visitjeju_expanded_moments_map_to_categories():
+    assert MOMENT_TO_CATEGORY["stay"] == "accommodation"
+    assert MOMENT_TO_CATEGORY["festival_event"] == "festival"
+    assert MOMENT_TO_CATEGORY["souvenir_shopping"] == "shopping"
+    assert MOMENT_TO_CATEGORY["culture_stop"] == "culture"
 
 
 def test_purpose_to_categories_covers_prd_purposes():
@@ -85,6 +95,13 @@ def test_moment_filter_primary_matches_card_mapping():
     mf = f.per_moment[0]
     assert mf.moment == "oreum"
     assert mf.primary_category == "oreum"
+
+
+def test_build_filters_accepts_visitjeju_expanded_moment():
+    f = build_filters(_req(moments=["stay"]))
+    mf = f.per_moment[0]
+    assert mf.moment == "stay"
+    assert mf.primary_category == "accommodation"
 
 
 def test_supporting_categories_exclude_primary():

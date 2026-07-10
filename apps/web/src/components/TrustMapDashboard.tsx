@@ -144,6 +144,26 @@ const MOMENT_REGION_GUIDES: Record<MomentId, { focus: string; tip: string; check
     tip: '체험형 일정이라 예약 가능 시간과 계절 적합성을 먼저 보는 편이 안전합니다.',
     check: '운영 기간, 예약 필요 여부',
   },
+  stay: {
+    focus: '하루 동선의 기준점을 잡는 순간',
+    tip: '숙소 후보는 관광지처럼 소비하기보다 이동 기준점으로 보고 주변 일정을 붙이면 좋습니다.',
+    check: '주소, 체크인 전 짐 보관 가능 여부',
+  },
+  festival_event: {
+    focus: '날짜와 운영 여부가 중요한 순간',
+    tip: '축제·행사는 여행 기간과 맞는지 먼저 보고, 날씨와 현장 공지를 한 번 더 확인하세요.',
+    check: '운영 기간, 현장 변경 공지',
+  },
+  souvenir_shopping: {
+    focus: '돌아가는 동선과 짐 부피를 함께 보는 순간',
+    tip: '마지막 날이나 숙소 복귀 전에 배치하면 보관과 이동 부담을 줄이기 좋습니다.',
+    check: '주소, 포장·보관 필요 여부',
+  },
+  culture_stop: {
+    focus: '날씨 대체와 제주 이야기를 함께 보는 순간',
+    tip: '비·바람이 있는 날 야외 일정을 줄이고 전시·문화 공간을 넣으면 일정이 덜 흔들립니다.',
+    check: '운영 정보, 휴관 여부',
+  },
 };
 
 const REGION_SHAPES: RegionShape[] = [
