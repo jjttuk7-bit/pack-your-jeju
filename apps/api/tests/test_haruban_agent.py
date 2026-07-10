@@ -179,6 +179,28 @@ def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
     assert result["result"]["sources"][0]["title"] == "Visit Jeju"
 
 
+def test_haruban_routes_airport_region_question_to_web_search(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "제주공항은 제주시 용담동 일대에 있습니다.",
+            "sources": [{"title": "한국공항공사", "url": "https://www.airport.co.kr/jeju/"}],
+            "source_type": "web",
+        },
+    )
+    conv = [{"role": "user", "content": "제주공항은 어느 지역에 있어?"}]
+
+    assert haruban._infer_place_detail_query(conv) == ""
+    result = haruban._build_search_pool_context(conv, {})
+
+    assert result["tool"] == "web_search_jeju"
+    assert "제주공항" in result["args"]["query"]
+    assert result["result"]["sources"][0]["title"] == "한국공항공사"
+
+
 def test_haruban_augment_runner_serializes_suggestions(monkeypatch):
     class FakeSuggestion:
         field = "moments"
