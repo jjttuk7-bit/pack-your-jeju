@@ -224,6 +224,21 @@ def test_haruban_fallback_replies_from_verify_review_result():
     assert "공공데이터 기준" in reply
 
 
+def test_haruban_prepares_args_for_direct_unlocked_tool_calls():
+    conv = [{"role": "user", "content": "블로그에서 봤는데 이 리뷰 맞아? 성산 A는 폐업했다."}]
+    form_state = {"regions": ["seongsan"], "moments": ["local_food"], "days": 2}
+
+    build_args = haruban._prepare_tool_args("build_pack", {}, conv, form_state)
+    verify_args = haruban._prepare_tool_args("verify_review", {}, conv, form_state)
+    coverage_args = haruban._prepare_tool_args("preview_region_coverage", {}, conv, form_state)
+    augment_args = haruban._prepare_tool_args("suggest_form_augment", {}, conv, form_state)
+
+    assert build_args["form_state"]["regions"] == ["seongsan"]
+    assert verify_args["text"].startswith("블로그에서 봤는데")
+    assert coverage_args["regions"] == ["seongsan"]
+    assert augment_args["form_state"]["moments"] == ["local_food"]
+
+
 def test_haruban_infers_visitjeju_expanded_categories():
     assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
     assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"

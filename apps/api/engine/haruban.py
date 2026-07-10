@@ -1177,6 +1177,40 @@ def _should_replace_low_value_reply(reply: str, conv: list[dict]) -> bool:
     ))
 
 
+def _prepare_tool_args(name: str, args: dict, conv: list[dict], form_state: dict) -> dict:
+    """LLM tool-call arguments가 비어 있을 때 현재 대화와 폼 상태로 안전하게 보강한다."""
+    prepared = dict(args or {})
+    if name == "search_places":
+        inferred_args = _infer_search_places_args(conv, form_state or {})
+        for key in ("regions", "category", "intent", "limit", "keywords"):
+            if inferred_args.get(key) and not prepared.get(key):
+                prepared[key] = inferred_args[key]
+        inferred_excludes = _conversation_exclude_names(conv)
+        if inferred_excludes:
+            prepared["exclude_names"] = _unique_preserve_order(
+                list(prepared.get("exclude_names") or []) + inferred_excludes
+            )
+    elif name == "get_place_detail":
+        inferred_query = _infer_place_detail_query(conv)
+        if inferred_query and not prepared.get("query"):
+            prepared["query"] = inferred_query
+        inferred_args = _infer_search_places_args(conv, form_state or {})
+        if inferred_args.get("regions") and not prepared.get("regions"):
+            prepared["regions"] = inferred_args["regions"]
+        if inferred_args.get("category") and not prepared.get("category"):
+            prepared["category"] = inferred_args["category"]
+    elif name in {"build_pack", "suggest_form_augment"}:
+        if not isinstance(prepared.get("form_state"), dict):
+            prepared["form_state"] = dict(form_state or {})
+    elif name == "verify_review":
+        if not prepared.get("text"):
+            prepared["text"] = _latest_user_text(conv)
+    elif name == "preview_region_coverage":
+        if not prepared.get("regions"):
+            prepared["regions"] = _infer_regions_from_text(_latest_user_text(conv), form_state)
+    return prepared
+
+
 def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dict | None:
     conv = [
         {"role": m.get("role"), "content": m.get("content") or ""}
@@ -1784,25 +1818,7 @@ def _chat_turn_raw(
                 args = json.loads(tc.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
-            if name == "search_places":
-                inferred_args = _infer_search_places_args(conv, form_state or {})
-                for key in ("regions", "category", "intent", "limit", "keywords"):
-                    if inferred_args.get(key) and not args.get(key):
-                        args[key] = inferred_args[key]
-                inferred_excludes = _conversation_exclude_names(conv)
-                if inferred_excludes:
-                    args["exclude_names"] = _unique_preserve_order(
-                        list(args.get("exclude_names") or []) + inferred_excludes
-                    )
-            elif name == "get_place_detail":
-                inferred_query = _infer_place_detail_query(conv)
-                if inferred_query and not args.get("query"):
-                    args["query"] = inferred_query
-                inferred_args = _infer_search_places_args(conv, form_state or {})
-                if inferred_args.get("regions") and not args.get("regions"):
-                    args["regions"] = inferred_args["regions"]
-                if inferred_args.get("category") and not args.get("category"):
-                    args["category"] = inferred_args["category"]
+            args = _prepare_tool_args(name, args, conv, form_state or {})
 
             runner = TOOL_RUNNERS.get(name)
             if runner is None:
