@@ -21,6 +21,7 @@ from typing import Any
 from sqlalchemy import text
 
 from apps.api import db
+from apps.api.engine import assemble as assemble_mod
 from apps.api.engine import fix_requests
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import llm
@@ -613,11 +614,112 @@ def _run_suggest_form_update(args: dict) -> dict:
     return {"suggestion": args}
 
 
+def _run_build_pack(args: dict) -> dict:
+    """현재 폼 상태로 /pack 핵심 조립 로직을 실행해 대화용 요약 payload를 만든다."""
+    form_state = args.get("form_state") or {}
+    if not isinstance(form_state, dict):
+        return {
+            "available": False,
+            "error": "form_state must be an object",
+            "fallback_reason": "out_of_scope",
+        }
+
+    try:
+        req = filters_mod.PackRequest.from_dict(form_state)
+        bundle = filters_mod.build_filters(req)
+    except (
+        KeyError,
+        ValueError,
+        filters_mod.UnknownRegion,
+        filters_mod.UnknownMoment,
+        filters_mod.UnknownCompanion,
+        filters_mod.UnknownPurpose,
+    ) as e:
+        return {
+            "available": False,
+            "error": f"{type(e).__name__}: {e}",
+            "fallback_reason": "out_of_scope",
+        }
+
+    weather_snapshot = weather_mod.smoke_kma_nowcast(
+        req.regions[0] if req.regions else "jeju_city",
+        target_start=req.start_date,
+        target_days=req.days,
+    )
+    sections = [trust_mod.judge_section(mf, weather_snapshot=weather_snapshot) for mf in bundle.per_moment]
+    intro = assemble_mod.compose_intro(
+        sections,
+        req.companion,
+        special_notes=form_state.get("special_notes"),
+    )
+    itinerary = assemble_mod.dispatch_itinerary(
+        sections,
+        req.days,
+        req.start_date,
+        selected_regions=req.regions,
+        selected_moments=req.moments,
+    )
+
+    return {
+        "available": True,
+        "intro": {"text": intro.text, "llm_used": intro.llm_used},
+        "sections": [_pack_section_payload(section) for section in sections],
+        "weather": _pack_weather_payload(weather_snapshot),
+        "itinerary": itinerary,
+    }
+
+
+def _pack_section_payload(section: Any) -> dict:
+    return {
+        "moment": getattr(section, "moment", ""),
+        "items": [
+            {
+                "name": getattr(item, "name", ""),
+                "badge": getattr(item, "badge", ""),
+                "note": getattr(item, "note", ""),
+                "address": getattr(item, "address", None),
+            }
+            for item in (getattr(section, "items", None) or [])
+        ],
+        "fallback": _pack_fallback_payload(getattr(section, "fallback", None)),
+    }
+
+
+def _pack_fallback_payload(fallback: Any) -> dict | None:
+    if fallback is None:
+        return None
+    return {
+        "reason": getattr(fallback, "reason", ""),
+        "message": getattr(fallback, "message", ""),
+        "stats": getattr(fallback, "stats", None),
+    }
+
+
+def _pack_weather_payload(snapshot: dict | None) -> dict:
+    if not snapshot:
+        return {"available": False, "provider": "kma_api_hub"}
+    public_keys = {
+        "available",
+        "provider",
+        "risk_level",
+        "signals",
+        "labels",
+        "summary",
+        "issued_at_label",
+        "daily_forecasts",
+        "region",
+        "source",
+        "http_status",
+    }
+    return {k: snapshot.get(k) for k in public_keys if k in snapshot}
+
+
 TOOL_RUNNERS = {
     "search_places": _run_search_places,
     "get_place_detail": _run_get_place_detail,
     "verify_claim": _run_verify_claim,
     "suggest_form_update": _run_suggest_form_update,
+    "build_pack": _run_build_pack,
 }
 
 

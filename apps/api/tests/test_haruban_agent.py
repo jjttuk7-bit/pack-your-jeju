@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from apps.api.engine import haruban
 
@@ -38,6 +39,57 @@ def test_build_pack_tool_requires_form_state():
     assert "form_state" in props
     assert "여행팩" in tool["function"]["description"]
     assert "공공데이터" in tool["function"]["description"]
+
+
+def test_haruban_build_pack_runner_summarizes_pack(monkeypatch):
+    class FakeReq:
+        regions = ["seongsan"]
+        moments = ["local_food"]
+        companion = "solo"
+        purpose = "food"
+        days = 2
+        start_date = date(2026, 7, 10)
+
+    class FakeFilterBundle:
+        per_moment = ["fake-filter"]
+
+    class FakeIntro:
+        text = "성산 현지 맛집 중심으로 조립했어요."
+        llm_used = False
+
+    class FakeItem:
+        name = "소심한이층"
+        badge = "verified"
+        note = ""
+        address = "서귀포시 성산읍"
+
+    class FakeSection:
+        moment = "local_food"
+        items = [FakeItem()]
+        fallback = None
+        observed_reasons = []
+
+    monkeypatch.setattr(haruban.filters_mod.PackRequest, "from_dict", lambda _: FakeReq())
+    monkeypatch.setattr(haruban.filters_mod, "build_filters", lambda _: FakeFilterBundle())
+    monkeypatch.setattr(
+        haruban.weather_mod,
+        "smoke_kma_nowcast",
+        lambda *a, **k: {"available": True, "summary": "바람 확인"},
+    )
+    monkeypatch.setattr(haruban.trust_mod, "judge_section", lambda *a, **k: FakeSection())
+    monkeypatch.setattr(haruban.assemble_mod, "compose_intro", lambda *a, **k: FakeIntro())
+    monkeypatch.setattr(
+        haruban.assemble_mod,
+        "dispatch_itinerary",
+        lambda *a, **k: [{"day": 1, "items": []}],
+    )
+
+    result = haruban._run_build_pack({"form_state": {"regions": ["seongsan"]}})
+
+    assert result["available"] is True
+    assert result["intro"]["text"] == "성산 현지 맛집 중심으로 조립했어요."
+    assert result["sections"][0]["items"][0]["name"] == "소심한이층"
+    assert result["weather"]["summary"] == "바람 확인"
 
 
 def test_haruban_infers_visitjeju_expanded_categories():
