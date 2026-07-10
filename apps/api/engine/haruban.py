@@ -493,7 +493,7 @@ def _run_get_place_detail(args: dict) -> dict:
         rows = conn.execute(
             text(
                 "SELECT external_id, name, category, region_normalized, address, "
-                "       info_type, valid_until, has_fix_request, source_url "
+                "       lat, lng, info_type, valid_until, has_fix_request, source_url "
                 "FROM place "
                 f"WHERE {' AND '.join(where)} "
                 "ORDER BY "
@@ -603,6 +603,7 @@ def _run_verify_claim(args: dict) -> dict:
             {
                 "text": r.text,
                 "verdict": r.verdict,
+                "fallback_reason": r.fallback_reason,
                 "matched_name": r.matched_name,
                 "reason": r.reason,
             }
@@ -885,7 +886,7 @@ def _infer_category_from_text(text_in: str, form_state: dict | None = None) -> s
         return "experience"
     if re.search(r"맛집|식당|점심|저녁|아침|해산물|해물|횟집|먹|음식|한식|갈치|고등어|전복|우럭", text_in):
         return "food"
-    if re.search(r"카페|커피|차|글쓰기", text_in):
+    if re.search(r"카페|커피|찻집|차\s*(마시|한잔|한\s*잔)|글쓰기", text_in):
         return "cafe"
     if re.search(r"바다|바닷가|해변|해수욕장|해안|비치", text_in):
         return "beach"
@@ -1042,13 +1043,18 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
         return ""
 
     cleaned = re.sub(
-        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|어떤거야|어떤가요|수정\s*요청\s*내역|수정요청내역|수정\s*요청|수정\s*이력|주의\s*내용|주차장|주차|정류소|버스\s*정류장?|대중교통|교통|있어|있나요|가능|하\.*)",
+        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|어떤거야|어떤가요|수정\s*요청\s*내역|수정요청내역|수정\s*요청|수정\s*이력|주의\s*내용|교통\s*편|주차장?|정류소|버스\s*정류장?|대중교통|교통|이동|있어|있나요|가능|하\.*)",
         " ",
         last_user,
     )
     cleaned = re.sub(r"[?？！!~…]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = cleaned.strip(" \t\n\r,，.。·ㆍ")
-    cleaned = re.sub(r"\s+(은|는|이|가|을|를)$", "", cleaned).strip()
+    for _ in range(3):
+        next_cleaned = re.sub(r"\s*(이나|하고|의|은|는|이|가|을|를|와|과|나|랑)$", "", cleaned).strip()
+        if next_cleaned == cleaned:
+            break
+        cleaned = next_cleaned
     if len(_normalize_place_name(cleaned)) < 2:
         return ""
     return cleaned
@@ -1234,8 +1240,9 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
         inferred = _infer_search_places_args(conv, form_state)
         if inferred.get("regions"):
             args["regions"] = inferred["regions"]
-        if inferred.get("category"):
-            args["category"] = inferred["category"]
+        explicit_category = _infer_category_from_text(last_user, {})
+        if explicit_category:
+            args["category"] = explicit_category
         try:
             result = _run_get_place_detail(args)
         except Exception as e:

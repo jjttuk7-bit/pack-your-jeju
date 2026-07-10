@@ -1,13 +1,15 @@
 """/verify — 킥1 데모.
 
 입력: 리뷰 텍스트 원문.
-출력: 문장별 verdict (verified | outdated | contradicted | coverage_gap) + 근거.
+출력: 문장별 verdict + fallback_reason(해당 시) + 근거.
 
 파이프라인 (TRUST_ENGINE §6):
   1. claim 분해: LLM 사용 가능하면 JSON, 아니면 문장 분리 폴백.
   2. claim별 장소명 후보 추출 → pg_trgm 유사도로 place 매칭.
   3. 판정:
-     - 매칭 없음                     → coverage_gap ("확인되지 않음", "없다" 금지)
+     - 제주 여행 범위 밖              → out_of_scope
+     - 장소/검증 필드 추출 실패        → retrieval_miss
+     - 후보는 있으나 매칭 없음         → coverage_gap ("확인되지 않음", "없다" 금지)
      - 매칭 + tombstoned              → contradicted
      - 매칭 + has_fix_request         → outdated (수정요청 이력)
      - 매칭 + valid_until 경과        → outdated
@@ -42,7 +44,8 @@ class Claim:
 @dataclass(frozen=True)
 class VerifiedClaim:
     text: str
-    verdict: str                 # verified | outdated | contradicted | coverage_gap
+    verdict: str                 # verified | outdated | contradicted | coverage_gap | retrieval_miss | out_of_scope
+    fallback_reason: str | None  # out_of_scope | contradicted | retrieval_miss | coverage_gap
     matched_name: str | None
     matched_external_id: str | None
     reason: str                  # 사용자 노출 문구
@@ -172,6 +175,24 @@ MSG_OUTDATED_FIX = "이용자 정보 수정요청 이력이 있어 정보 신선
 MSG_OUTDATED_TTL = "정보 유효기간이 지났거나 임박했습니다."
 MSG_CONTRADICTED = "폐업/이전이 확인됩니다."
 MSG_COVERAGE_GAP = "저희가 참조하는 공공데이터에서 확인되지 않습니다."
+MSG_RETRIEVAL_MISS = "검증할 장소명이나 공공데이터 필드를 안정적으로 찾지 못했습니다."
+MSG_OUT_OF_SCOPE = "제주 여행 정보 검증 범위 밖의 문장입니다."
+
+
+OUT_OF_SCOPE_HINTS: tuple[str, ...] = (
+    "서울", "부산", "대구", "대전", "광주", "인천", "울산", "세종",
+    "강릉", "속초", "경주", "전주", "여수", "통영", "거제",
+    "일본", "오사카", "도쿄", "후쿠오카", "대만", "태국",
+)
+
+
+def _is_out_of_scope(sentence: str) -> bool:
+    """명백히 제주 여행 검증 범위를 벗어난 문장만 out_of_scope로 분류."""
+    if not sentence:
+        return False
+    if "제주" in sentence or any(region in sentence for region in REGION_STOPWORDS):
+        return False
+    return any(hint in sentence for hint in OUT_OF_SCOPE_HINTS)
 
 
 def _judge_matched(match: dict[str, Any], *, now: datetime) -> tuple[str, str]:
@@ -253,9 +274,33 @@ def verify_text(text_in: str) -> list[VerifiedClaim]:
             query = _guess_place_name(c.text)
             match = _match_place(query) if query else None
         if match is None:
+            query = c.place_candidate or _guess_place_name(c.text)
+            if _is_out_of_scope(c.text):
+                results.append(VerifiedClaim(
+                    text=c.text,
+                    verdict="out_of_scope",
+                    fallback_reason="out_of_scope",
+                    matched_name=None,
+                    matched_external_id=None,
+                    reason=MSG_OUT_OF_SCOPE,
+                    sources=[],
+                ))
+                continue
+            if not query:
+                results.append(VerifiedClaim(
+                    text=c.text,
+                    verdict="retrieval_miss",
+                    fallback_reason="retrieval_miss",
+                    matched_name=None,
+                    matched_external_id=None,
+                    reason=MSG_RETRIEVAL_MISS,
+                    sources=[],
+                ))
+                continue
             results.append(VerifiedClaim(
                 text=c.text,
                 verdict="coverage_gap",
+                fallback_reason="coverage_gap",
                 matched_name=None,
                 matched_external_id=None,
                 reason=MSG_COVERAGE_GAP,
@@ -263,10 +308,12 @@ def verify_text(text_in: str) -> list[VerifiedClaim]:
             ))
             continue
         verdict, reason = _judge_matched(match, now=now)
+        fallback_reason = "contradicted" if verdict == "contradicted" else None
         sources = [{"name": "비짓제주", "url": match["source_url"]}] if match["source_url"] else []
         results.append(VerifiedClaim(
             text=c.text,
             verdict=verdict,
+            fallback_reason=fallback_reason,
             matched_name=match["name"],
             matched_external_id=match["external_id"],
             reason=reason,

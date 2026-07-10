@@ -471,10 +471,8 @@ def verify(body: VerifyBody) -> dict[str, Any]:
     reasons: list[str] = []
     for r in results:
         verdict_counts[r.verdict] += 1
-        if r.verdict == "coverage_gap":
-            reasons.append("coverage_gap")
-        elif r.verdict == "contradicted":
-            reasons.append("contradicted")
+        if r.fallback_reason:
+            reasons.append(r.fallback_reason)
 
     log_id = log_verify(
         request=body.model_dump(),
@@ -488,6 +486,7 @@ def verify(body: VerifyBody) -> dict[str, Any]:
             {
                 "text": r.text,
                 "verdict": r.verdict,
+                "fallback_reason": r.fallback_reason,
                 "matched_name": r.matched_name,
                 "matched_external_id": r.matched_external_id,
                 "reason": r.reason,

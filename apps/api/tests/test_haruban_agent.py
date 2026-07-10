@@ -581,6 +581,38 @@ def test_haruban_fallback_answers_transit_detail_from_place_detail():
     assert "좌표 기준" in reply
 
 
+def test_haruban_infers_transit_place_name_with_particles():
+    assert haruban._infer_place_detail_query([
+        {"role": "user", "content": "후포해변의 교통편을 알려줘"},
+    ]) == "후포해변"
+    assert haruban._infer_place_detail_query([
+        {"role": "user", "content": "돔베낭길의 주차장이 있어?"},
+    ]) == "돔베낭길"
+    assert haruban._infer_place_detail_query([
+        {"role": "user", "content": "금능포구 주차장이나 정류소는 어때?"},
+    ]) == "금능포구"
+
+
+def test_haruban_detail_query_does_not_inherit_form_moment_category(monkeypatch):
+    captured = {}
+
+    def fake_detail(args):
+        captured.update(args)
+        return {"query": args["query"], "items": []}
+
+    monkeypatch.setattr(haruban, "_run_get_place_detail", fake_detail)
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "돔베낭길의 주차장이 있어?"}],
+        {"regions": ["seogwipo"], "moments": ["climb_oreum"]},
+    )
+
+    assert result["tool"] == "get_place_detail"
+    assert captured["query"] == "돔베낭길"
+    assert captured["regions"] == ["seogwipo"]
+    assert "category" not in captured
+
+
 def test_haruban_fallback_answers_weather_signal_by_trip_days():
     reply = haruban._fallback_reply_from_tool_messages([
         {"role": "user", "content": "여행 기간 날씨는 어때?"},

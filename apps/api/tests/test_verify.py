@@ -50,11 +50,28 @@ def test_verify_nonexistent_place_returns_coverage_gap_without_denial():
     assert r.status_code == 200
     claims = r.json()["claims"]
     assert any(c["verdict"] == "coverage_gap" for c in claims)
+    assert any(c["fallback_reason"] == "coverage_gap" for c in claims)
     # "없다" 단언 금지 — TRUST_ENGINE §2/§6
     for c in claims:
         if c["verdict"] == "coverage_gap":
             assert "없습니다" not in c["reason"]
             assert "확인되지 않" in c["reason"]
+
+
+def test_verify_plain_sentence_returns_retrieval_miss():
+    r = client.post("/verify", json={"text": "초보자도 오르기 좋아요."})
+    assert r.status_code == 200
+    claims = r.json()["claims"]
+    assert any(c["verdict"] == "retrieval_miss" for c in claims)
+    assert any(c["fallback_reason"] == "retrieval_miss" for c in claims)
+
+
+def test_verify_non_jeju_sentence_returns_out_of_scope():
+    r = client.post("/verify", json={"text": "서울 남산에서 야경을 봤어요."})
+    assert r.status_code == 200
+    claims = r.json()["claims"]
+    assert any(c["verdict"] == "out_of_scope" for c in claims)
+    assert any(c["fallback_reason"] == "out_of_scope" for c in claims)
 
 
 def test_verify_flagged_place_returns_outdated():
