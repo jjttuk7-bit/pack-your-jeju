@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   AlertTriangle,
@@ -10,7 +10,6 @@ import {
   CloudSun,
   Database,
   FileText,
-  LockKeyhole,
   MapPin,
   MessageCircleQuestion,
   Package,
@@ -24,50 +23,18 @@ import CitrusMark from './marks/CitrusMark';
 import WaveLine from './marks/WaveLine';
 import StoneWallPattern from './marks/StoneWallPattern';
 
-// 시연용 문지기 — 진짜 보안이 아니라 발표 사전 접근 제어.
-const DEMO_PASSCODE = '123456';
-
 interface LandingPageProps {
   onEnter: () => void;
   isUnlocked?: boolean;
 }
 
 export default function LandingPage({ onEnter, isUnlocked = false }: LandingPageProps) {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [shake, setShake] = useState(false);
   const [entering, setEntering] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const enterApp = () => {
     if (entering) return;
     setEntering(true);
     setTimeout(() => onEnter(), 320);
-  };
-
-  const scrollToGate = () => {
-    if (isUnlocked) {
-      enterApp();
-      return;
-    }
-    document.getElementById('landing-gate')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-    setTimeout(() => inputRef.current?.focus(), 350);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (entering) return;
-    if (code.trim() === DEMO_PASSCODE) {
-      setError(null);
-      enterApp();
-      return;
-    }
-    setError('접근 코드가 맞지 않아요. 다시 확인해 주세요.');
-    setShake(true);
-    setTimeout(() => setShake(false), 420);
   };
 
   return (
@@ -117,7 +84,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 </button>
                 <button
                   type="button"
-                  onClick={scrollToGate}
+                  onClick={enterApp}
                   className="pyj-soft-cta inline-flex items-center gap-1.5 rounded-full bg-basalt px-4 py-2 text-[12px] font-bold text-white shadow-jeju-chip transition hover:bg-basalt-2"
                 >
                   {isUnlocked ? '대시보드로 이동' : '여행 준비 시작'}
@@ -147,7 +114,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                     <button
                       type="button"
-                      onClick={scrollToGate}
+                      onClick={enterApp}
                       className="pyj-primary-cta inline-flex items-center justify-center gap-2 rounded-2xl bg-citrus px-6 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
                     >
                       {isUnlocked ? '내 제주팩 열기' : '제주팩 만들러 가기'}
@@ -641,8 +608,8 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               <div className="mx-auto grid max-w-6xl gap-6 rounded-[28px] border border-orange-100/70 bg-white/85 p-5 shadow-pyj-card backdrop-blur lg:grid-cols-[1fr_360px] lg:p-8">
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full bg-citrus/10 px-3 py-1.5 text-[11px] font-bold text-citrus-2">
-                    <LockKeyhole className="h-3.5 w-3.5" />
-                    Demo Access
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Open Dashboard
                   </div>
                   <h2 className="mt-4 font-serif-kr text-[31px] font-bold leading-tight text-basalt">
                     이제 실제 여행팩을 만들어 볼 차례입니다.
@@ -653,60 +620,19 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   </p>
                 </div>
 
-                {isUnlocked ? (
-                  <div className="flex flex-col justify-center">
-                    <button
-                      type="button"
-                      onClick={enterApp}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-citrus px-5 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
-                    >
-                      대시보드로 이동
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                    <p className="mt-3 text-center text-[11px] text-basalt-2/60">
-                      이미 접근 코드가 확인되었습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <motion.form
-                    id="landing-gate"
-                    onSubmit={handleSubmit}
-                    animate={shake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
-                    transition={{ duration: 0.42 }}
-                    className="space-y-3"
+                <div className="flex flex-col justify-center">
+                  <button
+                    type="button"
+                    onClick={enterApp}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-citrus px-5 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
                   >
-                    <label
-                      htmlFor="passcode"
-                      className="block text-[10.5px] font-bold uppercase tracking-wider text-basalt-2/70"
-                    >
-                      접근 코드
-                    </label>
-                    <input
-                      id="passcode"
-                      ref={inputRef}
-                      type="password"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      value={code}
-                      onChange={(e) => {
-                        setCode(e.target.value);
-                        if (error) setError(null);
-                      }}
-                      placeholder="발표 초대 코드"
-                      maxLength={20}
-                      className="w-full rounded-2xl border border-earth bg-[#FDFBF7] px-4 py-3 text-center font-serif-kr text-[16px] tracking-[0.35em] text-basalt transition focus:border-citrus focus:outline-none focus:ring-2 focus:ring-citrus/30"
-                    />
-                    {error && <p className="text-[11.5px] leading-relaxed text-rose-700">{error}</p>}
-                    <button
-                      type="submit"
-                      disabled={code.length === 0 || entering}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-citrus px-5 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      여행 준비 시작하기
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </motion.form>
-                )}
+                    대시보드로 이동
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                  <p className="mt-3 text-center text-[11px] text-basalt-2/60">
+                    별도 접근 코드 없이 바로 체험할 수 있습니다.
+                  </p>
+                </div>
               </div>
               <footer className="mt-8 text-center text-[10px] text-basalt-2/50">
                 © 2026 제주를 담다

@@ -257,11 +257,18 @@ export interface PackResponse {
   log_id: string | null;
 }
 
-export type VerifyVerdict = 'verified' | 'outdated' | 'contradicted' | 'coverage_gap';
+export type VerifyVerdict =
+  | 'verified'
+  | 'outdated'
+  | 'contradicted'
+  | 'coverage_gap'
+  | 'retrieval_miss'
+  | 'out_of_scope';
 
 export interface VerifiedClaimDto {
   text: string;
   verdict: VerifyVerdict;
+  fallback_reason: FallbackReason | null;
   matched_name: string | null;
   matched_external_id: string | null;
   reason: string;

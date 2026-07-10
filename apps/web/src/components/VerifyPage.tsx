@@ -82,6 +82,7 @@ export default function VerifyPage() {
           <p className="text-[10.5px] text-stone-400 pl-1">
             {resp.claims.length}개 문장 · log_id {resp.log_id?.slice(0, 8) ?? '-'}
           </p>
+          <FallbackGuide />
           {resp.claims.map((c, i) => (
             <React.Fragment key={i}>
               <ClaimCard idx={i} claim={c} />
@@ -89,6 +90,32 @@ export default function VerifyPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function FallbackGuide() {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white/80 shadow-pyj-card p-3 space-y-2">
+      <div>
+        <p className="text-[11px] font-bold text-stone-800">판정 구조</p>
+        <p className="text-[10.5px] text-stone-500 leading-relaxed mt-0.5">
+          확인된 문장은 성공 판정으로 표시하고, 확인하지 못한 문장만 아래 4가지 fallback으로 분류합니다.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {[
+          ['out_of_scope', '제주 여행 범위 밖'],
+          ['coverage_gap', '공공데이터 범위 밖'],
+          ['retrieval_miss', '장소·필드 추출 실패'],
+          ['contradicted', '반증 확인'],
+        ].map(([key, desc]) => (
+          <div key={key} className="rounded-xl border border-stone-100 bg-[#FDFBF7] px-2 py-1.5">
+            <p className="text-[9.5px] font-bold text-orange-700">{key}</p>
+            <p className="text-[9.5px] text-stone-500 mt-0.5">{desc}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -112,6 +139,11 @@ function ClaimCard({ idx, claim }: { idx: number; claim: VerifyResponse['claims'
             >
               {style.label}
             </span>
+            {claim.fallback_reason && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border border-stone-200 bg-white/80 text-stone-600">
+                fallback: {claim.fallback_reason}
+              </span>
+            )}
             {claim.matched_name && (
               <span className="text-[10.5px] text-stone-500 font-medium">→ {claim.matched_name}</span>
             )}
@@ -158,15 +190,39 @@ function verdictStyle(v: VerifyVerdict) {
       };
     case 'contradicted':
       return {
-        label: '폐업/변경 확인',
+        label: '반증 확인',
         icon: <XCircle className="w-5 h-5" />,
         iconColor: 'text-rose-600',
         wrap: 'bg-white border-rose-200 shadow-pyj-card',
         chip: 'bg-rose-50 text-rose-700 border-rose-200',
       };
+    case 'coverage_gap':
+      return {
+        label: '공공데이터 범위 밖',
+        icon: <HelpCircle className="w-5 h-5" />,
+        iconColor: 'text-stone-500',
+        wrap: 'bg-white border-stone-200 shadow-pyj-card',
+        chip: 'bg-stone-50 text-stone-700 border-stone-200',
+      };
+    case 'retrieval_miss':
+      return {
+        label: '검색 근거 부족',
+        icon: <HelpCircle className="w-5 h-5" />,
+        iconColor: 'text-stone-500',
+        wrap: 'bg-white border-stone-200 shadow-pyj-card',
+        chip: 'bg-stone-50 text-stone-700 border-stone-200',
+      };
+    case 'out_of_scope':
+      return {
+        label: '제주 범위 밖',
+        icon: <HelpCircle className="w-5 h-5" />,
+        iconColor: 'text-stone-500',
+        wrap: 'bg-white border-stone-200 shadow-pyj-card',
+        chip: 'bg-stone-50 text-stone-700 border-stone-200',
+      };
     default:
       return {
-        label: '확인 안 됨',
+        label: '확인 필요',
         icon: <HelpCircle className="w-5 h-5" />,
         iconColor: 'text-stone-500',
         wrap: 'bg-white border-stone-200 shadow-pyj-card',
