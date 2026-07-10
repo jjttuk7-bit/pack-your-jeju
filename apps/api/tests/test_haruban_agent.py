@@ -111,6 +111,41 @@ def test_haruban_verify_review_runner_serializes_claims(monkeypatch):
     assert result["claims"][0]["sources"] == ["visitjeju"]
 
 
+def test_haruban_region_coverage_runner_handles_multiple_regions(monkeypatch):
+    monkeypatch.setattr(
+        haruban.region_coverage_mod,
+        "build_region_preview",
+        lambda region: {"region": region, "moments": [{"moment": "beach_walk", "count": 4}]},
+    )
+
+    result = haruban._run_preview_region_coverage({"regions": ["seongsan", "gujwa"]})
+
+    assert [r["region"] for r in result["regions"]] == ["seongsan", "gujwa"]
+
+
+def test_haruban_augment_runner_serializes_suggestions(monkeypatch):
+    class FakeSuggestion:
+        field = "moments"
+        kind = "add"
+        values = ["beach_walk"]
+        labels = ["바다 산책"]
+        reason = "성산에서 확인된 후보가 많습니다."
+        counts = {"beach_walk": 4}
+
+    class FakeResult:
+        available = True
+        suggestions = [FakeSuggestion()]
+        llm_used = False
+        reason = ""
+
+    monkeypatch.setattr(haruban.augment_mod, "build_augment", lambda form_state: FakeResult())
+
+    result = haruban._run_suggest_form_augment({"form_state": {"regions": ["seongsan"]}})
+
+    assert result["suggestions"][0]["field"] == "moments"
+    assert result["suggestions"][0]["values"] == ["beach_walk"]
+
+
 def test_haruban_infers_visitjeju_expanded_categories():
     assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
     assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"

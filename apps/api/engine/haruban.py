@@ -25,6 +25,7 @@ from apps.api.engine import assemble as assemble_mod
 from apps.api.engine import fix_requests
 from apps.api.engine import filters as filters_mod
 from apps.api.engine import llm
+from apps.api.engine import region_coverage as region_coverage_mod
 from apps.api.engine import search as search_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
@@ -91,6 +92,9 @@ CATEGORY_LABEL_KO: dict[str, str] = {
     "accommodation": "숙박시설",
     "other": "기타 관광정보",
 }
+
+# augment.py reuses the Korean labels above, so import it after labels exist.
+from apps.api.engine import augment as augment_mod
 
 
 # ─── 하루방 도구 정의 ───
@@ -636,6 +640,49 @@ def _run_suggest_form_update(args: dict) -> dict:
     return {"suggestion": args}
 
 
+def _run_preview_region_coverage(args: dict) -> dict:
+    """지역별 순간 카드 커버리지 프리뷰를 대화용 payload로 묶는다."""
+    raw_regions = args.get("regions") or []
+    if isinstance(raw_regions, str):
+        raw_regions = [raw_regions]
+    regions = [r for r in raw_regions if isinstance(r, str) and r in filters_mod.REGIONS]
+    previews = []
+    for region in regions:
+        try:
+            previews.append(region_coverage_mod.build_region_preview(region))
+        except Exception as e:
+            previews.append({
+                "region": region,
+                "available": False,
+                "error": f"{type(e).__name__}: {e}",
+            })
+    return {"regions": previews}
+
+
+def _run_suggest_form_augment(args: dict) -> dict:
+    """폼 증강 제안을 대화용 payload로 직렬화한다."""
+    form_state = args.get("form_state") or {}
+    if not isinstance(form_state, dict):
+        return {"available": False, "suggestions": [], "reason": "form_state must be an object"}
+    result = augment_mod.build_augment(form_state)
+    return {
+        "available": result.available,
+        "suggestions": [
+            {
+                "field": suggestion.field,
+                "kind": suggestion.kind,
+                "values": suggestion.values,
+                "labels": suggestion.labels,
+                "reason": suggestion.reason,
+                "counts": suggestion.counts,
+            }
+            for suggestion in result.suggestions
+        ],
+        "llm_used": result.llm_used,
+        "reason": result.reason,
+    }
+
+
 def _run_build_pack(args: dict) -> dict:
     """현재 폼 상태로 /pack 핵심 조립 로직을 실행해 대화용 요약 payload를 만든다."""
     form_state = args.get("form_state") or {}
@@ -742,6 +789,8 @@ TOOL_RUNNERS = {
     "verify_claim": _run_verify_claim,
     "verify_review": _run_verify_review,
     "suggest_form_update": _run_suggest_form_update,
+    "preview_region_coverage": _run_preview_region_coverage,
+    "suggest_form_augment": _run_suggest_form_augment,
     "build_pack": _run_build_pack,
 }
 
