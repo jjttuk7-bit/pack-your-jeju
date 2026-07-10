@@ -103,6 +103,35 @@ TOOLS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "web_search_jeju",
+            "description": (
+                "제주 여행의 최신·외부 웹 정보를 sources와 함께 검색한다. "
+                "사용자가 요즘/최신/운영시간/축제/행사/웹검색/가볼만한 곳처럼 내부 공공데이터만으로 답하기 넓거나 "
+                "최신성이 필요한 질문을 하면 호출한다. 반환 sources 밖의 사실은 지어내지 마라."
+            ),
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 200,
+                        "description": "웹에서 확인할 제주 여행 질문.",
+                    },
+                    "context": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "사용자의 현재 여행 맥락. 예: 처음 제주, 가족 동행, 비 오는 날.",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_places",
             "description": (
                 "제주 지역·카테고리로 공공데이터 근거 검색을 수행해 검증된 장소 후보와 총 개수를 조회한다. "
@@ -660,6 +689,123 @@ def _run_preview_region_coverage(args: dict) -> dict:
     return {"regions": previews}
 
 
+@dataclass(frozen=True)
+class WebSearchResult:
+    available: bool
+    query: str
+    answer: str = ""
+    sources: list[dict] = field(default_factory=list)
+    reason: str = ""
+
+
+def _source_key(source: dict) -> str:
+    return str(source.get("url") or source.get("title") or "").strip().lower()
+
+
+def _dedupe_sources(sources: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    result: list[dict] = []
+    for source in sources:
+        url = str(source.get("url") or "").strip()
+        title = str(source.get("title") or "").strip()
+        snippet = str(source.get("snippet") or "").strip()
+        if not url and not title:
+            continue
+        key = _source_key({"url": url, "title": title})
+        if key in seen:
+            continue
+        seen.add(key)
+        item = {"title": title or url, "url": url}
+        if snippet:
+            item["snippet"] = snippet
+        result.append(item)
+    return result[:5]
+
+
+def _extract_response_sources(resp: Any) -> list[dict]:
+    sources: list[dict] = []
+    for output in getattr(resp, "output", []) or []:
+        for content in getattr(output, "content", []) or []:
+            for annotation in getattr(content, "annotations", []) or []:
+                url = getattr(annotation, "url", "") or ""
+                title = getattr(annotation, "title", "") or ""
+                if url or title:
+                    sources.append({"title": title, "url": url})
+    return _dedupe_sources(sources)
+
+
+def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
+    """OpenAI web_search tool을 통해 최신 웹 근거를 가져온다. 실패해도 서버는 죽지 않는다."""
+    import os
+
+    clean_query = str(query or "").strip()
+    clean_context = str(context or "").strip()
+    if not clean_query:
+        return WebSearchResult(available=False, query=clean_query, reason="query is required")
+
+    key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not key:
+        return WebSearchResult(
+            available=False,
+            query=clean_query,
+            reason="OPENAI_API_KEY not set",
+        )
+
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        return WebSearchResult(available=False, query=clean_query, reason=f"openai import failed: {e}")
+
+    prompt = (
+        "제주 여행 질문에 대해 웹에서 확인한 출처가 있는 내용만 한국어로 짧게 답하세요. "
+        "출처가 부족하면 확인하지 못했다고 말하세요. 장소명·주소·운영시간은 출처에 있는 범위만 말하세요.\n\n"
+        f"질문: {clean_query}"
+    )
+    if clean_context:
+        prompt += f"\n사용자 맥락: {clean_context}"
+
+    client = OpenAI(api_key=key)
+    last_error = ""
+    for tool_type in ("web_search", "web_search_preview"):
+        try:
+            resp = client.responses.create(
+                model=llm.MODEL,
+                tools=[{"type": tool_type}],
+                input=prompt,
+                max_output_tokens=600,
+            )
+            answer = (getattr(resp, "output_text", "") or "").strip()
+            sources = _extract_response_sources(resp)
+            return WebSearchResult(
+                available=bool(answer or sources),
+                query=clean_query,
+                answer=answer,
+                sources=sources,
+                reason="" if (answer or sources) else "web search returned no usable result",
+            )
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {e}"
+    return WebSearchResult(available=False, query=clean_query, reason=last_error)
+
+
+def _run_web_search_jeju(args: dict) -> dict:
+    query = str(args.get("query") or "").strip()
+    context = str(args.get("context") or "").strip()
+    result = _perform_web_search_jeju(query, context=context)
+    return {
+        "available": result.available,
+        "query": result.query,
+        "answer": result.answer,
+        "sources": result.sources,
+        "source_type": "web",
+        "trust_level": "web_source",
+        "reason": result.reason,
+        "note": (
+            "웹검색 결과는 최신 외부 출처 기준입니다. 내부 공공데이터 검증 완료와 구분해서 사용자에게 안내해야 합니다."
+        ),
+    }
+
+
 def _run_suggest_form_augment(args: dict) -> dict:
     """폼 증강 제안을 대화용 payload로 직렬화한다."""
     form_state = args.get("form_state") or {}
@@ -785,6 +931,7 @@ def _pack_weather_payload(snapshot: dict | None) -> dict:
 
 
 TOOL_RUNNERS = {
+    "web_search_jeju": _run_web_search_jeju,
     "search_places": _run_search_places,
     "get_place_detail": _run_get_place_detail,
     "verify_claim": _run_verify_claim,
@@ -1018,6 +1165,15 @@ def _infer_search_places_args(conv: list[dict], form_state: dict | None = None) 
     }
 
 
+def _is_web_search_question(text_in: str) -> bool:
+    return bool(re.search(
+        r"요즘|최신|최근|지금|오늘|내일|이번\s*주|이번\s*달|웹|검색|찾아봐|찾아줘|"
+        r"운영시간|휴무|폐업|축제|행사|공연|이벤트|가볼\s*만한|갈\s*만한|핫플|"
+        r"실시간",
+        text_in,
+    ))
+
+
 def _infer_place_detail_query(conv: list[dict]) -> str:
     last_user = _latest_user_text(conv).strip()
     if not last_user:
@@ -1214,6 +1370,13 @@ def _prepare_tool_args(name: str, args: dict, conv: list[dict], form_state: dict
     elif name == "preview_region_coverage":
         if not prepared.get("regions"):
             prepared["regions"] = _infer_regions_from_text(_latest_user_text(conv), form_state)
+    elif name == "web_search_jeju":
+        if not prepared.get("query"):
+            prepared["query"] = _latest_user_text(conv)
+        if not prepared.get("context"):
+            filled = {k: v for k, v in (form_state or {}).items() if v not in (None, "", [], 0)}
+            if filled:
+                prepared["context"] = json.dumps(filled, ensure_ascii=False)
     return prepared
 
 
@@ -1264,6 +1427,23 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
         except Exception as e:
             result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
         return {"tool": "verify_review", "args": args, "result": result}
+
+    if _is_web_search_question(last_user):
+        args = {"query": last_user}
+        filled = {k: v for k, v in (form_state or {}).items() if v not in (None, "", [], 0)}
+        if filled:
+            args["context"] = json.dumps(filled, ensure_ascii=False)
+        try:
+            result = _run_web_search_jeju(args)
+        except Exception as e:
+            result = {
+                "available": False,
+                "query": last_user,
+                "sources": [],
+                "source_type": "web",
+                "error": f"{type(e).__name__}: {e}",
+            }
+        return {"tool": "web_search_jeju", "args": args, "result": result}
 
     if re.search(r"비교|지역 추천|어디.*좋|좋아|강점|커버리지|가볼\s*만한|갈\s*만한|어디\s*갈|처음.*지역", last_user):
         regions = _infer_regions_from_text(last_user, form_state)
@@ -1318,6 +1498,27 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             continue
 
         name = message.get("name")
+        if name == "web_search_jeju":
+            if not payload.get("available"):
+                reason = payload.get("reason") or payload.get("error") or "웹 출처를 확인하지 못했습니다"
+                return (
+                    f"지금 질문은 웹에서 바로 확인하려 했지만 {reason}. "
+                    "그래서 확인된 출처 없이 장소명·운영시간을 단정하지 않겠습니다. 지역이나 순간을 하나 고르면 확인된 후보부터 좁혀드릴게요."
+                )
+            answer = (payload.get("answer") or "").strip()
+            sources = payload.get("sources") or []
+            source_text = ""
+            if sources:
+                labels = []
+                for source in sources[:3]:
+                    title = source.get("title") or source.get("url") or "웹 출처"
+                    url = source.get("url")
+                    labels.append(f"{title}({url})" if url else title)
+                source_text = " 확인한 출처: " + ", ".join(labels) + "."
+            if answer:
+                return f"{answer} 웹 출처 기준으로 확인한 내용입니다.{source_text}"
+            return "웹 출처는 확인했지만 요약 가능한 본문이 부족합니다." + source_text
+
         if name == "weather_signal":
             region_text = payload.get("region_label") or "선택한 지역"
             if not payload.get("available"):
@@ -1597,8 +1798,8 @@ _BASE_SYSTEM_PROMPT = (
     "이모지는 쓰지 않는다.\n\n"
     "역할: 사용자가 폼을 채우는 과정에서 궁금한 것에 답하고, 검증된 데이터로 조언한다. "
     "일반 여행 상담, 준비물, 서비스 사용법, 선택 기준 설명처럼 새 사실 조회가 필요 없는 질문은 "
-    "gpt-5-mini가 바로 답해도 된다. 장소 추천, 장소 개수, 특정 지역의 후보, 특정 장소 상세, 리뷰 검증처럼 "
-    "사실 확인이 필요한 질문은 반드시 도구(search_places, get_place_detail, verify_claim, suggest_form_update)를 "
+    "gpt-5-mini가 바로 답해도 된다. 장소 추천, 장소 개수, 특정 지역의 후보, 특정 장소 상세, 최신 웹 정보, 리뷰 검증처럼 "
+    "사실 확인이 필요한 질문은 반드시 도구(web_search_jeju, search_places, get_place_detail, verify_claim, suggest_form_update)를 "
     "먼저 호출한 뒤 답한다.\n\n"
     "도구 사용 정책:\n"
     "- 사용자가 특정 장소명을 말하며 '자세히', '어때', '위치', '주소', '정보'를 물으면 get_place_detail을 먼저 호출한다.\n"
@@ -1606,6 +1807,8 @@ _BASE_SYSTEM_PROMPT = (
     "상세 사유가 없으면 없다고 말하고 추정하지 않는다.\n"
     "- 사용자가 '주차장', '정류소', '대중교통', '이동'을 특정 장소와 함께 물으면 get_place_detail 결과의 transit만 근거로 답한다.\n"
     "- 사용자가 여행 기간 날씨를 물으면 기상청 예보 스냅샷만 근거로 날짜별로 답하고, 장소 카드마다 날씨를 반복하지 않는다.\n"
+    "- 사용자가 요즘/최신/웹검색/축제/행사/가볼만한 곳처럼 최신성이나 외부 출처가 필요한 질문을 하면 web_search_jeju를 호출한다.\n"
+    "- web_search_jeju 결과는 웹 출처 기준이라고 구분하고, sources 밖의 사실은 말하지 않는다.\n"
     "- 사용자가 '한 곳만', '하나만', '점심으로 한 곳 추천'을 말하면 search_places의 intent='recommend', limit=1을 사용한다.\n"
     "- 사용자가 '더', '이외에', '제외하고', '빼고'를 말하면 이미 보여준 후보와 사용자가 제외한 후보를 exclude_names에 넣는다.\n"
     "- '해산물', '조용한', '혼자', '점심' 같은 선호는 keywords로 넘긴다. 단, 메뉴·영업시간은 도구 결과에 없으면 말하지 않는다.\n\n"

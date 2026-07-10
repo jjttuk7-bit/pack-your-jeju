@@ -30,6 +30,16 @@ def test_haruban_tools_include_unlocked_agent_capabilities():
     assert "verify_review" in tool_names
     assert "preview_region_coverage" in tool_names
     assert "suggest_form_augment" in tool_names
+    assert "web_search_jeju" in tool_names
+
+
+def test_web_search_jeju_tool_requires_query_and_returns_sources():
+    tool = next(t for t in haruban.TOOLS if t["function"]["name"] == "web_search_jeju")
+    props = tool["function"]["parameters"]["properties"]
+
+    assert "query" in props
+    assert "sources" in tool["function"]["description"]
+    assert "최신" in tool["function"]["description"]
 
 
 def test_build_pack_tool_requires_form_state():
@@ -123,6 +133,52 @@ def test_haruban_region_coverage_runner_handles_multiple_regions(monkeypatch):
     assert [r["region"] for r in result["regions"]] == ["seongsan", "gujwa"]
 
 
+def test_haruban_web_search_runner_serializes_sources(monkeypatch):
+    class FakeWebResult:
+        available = True
+        answer = "제주시에서는 원도심 산책과 해안 드라이브를 함께 보기 좋습니다."
+        sources = [
+            {"title": "Visit Jeju", "url": "https://www.visitjeju.net/", "snippet": "제주시 여행 정보"},
+        ]
+        query = "제주시 요즘 가볼만한 곳"
+        reason = ""
+
+    monkeypatch.setattr(haruban, "_perform_web_search_jeju", lambda query, context="": FakeWebResult())
+
+    result = haruban._run_web_search_jeju({
+        "query": "제주시 요즘 가볼만한 곳",
+        "context": "처음 제주",
+    })
+
+    assert result["available"] is True
+    assert result["source_type"] == "web"
+    assert result["answer"].startswith("제주시")
+    assert result["sources"][0]["url"] == "https://www.visitjeju.net/"
+
+
+def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "요즘 제주시 여행은 원도심과 바다 산책을 같이 보기 좋습니다.",
+            "sources": [{"title": "Visit Jeju", "url": "https://www.visitjeju.net/"}],
+            "source_type": "web",
+        },
+    )
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "제주가 처음인데 요즘 제주시의 가볼만한 곳들은?"}],
+        {},
+    )
+
+    assert result["tool"] == "web_search_jeju"
+    assert "요즘" in result["args"]["query"]
+    assert result["result"]["sources"][0]["title"] == "Visit Jeju"
+
+
 def test_haruban_augment_runner_serializes_suggestions(monkeypatch):
     class FakeSuggestion:
         field = "moments"
@@ -175,16 +231,27 @@ def test_haruban_routes_review_question_to_verify_review(monkeypatch):
     assert result["tool"] == "verify_review"
 
 
-def test_haruban_routes_region_overview_question_to_coverage(monkeypatch):
-    monkeypatch.setattr(haruban, "_run_preview_region_coverage", lambda args: {"regions": []})
+def test_haruban_routes_region_overview_question_to_web_search(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "제주시 가볼만한 곳은 웹 출처 기준으로 확인했습니다.",
+            "sources": [{"title": "Visit Jeju", "url": "https://www.visitjeju.net/"}],
+            "source_type": "web",
+        },
+    )
 
     result = haruban._build_search_pool_context(
         [{"role": "user", "content": "제주시의 가볼만한 곳들ㅇ느?"}],
         {},
     )
 
-    assert result["tool"] == "preview_region_coverage"
-    assert result["args"]["regions"] == ["jeju_city"]
+    assert result["tool"] == "web_search_jeju"
+    assert result["result"]["sources"][0]["title"] == "Visit Jeju"
+    assert "제주시" in result["args"]["query"]
 
 
 def test_haruban_fallback_replies_from_build_pack_result():
