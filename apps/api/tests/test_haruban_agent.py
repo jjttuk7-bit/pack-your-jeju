@@ -175,6 +175,18 @@ def test_haruban_routes_review_question_to_verify_review(monkeypatch):
     assert result["tool"] == "verify_review"
 
 
+def test_haruban_routes_region_overview_question_to_coverage(monkeypatch):
+    monkeypatch.setattr(haruban, "_run_preview_region_coverage", lambda args: {"regions": []})
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "제주시의 가볼만한 곳들ㅇ느?"}],
+        {},
+    )
+
+    assert result["tool"] == "preview_region_coverage"
+    assert result["args"]["regions"] == ["jeju_city"]
+
+
 def test_haruban_fallback_replies_from_build_pack_result():
     reply = haruban._fallback_reply_from_tool_messages([
         {
@@ -222,6 +234,30 @@ def test_haruban_fallback_replies_from_verify_review_result():
     assert "A는 폐업했다" in reply
     assert "폐업 신호" in reply
     assert "공공데이터 기준" in reply
+
+
+def test_haruban_fallback_replies_from_region_coverage_result():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "제주시의 가볼만한 곳들ㅇ느?"},
+        {
+            "role": "tool",
+            "name": "preview_region_coverage",
+            "content": json.dumps({
+                "regions": [
+                    {
+                        "region": "jeju_city",
+                        "region_label": "제주시",
+                        "briefing": "제주시는 바다 산책·현지 맛집 쪽 후보가 비교적 확인되어 있습니다.",
+                    }
+                ],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "제주시" in reply
+    assert "바다 산책" in reply
+    assert "현지 맛집" in reply
+    assert "조건을 조금 더 확인" not in reply
 
 
 def test_haruban_prepares_args_for_direct_unlocked_tool_calls():

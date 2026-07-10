@@ -1265,7 +1265,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
         return {"tool": "verify_review", "args": args, "result": result}
 
-    if re.search(r"비교|지역 추천|어디.*좋|좋아|강점|커버리지", last_user):
+    if re.search(r"비교|지역 추천|어디.*좋|좋아|강점|커버리지|가볼\s*만한|갈\s*만한|어디\s*갈|처음.*지역", last_user):
         regions = _infer_regions_from_text(last_user, form_state)
         if regions:
             args = {"regions": regions}
