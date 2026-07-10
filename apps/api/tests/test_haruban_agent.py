@@ -92,6 +92,25 @@ def test_haruban_build_pack_runner_summarizes_pack(monkeypatch):
     assert result["weather"]["summary"] == "바람 확인"
 
 
+def test_haruban_verify_review_runner_serializes_claims(monkeypatch):
+    class FakeClaim:
+        text = "A 식당은 폐업했다."
+        verdict = "contradicted"
+        fallback_reason = "contradicted"
+        matched_name = "A 식당"
+        matched_external_id = "v1"
+        reason = "수정요청에서 폐업 신호가 확인됩니다."
+        sources = ["visitjeju"]
+
+    monkeypatch.setattr(haruban.verify_mod, "verify_text", lambda text: [FakeClaim()])
+
+    result = haruban._run_verify_review({"text": "A 식당은 폐업했다."})
+
+    assert result["claims"][0]["verdict"] == "contradicted"
+    assert result["claims"][0]["matched_name"] == "A 식당"
+    assert result["claims"][0]["sources"] == ["visitjeju"]
+
+
 def test_haruban_infers_visitjeju_expanded_categories():
     assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
     assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"

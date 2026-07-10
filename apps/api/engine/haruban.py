@@ -607,6 +607,28 @@ def _run_verify_claim(args: dict) -> dict:
     }
 
 
+def _run_verify_review(args: dict) -> dict:
+    """리뷰·블로그 문장을 /verify 로직으로 검증해 대화용 payload로 직렬화한다."""
+    text_in = str(args.get("text") or "").strip()
+    if not text_in:
+        return {"claims": []}
+    results = verify_mod.verify_text(text_in)
+    return {
+        "claims": [
+            {
+                "text": r.text,
+                "verdict": r.verdict,
+                "fallback_reason": r.fallback_reason,
+                "matched_name": r.matched_name,
+                "matched_external_id": getattr(r, "matched_external_id", None),
+                "reason": r.reason,
+                "sources": getattr(r, "sources", []),
+            }
+            for r in results
+        ],
+    }
+
+
 def _run_suggest_form_update(args: dict) -> dict:
     """suggest_form_update는 실제 실행이 아니라 프론트로 넘겨줄 제안.
     도구 실행 결과는 반영 대기 상태로 프론트에 노출."""
@@ -718,6 +740,7 @@ TOOL_RUNNERS = {
     "search_places": _run_search_places,
     "get_place_detail": _run_get_place_detail,
     "verify_claim": _run_verify_claim,
+    "verify_review": _run_verify_review,
     "suggest_form_update": _run_suggest_form_update,
     "build_pack": _run_build_pack,
 }
