@@ -175,6 +175,55 @@ def test_haruban_routes_review_question_to_verify_review(monkeypatch):
     assert result["tool"] == "verify_review"
 
 
+def test_haruban_fallback_replies_from_build_pack_result():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {
+            "role": "tool",
+            "name": "build_pack",
+            "content": json.dumps({
+                "available": True,
+                "intro": {"text": "성산 현지 맛집 중심으로 조립했어요."},
+                "sections": [
+                    {
+                        "moment": "local_food",
+                        "items": [{"name": "소심한이층", "badge": "verified"}],
+                        "fallback": None,
+                    }
+                ],
+                "weather": {"summary": "바람 확인"},
+            }, ensure_ascii=False),
+        }
+    ])
+
+    assert "성산 현지 맛집" in reply
+    assert "소심한이층" in reply
+    assert "바람 확인" in reply
+
+
+def test_haruban_fallback_replies_from_verify_review_result():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {
+            "role": "tool",
+            "name": "verify_review",
+            "content": json.dumps({
+                "claims": [
+                    {
+                        "text": "A는 폐업했다.",
+                        "verdict": "contradicted",
+                        "fallback_reason": "contradicted",
+                        "matched_name": "A",
+                        "reason": "폐업 신호가 확인됩니다.",
+                    }
+                ],
+            }, ensure_ascii=False),
+        }
+    ])
+
+    assert "A는 폐업했다" in reply
+    assert "폐업 신호" in reply
+    assert "공공데이터 기준" in reply
+
+
 def test_haruban_infers_visitjeju_expanded_categories():
     assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
     assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"

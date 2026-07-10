@@ -1312,6 +1312,98 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
             summary = payload.get("summary") or "기상청 예보가 확인되었습니다."
             return f"{region_text} 날씨는 {summary} 주요 신호는 {label_text}입니다."
 
+        if name == "build_pack":
+            if not payload.get("available", True):
+                reason = payload.get("error") or "현재 폼 조건을 여행팩으로 조립하지 못했습니다"
+                return (
+                    f"이 조건으로는 바로 여행팩을 만들기 어렵습니다. {reason}. "
+                    "지역, 날짜, 동행자, 순간 카드를 한 번 더 확인해 주세요."
+                )
+            intro_text = (payload.get("intro") or {}).get("text") or "선택한 조건으로 여행팩을 조립했습니다."
+            sections = payload.get("sections") or []
+            names: list[str] = []
+            fallback_messages: list[str] = []
+            for section in sections:
+                for item in (section.get("items") or [])[:2]:
+                    if item.get("name"):
+                        names.append(item["name"])
+                fallback = section.get("fallback")
+                if fallback and fallback.get("message"):
+                    fallback_messages.append(fallback["message"])
+            weather_summary = (payload.get("weather") or {}).get("summary")
+            parts = [intro_text]
+            if names:
+                parts.append("확인된 후보로는 " + ", ".join(_unique_preserve_order(names)[:4]) + " 등을 먼저 볼 수 있어요.")
+            if fallback_messages:
+                parts.append("다만 " + " ".join(fallback_messages[:2]))
+            if weather_summary:
+                parts.append(f"날씨 신호는 {weather_summary}입니다.")
+            return " ".join(parts)
+
+        if name == "verify_review":
+            claims = payload.get("claims") or []
+            if not claims:
+                return (
+                    "붙여주신 문장에서 바로 검증할 주장을 찾지 못했습니다. "
+                    "장소명과 주장 문장을 함께 주시면 저희 공공데이터 기준으로 다시 확인할게요."
+                )
+            lines = []
+            for claim in claims[:3]:
+                text_in = claim.get("text") or "해당 문장"
+                reason = claim.get("reason") or "근거를 확인했습니다."
+                verdict = claim.get("verdict") or "coverage_gap"
+                label = {
+                    "verified": "확인됨",
+                    "contradicted": "반증 확인",
+                    "outdated": "변경 가능성",
+                    "coverage_gap": "확인 불가",
+                }.get(verdict, verdict)
+                lines.append(f"{text_in}: {label}입니다. {reason}")
+            return "저희 공공데이터 기준으로 보면 " + " ".join(lines)
+
+        if name == "preview_region_coverage":
+            previews = payload.get("regions") or []
+            if not previews:
+                return "비교할 지역을 찾지 못했습니다. 제주 지역을 하나 이상 알려주시면 공공데이터 커버리지를 비교해드릴게요."
+            summaries = []
+            for preview in previews[:3]:
+                label = preview.get("region_label") or REGION_LABEL_KO.get(preview.get("region"), preview.get("region", "선택 지역"))
+                briefing = preview.get("briefing")
+                if briefing:
+                    summaries.append(briefing)
+                    continue
+                moments = preview.get("moments") or []
+                strong = [
+                    m.get("moment_label") or MOMENT_LABEL_KO.get(m.get("moment"), m.get("moment", ""))
+                    for m in moments
+                    if not m.get("coverage_gap")
+                ][:2]
+                weak = [
+                    m.get("moment_label") or MOMENT_LABEL_KO.get(m.get("moment"), m.get("moment", ""))
+                    for m in moments
+                    if m.get("coverage_gap")
+                ][:2]
+                summary = f"{label}은(는) "
+                if strong:
+                    summary += " · ".join(strong) + " 후보가 비교적 확인됩니다"
+                else:
+                    summary += "선택한 순간 후보가 저희가 참조하는 공공데이터 기준으로 확인되지 않습니다"
+                if weak:
+                    summary += f", { ' · '.join(weak) }은 데이터가 부족합니다"
+                summaries.append(summary + ".")
+            return " ".join(summaries)
+
+        if name == "suggest_form_augment":
+            suggestions = payload.get("suggestions") or []
+            if not suggestions:
+                return "지금 폼 조건에서는 바로 추가할 만한 보강 제안을 찾지 못했습니다. 현재 조건 그대로 팩을 만들어도 됩니다."
+            lines = []
+            for suggestion in suggestions[:3]:
+                labels = ", ".join(suggestion.get("labels") or suggestion.get("values") or [])
+                reason = suggestion.get("reason") or "저희 공공데이터 기준으로 함께 볼 만한 조건입니다."
+                lines.append(f"{labels}: {reason}")
+            return "폼에 더해볼 만한 제안은 " + " ".join(lines)
+
         if name == "search_places":
             total = int(payload.get("total_count") or 0)
             regions = payload.get("regions") or []
