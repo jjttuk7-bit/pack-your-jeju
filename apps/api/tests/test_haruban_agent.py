@@ -146,6 +146,35 @@ def test_haruban_augment_runner_serializes_suggestions(monkeypatch):
     assert result["suggestions"][0]["values"] == ["beach_walk"]
 
 
+def test_haruban_builds_pack_tool_pool_for_pack_request(monkeypatch):
+    called = {}
+
+    def fake_build_pack(args):
+        called.update(args)
+        return {"available": True, "sections": []}
+
+    monkeypatch.setattr(haruban, "_run_build_pack", fake_build_pack)
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "이 조건으로 팩 만들어줘"}],
+        {"regions": ["seongsan"], "moments": ["local_food"], "days": 2},
+    )
+
+    assert result["tool"] == "build_pack"
+    assert called["form_state"]["regions"] == ["seongsan"]
+
+
+def test_haruban_routes_review_question_to_verify_review(monkeypatch):
+    monkeypatch.setattr(haruban, "_run_verify_review", lambda args: {"claims": []})
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "블로그에서 봤는데 이 리뷰 맞아? 성산 A는 폐업했다."}],
+        {},
+    )
+
+    assert result["tool"] == "verify_review"
+
+
 def test_haruban_infers_visitjeju_expanded_categories():
     assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
     assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"

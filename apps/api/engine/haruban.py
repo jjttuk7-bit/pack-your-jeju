@@ -1208,6 +1208,40 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = {"query": detail_query, "items": [], "error": f"{type(e).__name__}: {e}"}
         return {"tool": "get_place_detail", "args": args, "result": result}
 
+    if re.search(r"팩|일정|코스|만들|짜줘|짜 줘", last_user):
+        args = {"form_state": dict(form_state or {})}
+        try:
+            result = _run_build_pack(args)
+        except Exception as e:
+            result = {"available": False, "error": f"{type(e).__name__}: {e}"}
+        return {"tool": "build_pack", "args": args, "result": result}
+
+    if re.search(r"리뷰|블로그|맞아|사실|검증|팩트체크", last_user):
+        args = {"text": last_user}
+        try:
+            result = _run_verify_review(args)
+        except Exception as e:
+            result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
+        return {"tool": "verify_review", "args": args, "result": result}
+
+    if re.search(r"비교|지역 추천|어디.*좋|좋아|강점|커버리지", last_user):
+        regions = _infer_regions_from_text(last_user, form_state)
+        if regions:
+            args = {"regions": regions}
+            try:
+                result = _run_preview_region_coverage(args)
+            except Exception as e:
+                result = {"regions": [], "error": f"{type(e).__name__}: {e}"}
+            return {"tool": "preview_region_coverage", "args": args, "result": result}
+
+    if re.search(r"폼|조건|바꾸|추천 조합|더 좋은 조합|보강", last_user):
+        args = {"form_state": dict(form_state or {})}
+        try:
+            result = _run_suggest_form_augment(args)
+        except Exception as e:
+            result = {"available": False, "suggestions": [], "error": f"{type(e).__name__}: {e}"}
+        return {"tool": "suggest_form_augment", "args": args, "result": result}
+
     if not _is_search_like_text(_all_user_text(conv)):
         return None
 
