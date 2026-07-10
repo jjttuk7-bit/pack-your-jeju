@@ -238,6 +238,94 @@ TOOLS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "build_pack",
+            "description": (
+                "현재 폼 상태를 바탕으로 여행팩을 조립한다. "
+                "섹션별 후보, fallback, 날씨, 일정 요약은 공공데이터와 도구 결과에 있는 사실만 반환한다. "
+                "반환 결과 밖의 장소·주소·운영시간·수치를 절대 지어내지 마라."
+            ),
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "form_state": {
+                        "type": "object",
+                        "description": "현재 사용자가 선택한 제주 여행 폼 상태.",
+                    },
+                },
+                "required": ["form_state"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "verify_review",
+            "description": (
+                "사용자가 붙여넣은 리뷰·블로그·외부 주장을 공공데이터와 도구 결과 기준으로 검증한다. "
+                "검증 결과 밖의 사실은 지어내지 말고, 확인되지 않으면 공공데이터 기준 한계를 밝혀라."
+            ),
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 1500,
+                        "description": "검증할 리뷰, 블로그 문장, 외부 주장 텍스트.",
+                    },
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "preview_region_coverage",
+            "description": (
+                "선택한 제주 지역들의 순간 카드별 공공데이터 커버리지를 비교한다. "
+                "강점과 빈틈은 도구 결과의 후보 수와 coverage 정보만 근거로 설명한다."
+            ),
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "regions": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": list(filters_mod.REGIONS)},
+                        "minItems": 1,
+                    },
+                },
+                "required": ["regions"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_form_augment",
+            "description": (
+                "현재 폼 상태에서 더 좋은 지역·순간·조건 보강안을 제안한다. "
+                "제안 이유와 카운트는 공공데이터와 도구 결과만 근거로 삼고, 실제 폼 변경은 사용자 승인 후 처리한다."
+            ),
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "form_state": {
+                        "type": "object",
+                        "description": "현재 사용자가 선택한 제주 여행 폼 상태.",
+                    },
+                },
+                "required": ["form_state"],
+            },
+        },
+    },
 ]
 
 

@@ -22,6 +22,24 @@ def test_search_places_tool_supports_count_questions():
     assert "공공데이터 근거" in description
 
 
+def test_haruban_tools_include_unlocked_agent_capabilities():
+    tool_names = {t["function"]["name"] for t in haruban.TOOLS}
+
+    assert "build_pack" in tool_names
+    assert "verify_review" in tool_names
+    assert "preview_region_coverage" in tool_names
+    assert "suggest_form_augment" in tool_names
+
+
+def test_build_pack_tool_requires_form_state():
+    tool = next(t for t in haruban.TOOLS if t["function"]["name"] == "build_pack")
+    props = tool["function"]["parameters"]["properties"]
+
+    assert "form_state" in props
+    assert "여행팩" in tool["function"]["description"]
+    assert "공공데이터" in tool["function"]["description"]
+
+
 def test_haruban_infers_visitjeju_expanded_categories():
     assert haruban._infer_category_from_text("한림 숙박시설 알려줘") == "accommodation"
     assert haruban._infer_category_from_text("이번 여행 기간 축제 행사 알려줘") == "festival"
