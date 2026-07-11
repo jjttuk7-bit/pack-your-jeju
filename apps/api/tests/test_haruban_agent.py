@@ -1,5 +1,9 @@
 import json
+import logging
 from datetime import date
+from types import SimpleNamespace
+
+import openai
 
 from apps.api.engine import haruban
 
@@ -241,6 +245,61 @@ def test_web_research_retries_once_when_all_planned_queries_are_empty(monkeypatc
     assert result.research_status == "unavailable"
     assert len(calls) == 3
     assert calls[-1] == "구좌에서 가장 맛집은?"
+
+
+def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
+    captured = {}
+
+    class FakeResponses:
+        @staticmethod
+        def create(**kwargs):
+            raise RuntimeError("provider timeout")
+
+    def fake_openai(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(responses=FakeResponses())
+
+    monkeypatch.setattr(openai, "OpenAI", fake_openai)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    caplog.set_level(logging.WARNING, logger=haruban.__name__)
+
+    result = haruban._perform_single_web_search("구좌 오름 공식", source_class="official")
+
+    assert result.available is False
+    assert captured["timeout"] == haruban.WEB_SEARCH_TIMEOUT_SECONDS
+    assert captured["max_retries"] == 0
+    assert "provider timeout" in caplog.text
+    assert "official" in caplog.text
+
+
+def test_preloaded_search_pool_disables_duplicate_model_tool_calls(monkeypatch):
+    captured = {}
+    message = SimpleNamespace(content="확인한 웹 근거를 정리했습니다.", tool_calls=[])
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    class FakeCompletions:
+        @staticmethod
+        def create(**kwargs):
+            captured.update(kwargs)
+            return response
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=FakeCompletions()),
+    )
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: fake_client)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    turn = haruban._chat_turn_raw(
+        [{"role": "system", "content": "웹 검색 결과가 이미 제공됨"}],
+        [{"tool": "preload:web_search_jeju", "args": {}, "result_size": 10}],
+        3,
+        {},
+        preloaded_tool="web_search_jeju",
+    )
+
+    assert turn.available is True
+    assert captured["tools"] == []
+    assert captured["tool_choice"] == "none"
 
 
 def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):

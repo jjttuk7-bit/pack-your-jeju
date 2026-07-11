@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -31,6 +32,10 @@ from apps.api.engine import search as search_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.engine import weather as weather_mod
+
+
+logger = logging.getLogger(__name__)
+WEB_SEARCH_TIMEOUT_SECONDS = 15.0
 
 
 # ─── 한글 라벨 (하이라이트 문구 조립용) ───
@@ -837,9 +842,13 @@ def _perform_single_web_search(
     if clean_context:
         prompt += f"\n사용자 맥락: {clean_context}"
 
-    client = OpenAI(api_key=key)
+    client = OpenAI(
+        api_key=key,
+        timeout=WEB_SEARCH_TIMEOUT_SECONDS,
+        max_retries=0,
+    )
     last_error = ""
-    for tool_type in ("web_search", "web_search_preview"):
+    for tool_type in ("web_search",):
         try:
             resp = client.responses.create(
                 model=llm.MODEL,
@@ -863,6 +872,13 @@ def _perform_single_web_search(
             )
         except Exception as e:
             last_error = f"{type(e).__name__}: {e}"
+            logger.warning(
+                "haruban web search failed source_class=%s tool_type=%s query=%r error=%s",
+                source_class,
+                tool_type,
+                clean_query,
+                last_error,
+            )
     return WebSearchResult(available=False, query=clean_query, reason=last_error)
 
 
@@ -2314,6 +2330,7 @@ def chat_turn(
         max_iterations,
         form_state,
         answer_contract=(search_pool.get("contract") if search_pool else None),
+        preloaded_tool=(search_pool.get("tool") if search_pool else None),
     )
 
 
@@ -2323,6 +2340,7 @@ def _chat_turn_raw(
     max_iterations: int,
     form_state: dict | None = None,
     answer_contract: dict | None = None,
+    preloaded_tool: str | None = None,
 ) -> HarubanTurn:
     """openai client를 직접 사용해 conv 배열 통째 전달 + tool 실행 루프."""
     import os
@@ -2337,14 +2355,16 @@ def _chat_turn_raw(
 
     client = OpenAI(api_key=key)
     form_suggestion: dict | None = None
+    available_tools = [] if preloaded_tool else TOOLS
+    tool_choice = "none" if preloaded_tool else "auto"
 
     for it in range(max_iterations):
         try:
             resp = client.chat.completions.create(
                 model=llm.MODEL,
                 messages=conv,
-                tools=TOOLS,
-                tool_choice="auto",
+                tools=available_tools,
+                tool_choice=tool_choice,
                 max_completion_tokens=600,
             )
         except Exception as e:
