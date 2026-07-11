@@ -286,6 +286,15 @@ def test_web_failure_fallback_does_not_substitute_public_data_candidates():
     assert "공공데이터 후보" not in reply
 
 
+def test_generic_fallback_does_not_default_to_public_data_mode():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "구좌 여행을 더 알아보고 싶어"},
+    ])
+
+    assert "공공데이터 기준으로 다시 좁혀" not in reply
+    assert "웹" in reply
+
+
 def test_partial_web_fallback_discloses_partial_result_and_source_role():
     reply = haruban._fallback_reply_from_tool_messages([
         {"role": "user", "content": "구좌 오름을 알려줘"},
