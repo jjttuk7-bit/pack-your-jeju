@@ -268,6 +268,84 @@ def test_haruban_general_question_router_does_not_capture_place_recommendations(
     assert "한 곳만" in result.reply_text
 
 
+def test_haruban_general_question_has_answer_contract(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+
+    result = haruban.chat_turn(
+        [{"role": "user", "content": "제주공항은 어느 지역에 있어?"}],
+        {},
+    )
+
+    assert result.answer_contract == {
+        "answer_type": "general_knowledge",
+        "source_type": "stable_general",
+        "confidence": "medium",
+        "requires_tool": False,
+        "limitations": ["장소·운영시간·요금은 별도 근거 확인 필요"],
+    }
+
+
+def test_haruban_search_pool_contract_for_weather(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_weather_signal",
+        lambda form_state: {"available": True, "region_label": "제주시", "labels": ["비 확인"]},
+    )
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "여행 기간 날씨는 어때?"}],
+        {"regions": ["jeju_city"]},
+    )
+
+    assert result["contract"]["answer_type"] == "weather"
+    assert result["contract"]["source_type"] == "kma_weather"
+    assert result["contract"]["requires_tool"] is True
+
+
+def test_haruban_search_pool_contract_for_place_recommendation(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_search_places",
+        lambda args: {
+            "intent": args.get("intent"),
+            "total_count": 1,
+            "regions": args.get("regions"),
+            "category": args.get("category"),
+            "items": [{"name": "테스트식당", "address": "제주시"}],
+        },
+    )
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "제주시 맛집 한 곳 추천해줘"}],
+        {},
+    )
+
+    assert result["tool"] == "search_places"
+    assert result["contract"]["answer_type"] == "place_recommendation"
+    assert result["contract"]["source_type"] == "public_data"
+
+
+def test_haruban_search_pool_contract_for_web_search(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "answer": "이번 주 제주 축제는 웹 출처로 확인했습니다.",
+            "sources": [{"title": "Visit Jeju", "url": "https://www.visitjeju.net/"}],
+        },
+    )
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "이번 주 제주 축제 알려줘"}],
+        {},
+    )
+
+    assert result["tool"] == "web_search_jeju"
+    assert result["contract"]["answer_type"] == "fresh_web"
+    assert result["contract"]["source_type"] == "web"
+
+
 def test_haruban_augment_runner_serializes_suggestions(monkeypatch):
     class FakeSuggestion:
         field = "moments"

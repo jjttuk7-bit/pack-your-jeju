@@ -170,6 +170,14 @@ export interface HarubanChatResponse {
   form_suggestion: HarubanFormSuggestion | null;
   tool_trace: any[];
   reason: string;
+  answer_contract?: HarubanAnswerContract;
+}
+export interface HarubanAnswerContract {
+  answer_type: string;
+  source_type: string;
+  confidence: 'low' | 'medium' | 'high' | string;
+  requires_tool: boolean;
+  limitations: string[];
 }
 export function requestHarubanChat(
   messages: HarubanChatMessage[],

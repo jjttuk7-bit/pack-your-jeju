@@ -26,6 +26,7 @@ import type {
 import {
   requestHarubanChat,
   requestHarubanIntro,
+  type HarubanAnswerContract,
   type HarubanChatMessage,
   type HarubanFormSuggestion,
   type HarubanIntroResponse,
@@ -49,7 +50,7 @@ interface HarubanChatProps {
 // 카드 리스트를 별도 슬롯으로 두어 배지·주소·근거 액션을 대화 흐름과 분리한다.
 type ChatEntry =
   | { kind: 'user'; content: string }
-  | { kind: 'assistant'; content: string }
+  | { kind: 'assistant'; content: string; contract?: HarubanAnswerContract }
   | { kind: 'intro'; intro: HarubanIntroResponse; formSnapshot: FormStateSnapshot };
 
 interface FormStateSnapshot {
@@ -239,7 +240,7 @@ export default function HarubanChat({
       }
       setEntries((prev) => [
         ...prev,
-        { kind: 'assistant', content: resp.reply_text },
+        { kind: 'assistant', content: resp.reply_text, contract: resp.answer_contract },
       ]);
       if (resp.form_suggestion) {
         setPendingSuggestion(resp.form_suggestion);
@@ -367,7 +368,14 @@ export default function HarubanChat({
                 }
                 if (entry.kind === 'assistant') {
                   if (!entry.content) return null;
-                  return <MessageBubble key={i} role="assistant" content={entry.content} />;
+                  return (
+                    <MessageBubble
+                      key={i}
+                      role="assistant"
+                      content={entry.content}
+                      contract={entry.contract}
+                    />
+                  );
                 }
                 // intro — 현재 폼 상태를 함께 넘겨 이미 포함된 조건은 disabled 처리.
                 return (
@@ -456,8 +464,18 @@ export default function HarubanChat({
   );
 }
 
-function MessageBubble({ role, content }: { role: 'user' | 'assistant'; content: string }) {
+function MessageBubble({
+  role,
+  content,
+  contract,
+}: {
+  role: 'user' | 'assistant';
+  content: string;
+  contract?: HarubanAnswerContract;
+}) {
   const isUser = role === 'user';
+  const sourceLabel = contract ? answerSourceLabel(contract.source_type) : '';
+  const confidenceLabel = contract ? confidenceLabelFor(contract.confidence) : '';
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -467,10 +485,59 @@ function MessageBubble({ role, content }: { role: 'user' | 'assistant'; content:
             : 'bg-[#FDF6EA] text-basalt border border-earth/60 rounded-bl-md'
         }`}
       >
-        {content}
+        <div>{content}</div>
+        {!isUser && contract && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-earth/50 pt-2 text-[10px] leading-none text-basalt-2/70">
+            {sourceLabel && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-1 font-bold">
+                <ShieldCheck className="h-3 w-3 text-citrus-2" />
+                {sourceLabel}
+              </span>
+            )}
+            {confidenceLabel && (
+              <span className="rounded-full bg-white/70 px-2 py-1 font-bold">
+                {confidenceLabel}
+              </span>
+            )}
+            {contract.limitations?.[0] && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-900">
+                <AlertTriangle className="h-3 w-3" />
+                {contract.limitations[0]}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+function answerSourceLabel(sourceType: string): string {
+  switch (sourceType) {
+    case 'public_data':
+      return '공공데이터 기준';
+    case 'web':
+      return '웹 출처 기준';
+    case 'kma_weather':
+      return '기상청 예보 기준';
+    case 'stable_general':
+      return '일반 제주 안내';
+    default:
+      return '';
+  }
+}
+
+function confidenceLabelFor(confidence: string): string {
+  switch (confidence) {
+    case 'high':
+      return '신뢰 높음';
+    case 'medium':
+      return '확인 필요';
+    case 'low':
+      return '근거 약함';
+    default:
+      return '';
+  }
 }
 
 // ── 인사 블록: greeting 말풍선 + 플랜 코치 액션 + 데이터 부족 섹션 ──

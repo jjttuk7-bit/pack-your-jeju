@@ -378,6 +378,7 @@ def agent_chat(body: HarubangChatBody) -> dict[str, Any]:
         "form_suggestion": turn.form_suggestion,
         "tool_trace": turn.tool_trace,
         "reason": turn.reason,
+        "answer_contract": turn.answer_contract,
     }
 
 

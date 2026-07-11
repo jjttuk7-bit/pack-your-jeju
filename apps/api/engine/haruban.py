@@ -1182,6 +1182,8 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
     last_user = _latest_user_text(conv).strip()
     if not last_user:
         return ""
+    if _is_weather_question(last_user):
+        return ""
 
     previous_candidates: list[str] = []
     for message in conv:
@@ -1336,6 +1338,101 @@ def _try_general_question_answer(messages_in: list[dict]) -> str:
     return _template_general_question_answer(last_user)
 
 
+def _answer_contract(
+    answer_type: str,
+    source_type: str,
+    *,
+    confidence: str = "medium",
+    requires_tool: bool = False,
+    limitations: list[str] | None = None,
+) -> dict:
+    return {
+        "answer_type": answer_type,
+        "source_type": source_type,
+        "confidence": confidence,
+        "requires_tool": requires_tool,
+        "limitations": limitations or [],
+    }
+
+
+def _general_question_contract() -> dict:
+    return _answer_contract(
+        "general_knowledge",
+        "stable_general",
+        requires_tool=False,
+        limitations=["장소·운영시간·요금은 별도 근거 확인 필요"],
+    )
+
+
+def _contract_for_tool(tool_name: str) -> dict:
+    if tool_name == "weather_signal":
+        return _answer_contract(
+            "weather",
+            "kma_weather",
+            confidence="high",
+            requires_tool=True,
+            limitations=["예보는 발표 시각 이후 바뀔 수 있음"],
+        )
+    if tool_name == "web_search_jeju":
+        return _answer_contract(
+            "fresh_web",
+            "web",
+            confidence="medium",
+            requires_tool=True,
+            limitations=["웹 출처 기준이며 내부 공공데이터 검증과 구분"],
+        )
+    if tool_name == "search_places":
+        return _answer_contract(
+            "place_recommendation",
+            "public_data",
+            confidence="high",
+            requires_tool=True,
+            limitations=["운영시간·대표 메뉴·혼잡도는 별도 확인 필요"],
+        )
+    if tool_name == "get_place_detail":
+        return _answer_contract(
+            "place_detail",
+            "public_data",
+            confidence="high",
+            requires_tool=True,
+            limitations=["실시간 운영 변동은 방문 전 확인 필요"],
+        )
+    if tool_name == "verify_review":
+        return _answer_contract(
+            "claim_verification",
+            "public_data",
+            confidence="medium",
+            requires_tool=True,
+            limitations=["공공데이터에 없는 주장은 확인 불가로 분리"],
+        )
+    if tool_name == "build_pack":
+        return _answer_contract(
+            "travel_pack",
+            "public_data",
+            confidence="high",
+            requires_tool=True,
+            limitations=["데이터 부족 조합은 fallback_reason으로 분리"],
+        )
+    if tool_name == "preview_region_coverage":
+        return _answer_contract(
+            "coverage_preview",
+            "public_data",
+            confidence="high",
+            requires_tool=True,
+            limitations=["후보 수는 현재 적재된 공공데이터 기준"],
+        )
+    return _answer_contract("conversation", "agent", limitations=["사실 정보는 추가 근거 확인 필요"])
+
+
+def _pool_context(tool_name: str, args: dict, result: dict) -> dict:
+    return {
+        "tool": tool_name,
+        "args": args,
+        "result": result,
+        "contract": _contract_for_tool(tool_name),
+    }
+
+
 def _category_label(category: str | None) -> str:
     if not category:
         return "선택한 순간"
@@ -1461,7 +1558,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = _run_weather_signal(form_state)
         except Exception as e:
             result = {"available": False, "error": f"{type(e).__name__}: {e}"}
-        return {"tool": "weather_signal", "args": {}, "result": result}
+        return _pool_context("weather_signal", {}, result)
 
     detail_query = _infer_place_detail_query(conv)
     if detail_query:
@@ -1476,7 +1573,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = _run_get_place_detail(args)
         except Exception as e:
             result = {"query": detail_query, "items": [], "error": f"{type(e).__name__}: {e}"}
-        return {"tool": "get_place_detail", "args": args, "result": result}
+        return _pool_context("get_place_detail", args, result)
 
     if re.search(r"팩|일정|코스|만들|짜줘|짜 줘", last_user):
         args = {"form_state": dict(form_state or {})}
@@ -1484,7 +1581,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = _run_build_pack(args)
         except Exception as e:
             result = {"available": False, "error": f"{type(e).__name__}: {e}"}
-        return {"tool": "build_pack", "args": args, "result": result}
+        return _pool_context("build_pack", args, result)
 
     if re.search(r"리뷰|블로그|맞아|사실|검증|팩트체크", last_user):
         args = {"text": last_user}
@@ -1492,7 +1589,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = _run_verify_review(args)
         except Exception as e:
             result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
-        return {"tool": "verify_review", "args": args, "result": result}
+        return _pool_context("verify_review", args, result)
 
     if _is_web_search_question(last_user):
         args = {"query": last_user}
@@ -1509,7 +1606,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
                 "source_type": "web",
                 "error": f"{type(e).__name__}: {e}",
             }
-        return {"tool": "web_search_jeju", "args": args, "result": result}
+        return _pool_context("web_search_jeju", args, result)
 
     if re.search(r"비교|지역 추천|어디.*좋|좋아|강점|커버리지|가볼\s*만한|갈\s*만한|어디\s*갈|처음.*지역", last_user):
         regions = _infer_regions_from_text(last_user, form_state)
@@ -1519,7 +1616,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
                 result = _run_preview_region_coverage(args)
             except Exception as e:
                 result = {"regions": [], "error": f"{type(e).__name__}: {e}"}
-            return {"tool": "preview_region_coverage", "args": args, "result": result}
+            return _pool_context("preview_region_coverage", args, result)
 
     if re.search(r"폼|조건|바꾸|추천 조합|더 좋은 조합|보강", last_user):
         args = {"form_state": dict(form_state or {})}
@@ -1527,7 +1624,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = _run_suggest_form_augment(args)
         except Exception as e:
             result = {"available": False, "suggestions": [], "error": f"{type(e).__name__}: {e}"}
-        return {"tool": "suggest_form_augment", "args": args, "result": result}
+            return _pool_context("suggest_form_augment", args, result)
 
     if not _is_search_like_text(_all_user_text(conv)):
         return None
@@ -1539,7 +1636,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
         result = _run_search_places(args)
     except Exception as e:
         result = {"items": [], "error": f"{type(e).__name__}: {e}"}
-    return {"tool": "search_places", "args": args, "result": result}
+    return _pool_context("search_places", args, result)
 
 
 def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
@@ -1933,6 +2030,7 @@ class HarubanTurn:
     form_suggestion: dict | None = None              # suggest_form_update args (있을 때만)
     tool_trace: list[dict] = field(default_factory=list)  # 디버깅용
     reason: str = ""
+    answer_contract: dict = field(default_factory=dict)
 
 
 def chat_turn(
@@ -1956,6 +2054,7 @@ def chat_turn(
             available=True,
             reply_text=general_reply,
             reason="general question template",
+            answer_contract=_general_question_contract(),
         )
 
     if _should_answer_without_search(messages_in):
@@ -2023,10 +2122,17 @@ def chat_turn(
                 reply_text=_fallback_reply_from_tool_messages(conv),
                 tool_trace=trace,
                 reason="OPENAI_API_KEY not set; used search pool fallback",
+                answer_contract=search_pool.get("contract") or {},
             )
         return HarubanTurn(available=False, reason="OPENAI_API_KEY not set", tool_trace=trace)
 
-    return _chat_turn_raw(conv, trace, max_iterations, form_state)
+    return _chat_turn_raw(
+        conv,
+        trace,
+        max_iterations,
+        form_state,
+        answer_contract=(search_pool.get("contract") if search_pool else None),
+    )
 
 
 def _chat_turn_raw(
@@ -2034,6 +2140,7 @@ def _chat_turn_raw(
     trace: list[dict],
     max_iterations: int,
     form_state: dict | None = None,
+    answer_contract: dict | None = None,
 ) -> HarubanTurn:
     """openai client를 직접 사용해 conv 배열 통째 전달 + tool 실행 루프."""
     import os
@@ -2077,6 +2184,7 @@ def _chat_turn_raw(
                 reply_text=text_reply,
                 form_suggestion=form_suggestion,
                 tool_trace=trace,
+                answer_contract=answer_contract or {},
             )
 
         # 도구 호출들을 실제로 실행하고 tool role 메시지 추가.
@@ -2137,6 +2245,7 @@ def _chat_turn_raw(
         form_suggestion=form_suggestion,
         tool_trace=trace,
         reason=f"max iterations ({max_iterations}) reached",
+        answer_contract=answer_contract or {},
     )
 
 
