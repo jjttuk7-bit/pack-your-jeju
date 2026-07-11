@@ -701,6 +701,8 @@ class WebSearchResult:
     answer: str = ""
     sources: list[dict] = field(default_factory=list)
     reason: str = ""
+    queries: list[str] = field(default_factory=list)
+    research_status: str = "unavailable"
 
 
 def _source_key(source: dict) -> str:
@@ -795,8 +797,12 @@ def _extract_response_sources(resp: Any) -> list[dict]:
     return _dedupe_sources(sources)
 
 
-def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
-    """OpenAI web_search tool을 통해 최신 웹 근거를 가져온다. 실패해도 서버는 죽지 않는다."""
+def _perform_single_web_search(
+    query: str,
+    context: str = "",
+    source_class: str = "web",
+) -> WebSearchResult:
+    """하나의 검색 관점을 실행한다. 상위 함수가 실패를 병합한다."""
     import os
 
     clean_query = str(query or "").strip()
@@ -817,9 +823,15 @@ def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
     except Exception as e:
         return WebSearchResult(available=False, query=clean_query, reason=f"openai import failed: {e}")
 
+    role_instruction = {
+        "official": "공식 운영 주체·지자체·공공기관 출처를 우선 확인하세요.",
+        "platform": "지도·예약·지역 매체에서 위치와 현재 이용 정보를 확인하세요.",
+        "experience": "최근 블로그·영상·사용자 후기에서 반복되는 경험 경향을 확인하세요.",
+    }.get(source_class, "질문에 직접 관련된 신뢰 가능한 웹 출처를 확인하세요.")
     prompt = (
-        "제주 여행 질문에 대해 웹에서 확인한 출처가 있는 내용만 한국어로 짧게 답하세요. "
-        "출처가 부족하면 확인하지 못했다고 말하세요. 장소명·주소·운영시간은 출처에 있는 범위만 말하세요.\n\n"
+        "제주 여행 질문을 웹에서 조사하세요. 출처가 직접 뒷받침하는 내용만 한국어로 설명하고, "
+        "장소명·주소·운영시간·가격은 확인된 범위만 말하세요. "
+        f"{role_instruction}\n\n"
         f"질문: {clean_query}"
     )
     if clean_context:
@@ -833,20 +845,78 @@ def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
                 model=llm.MODEL,
                 tools=[{"type": tool_type}],
                 input=prompt,
-                max_output_tokens=600,
+                max_output_tokens=1400,
             )
             answer = (getattr(resp, "output_text", "") or "").strip()
-            sources = _extract_response_sources(resp)
+            sources = [
+                {**source, "source_class": source_class}
+                for source in _extract_response_sources(resp)
+            ]
             return WebSearchResult(
-                available=bool(answer or sources),
+                available=bool(sources),
                 query=clean_query,
                 answer=answer,
                 sources=sources,
-                reason="" if (answer or sources) else "web search returned no usable result",
+                reason="" if sources else "web search returned no usable source",
+                queries=[clean_query],
+                research_status="sufficient" if sources else "unavailable",
             )
         except Exception as e:
             last_error = f"{type(e).__name__}: {e}"
     return WebSearchResult(available=False, query=clean_query, reason=last_error)
+
+
+def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
+    """복수 검색 관점을 실행하고 usable source가 있는 결과만 병합한다."""
+    clean_query = str(query or "").strip()
+    if not clean_query:
+        return WebSearchResult(available=False, query=clean_query, reason="query is required")
+
+    plan = _build_web_search_plan(clean_query, context)
+    executed_queries: list[str] = []
+    results: list[WebSearchResult] = []
+    for item in plan:
+        planned_query = item["query"]
+        executed_queries.append(planned_query)
+        results.append(_perform_single_web_search(
+            planned_query,
+            context=context,
+            source_class=item["source_class"],
+        ))
+
+    successful = [result for result in results if result.available and result.sources]
+    if not successful and clean_query not in executed_queries:
+        executed_queries.append(clean_query)
+        retry = _perform_single_web_search(clean_query, context=context, source_class="web")
+        results.append(retry)
+        if retry.available and retry.sources:
+            successful.append(retry)
+
+    if not successful:
+        reasons = _unique_preserve_order([result.reason for result in results if result.reason])
+        return WebSearchResult(
+            available=False,
+            query=clean_query,
+            reason="; ".join(reasons) or "web search returned no usable source",
+            queries=executed_queries,
+            research_status="unavailable",
+        )
+
+    answers = [result.answer for result in successful if result.answer]
+    sources = _dedupe_sources([
+        source
+        for result in successful
+        for source in result.sources
+    ])
+    status = "sufficient" if len(successful) == len(results) else "partial"
+    return WebSearchResult(
+        available=True,
+        query=clean_query,
+        answer="\n\n".join(_unique_preserve_order(answers)),
+        sources=sources,
+        queries=executed_queries,
+        research_status=status,
+    )
 
 
 def _run_web_search_jeju(args: dict) -> dict:
@@ -858,6 +928,12 @@ def _run_web_search_jeju(args: dict) -> dict:
         "query": result.query,
         "answer": result.answer,
         "sources": result.sources,
+        "queries": list(getattr(result, "queries", []) or [result.query]),
+        "research_status": getattr(
+            result,
+            "research_status",
+            "sufficient" if result.available else "unavailable",
+        ),
         "source_type": "web",
         "trust_level": "web_source",
         "reason": result.reason,
