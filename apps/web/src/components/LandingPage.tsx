@@ -78,7 +78,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       제주를 담다
                     </span>
                     <span className="mt-1 block text-[11.5px] font-bold text-basalt-2/78">
-                      제주 · 신뢰 여행 준비
+                      공공데이터 AI 여행 신뢰 플랫폼
                     </span>
                   </span>
                 </button>
@@ -87,7 +87,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   onClick={enterApp}
                   className="pyj-soft-cta inline-flex items-center gap-1.5 rounded-full bg-basalt px-4 py-2 text-[12px] font-bold text-white shadow-jeju-chip transition hover:bg-basalt-2"
                 >
-                  {isUnlocked ? '대시보드로 이동' : '여행 준비 시작'}
+                  {isUnlocked ? '서비스 대시보드' : '서비스 체험하기'}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </nav>
@@ -96,20 +96,19 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <div className="relative">
                   <div className="inline-flex items-center gap-2 rounded-full border border-citrus/25 bg-citrus/10 px-3 py-1.5 text-[11px] font-bold text-citrus-2">
                     <Sparkles className="h-3.5 w-3.5" />
-                    신뢰 기반 제주 여행팩
+                    2026 제주 공공데이터·AI 창업경진대회
                   </div>
                   <h1 className="mt-5 font-serif-kr text-[44px] font-bold leading-[1.04] tracking-tight text-basalt sm:text-[58px] lg:text-[68px]">
-                    이번 제주는
+                    제주 여행 결정을
                     <br />
-                    설렘부터
+                    공공데이터와 AI로
                     <br />
-                    근거 있게
+                    검증합니다
                   </h1>
                   <p className="mt-5 max-w-2xl text-[15px] leading-8 text-basalt-2 sm:text-[17px]">
-                    떠나기 전부터 제주가 가까워지는 여행 준비.
+                    비짓제주, 기상청, 교통·주차, 콘텐츠 수정요청 데이터를 AI가 함께 읽고
                     <br className="hidden sm:block" />
-                    지역, 기간, 동행자, 여행 순간을 고르면 하루방 에이전트가
-                    여행팩에 근거를 확인해 담아드립니다.
+                    여행자의 지역·날씨·동행 조건에 맞춰 확인 가능한 후보와 재확인할 정보를 분리합니다.
                   </p>
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                     <button
@@ -117,14 +116,14 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       onClick={enterApp}
                       className="pyj-primary-cta inline-flex items-center justify-center gap-2 rounded-2xl bg-citrus px-6 py-3.5 font-serif-kr text-[15px] font-bold text-white shadow-jeju-chip transition hover:bg-citrus-2"
                     >
-                      {isUnlocked ? '내 제주팩 열기' : '제주팩 만들러 가기'}
+                      {isUnlocked ? '대시보드에서 시연 보기' : '서비스 시연 시작'}
                       <ArrowRight className="h-4 w-4" />
                     </button>
                     <a
                       href="#trust-flow"
                       className="inline-flex items-center justify-center gap-2 rounded-2xl border border-earth bg-white/75 px-6 py-3.5 text-[14px] font-bold text-basalt-2 transition hover:bg-white hover:text-basalt"
                     >
-                      신뢰 구조 보기
+                      데이터 활용 구조 보기
                       <ShieldCheck className="h-4 w-4" />
                     </a>
                   </div>
@@ -140,10 +139,10 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-citrus-2">
-                          Live Preview
+                          Competition Service Preview
                         </p>
                         <h2 className="mt-1 font-serif-kr text-[23px] font-bold text-basalt">
-                          우도 추천 미리보기
+                          비 오는 제주 일정 판정
                         </h2>
                       </div>
                       <span className="pyj-citrus-breathe">
@@ -152,31 +151,30 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     </div>
                     <div className="mt-5 space-y-3">
                       <PreviewRow
-                        icon={<CheckCircle2 className="h-4 w-4" />}
-                        title="오름 · 바다 산책"
-                        body="확인 후보가 많아 일정에 넣기 좋습니다."
+                        icon={<CloudSun className="h-4 w-4" />}
+                        title="기상청 예보 신호"
+                        body="강수·풍속 신호를 야외 일정 위험도에 반영합니다."
                         tone="verified"
                       />
                       <PreviewRow
                         icon={<AlertTriangle className="h-4 w-4" />}
-                        title="노을 감상"
-                        body="저희가 참조하는 공공데이터 기준으로 확인 근거가 부족합니다."
+                        title="수정요청 이력"
+                        body="운영·주소 변경 가능성이 있는 후보는 방문 전 재확인으로 분리합니다."
                         tone="caution"
                       />
                       <PreviewRow
                         icon={<MessageCircleQuestion className="h-4 w-4" />}
                         title="하루방 에이전트"
-                        body="선택한 지역과 순간을 기준으로 후보를 다시 조회합니다."
+                        body="DB와 웹 출처를 구분해 근거 있는 답변만 조립합니다."
                         tone="agent"
                       />
                     </div>
                     <div className="mt-5 rounded-2xl border border-earth bg-white p-4">
                       <p className="font-serif-kr text-[14px] font-bold text-basalt">
-                        "우도는 바다 산책 후보가 충분하지만, 노을은 확인 근거가 아직 약합니다."
+                        "내일 강풍 신호가 있어 오름은 낮추고, 문화·카페·시장 후보를 먼저 보겠습니다."
                       </p>
                       <p className="mt-2 text-[11.5px] leading-relaxed text-basalt-2">
-                        사용자가 팩을 다 만든 뒤가 아니라, 지역을 고르는 순간 신뢰 범위를 먼저
-                        보여주는 구조입니다.
+                        추천보다 먼저 기상·교통·수정요청 근거를 확인해 여행 실패 가능성을 줄이는 구조입니다.
                       </p>
                     </div>
                   </div>
@@ -240,30 +238,30 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
             <section id="trust-flow" className="px-5 py-16 lg:px-10">
               <div className="mx-auto max-w-6xl">
                 <SectionHeader
-                  eyebrow="Trust Engine"
-                  title="설렘을 깨지 않도록, 먼저 확인합니다."
-                  body="제주를 담다의 핵심은 더 많은 장소를 채우는 것이 아니라, 확인 가능한 정보와 아직 근거가 부족한 정보를 사용자가 구분할 수 있게 만드는 것입니다."
+                  eyebrow="Public Data Assets"
+                  title="이미 구조화된 제주 공공데이터를 실제 결정으로 바꿉니다."
+                  body="제주를 담다는 새 장소를 만들어내는 서비스가 아니라, 비짓제주·기상청·교통·수정요청 데이터를 여행자의 조건에 맞춰 판정하고 조립하는 제품입니다."
                 />
                 <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <FeatureCard
                     icon={<MapPin className="h-5 w-5" />}
-                    title="지역 줌인"
-                    body="우도·애월·성산처럼 지역을 고르면 순간별 추천 가능성과 확인 필요 항목을 먼저 보여줍니다."
+                    title="비짓제주 확장"
+                    body="관광·음식·숙박·축제·쇼핑·문화 후보를 12종 여행 순간 카드와 연결합니다."
                   />
                   <FeatureCard
-                    icon={<MessageCircleQuestion className="h-5 w-5" />}
-                    title="하루방 에이전트"
-                    body="대화 중에도 장소명과 주소는 DB 후보 안에서만 말하고, 근거가 없으면 확인 불가로 남깁니다."
+                    icon={<CloudSun className="h-5 w-5" />}
+                    title="기상 리스크"
+                    body="기상청 예보를 읽어 오름·바다 같은 야외 일정의 비·바람 위험 신호를 표시합니다."
                   />
                   <FeatureCard
-                    icon={<FileText className="h-5 w-5" />}
-                    title="플랜 파일"
-                    body="확정된 여행팩은 PDF 여행플랜으로 저장하고, 근거 링크와 데이터가 부족한 조합까지 함께 정리합니다."
+                    icon={<Route className="h-5 w-5" />}
+                    title="교통 접근성"
+                    body="주차장과 정류장 반경 신호를 붙여 실제로 갈 수 있는 후보인지 확인합니다."
                   />
                   <FeatureCard
                     icon={<Search className="h-5 w-5" />}
-                    title="리뷰 검증"
-                    body="외부 리뷰 문장은 추천 근거가 아니라 검증 대상입니다. 반증이 있으면 주의 신호로 분리합니다."
+                    title="수정요청 검증"
+                    body="콘텐츠 수정요청 이력이 있는 장소는 신뢰도를 낮추고 방문 전 확인 항목을 분리합니다."
                   />
                 </div>
               </div>
@@ -274,17 +272,17 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
-                      GPT-5-mini RAG Design
+                      AI Decision Flow
                     </p>
                     <h2 className="mt-3 font-serif-kr text-[34px] font-bold leading-tight text-basalt">
-                      모델이 답하기 전에,
+                      AI가 먼저 말하지 않고,
                       <br />
-                      근거가 먼저 줄을 섭니다.
+                      공공데이터가 먼저 판정합니다.
                     </h2>
                     <p className="mt-4 text-[14px] leading-7 text-basalt-2">
-                      제주를 담다는 GPT-5-mini에게 장소를 상상하게 하지 않습니다. 폼 입력으로 DB 후보를
-                      찾고, 공공데이터·수정요청·기상청·방문 신호를 점수화한 뒤, 모델은 조회된 근거를
-                      사용자가 읽기 쉬운 말로 정리합니다.
+                      이 서비스의 핵심은 AI 답변 자체가 아니라 AI가 공공데이터를 어떻게 의사결정으로
+                      바꾸는지입니다. 후보 조회, 날씨·이동·수정요청 판정, 확인 불가 분리를 먼저 수행하고
+                      모델은 그 결과를 사용자가 이해하기 쉬운 설명으로 정리합니다.
                     </p>
                     <div className="mt-5 rounded-3xl border border-citrus/20 bg-white p-4">
                       <span className="inline-flex items-center gap-1 rounded-full bg-citrus/10 px-2.5 py-1 text-[10px] font-bold text-citrus-2">
@@ -292,8 +290,8 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                         No Hallucination Guard
                       </span>
                       <p className="mt-3 text-[12px] leading-relaxed text-basalt-2">
-                        장소명·주소·운영 정보는 DB 조회값만 사용합니다. GPT-5-mini는 근거 요약,
-                        리뷰 claim 분해, 안내 문구 조립에만 들어갑니다.
+                        장소명·주소·운영 정보는 조회된 데이터와 웹 출처 밖에서 만들지 않습니다. AI는
+                        근거 요약, 리뷰 claim 분해, 대체 일정 설명에만 들어갑니다.
                       </p>
                     </div>
                   </div>
@@ -303,32 +301,32 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       <RagFlowStep
                         number="01"
                         icon={<Search className="h-4 w-4" />}
-                        title="구조화 입력"
-                        body="지역·기간·동행자·목적·순간카드를 폼으로 받아 검색 범위를 먼저 좁힙니다."
+                        title="여행 조건 구조화"
+                        body="지역·기간·동행자·목적·12종 순간카드를 받아 필요한 데이터 범위를 먼저 좁힙니다."
                       />
                       <RagFlowStep
                         number="02"
                         icon={<Database className="h-4 w-4" />}
-                        title="근거 검색"
-                        body="비짓제주, 수정요청, 교통·주차, 기상청 예보, 방문 신호에서 후보와 위험 신호를 가져옵니다."
+                        title="공공데이터 조회"
+                        body="비짓제주, 기상청, 주차장·정류장, 수정요청 데이터에서 후보와 위험 신호를 가져옵니다."
                       />
                       <RagFlowStep
                         number="03"
                         icon={<ShieldCheck className="h-4 w-4" />}
-                        title="신뢰도 계산"
-                        body="공공데이터 일치도, 사용자 조건, 날씨, 이동 가능성, 운영 정보, 방문 신호를 100점 루브릭으로 계산합니다."
+                        title="신뢰·위험 판정"
+                        body="날씨, 이동 가능성, 운영 정보, 수정요청 이력, 데이터 부족 여부를 분리합니다."
                       />
                       <RagFlowStep
                         number="04"
                         icon={<Sparkles className="h-4 w-4" />}
-                        title="GPT-5-mini 조립"
-                        body="모델은 검색된 후보와 점수만 받아 소개 문구, 하루방 응답, 리뷰 검증 설명을 정리합니다."
+                        title="AI 설명 조립"
+                        body="모델은 조회된 후보와 판정 결과만 받아 하루방 응답과 여행팩 설명을 조립합니다."
                       />
                       <RagFlowStep
                         number="05"
                         icon={<BookOpenCheck className="h-4 w-4" />}
-                        title="검증 가능한 결과"
-                        body="사용자는 추천 카드에서 출처, 확인 필요 항목, fallback_reason, 날씨 신호, 방문 피드백 흐름을 봅니다."
+                        title="시연 가능한 결과"
+                        body="사용자는 출처, 확인 필요 항목, 날씨 신호, 교통 접근성, 수정요청 경고를 함께 봅니다."
                       />
                     </div>
                   </div>
@@ -472,22 +470,21 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-citrus-2">
-                      제주를 담다 Trust Cycle
+                      Competition Service Loop
                     </p>
                     <h2 className="mt-3 font-serif-kr text-[36px] font-bold leading-tight text-basalt">
-                      공공데이터로 계획하고,
+                      시제품은 여행자에게,
                       <br />
-                      방문 기록으로 다시 좋아집니다.
+                      근거는 심사위원에게 보입니다.
                     </h2>
                     <p className="mt-4 text-[14px] leading-7 text-basalt-2">
-                      제주를 담다는 추천에서 끝나지 않습니다. 공공데이터로 만든 여행플랜을
-                      사용자가 실제로 실행하고, 방문 기록과 수정 신호가 다시 하루방 에이전트의
-                      신뢰 신호로 돌아오는 순환형 AI 여행플랜 서비스입니다.
+                      제품·서비스 개발 부문에서 중요한 것은 완성된 화면과 실제 시연입니다. 제주를 담다는
+                      사용자가 여행팩을 만들고, 심사위원은 그 뒤의 공공데이터·AI 판정 흐름을 함께 볼 수 있게
+                      설계했습니다.
                     </p>
                     <div className="mt-5 rounded-2xl border border-citrus/20 bg-citrus/8 p-4">
                       <p className="font-serif-kr text-[15px] font-bold leading-relaxed text-basalt">
-                        “공공데이터로 여행을 계획하고, 실제 방문 기록으로 제주 여행 신뢰도를
-                        다시 키우는 서비스”
+                        “제주 공공데이터를 여행자의 선택 언어로 바꾸는 AI 서비스”
                       </p>
                     </div>
                   </div>
@@ -525,43 +522,43 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       <CycleNode
                         step="01"
                         icon={<CloudSun className="h-4 w-4" />}
-                        title="공공데이터 API"
-                        body="관광·교통·기상·수정요청 데이터를 1차 근거로 수집합니다."
+                        title="공공데이터 자산"
+                        body="비짓제주·기상청·교통·수정요청 데이터를 1차 근거로 사용합니다."
                         order={0}
                       />
                       <CycleNode
                         step="02"
                         icon={<Database className="h-4 w-4" />}
-                        title="정보 기반 정리"
-                        body="지역·순간별 확인 후보와 데이터 부족 범위를 나눕니다."
+                        title="구조화·정규화"
+                        body="지역·카테고리·날짜·접근성 기준으로 후보와 부족 범위를 나눕니다."
                         order={1}
                       />
                       <CycleNode
                         step="03"
                         icon={<MessageCircleQuestion className="h-4 w-4" />}
-                        title="하루방 에이전트"
-                        body="DB 후보 안에서 상담하고, 조건에 맞는 대안을 조율합니다."
+                        title="AI 의사결정"
+                        body="하루방이 조건에 맞는 후보, 대체안, 재확인 항목을 설명합니다."
                         order={2}
                       />
                       <CycleNode
                         step="04"
                         icon={<Route className="h-4 w-4" />}
-                        title="여행플랜 생성"
-                        body="Day별 플랜, 지도, PDF, 공유 텍스트로 실행 가능하게 만듭니다."
+                        title="여행팩 생성"
+                        body="날씨·교통·수정요청 신호가 붙은 실행 가능한 코스로 만듭니다."
                         order={3}
                       />
                       <CycleNode
                         step="05"
                         icon={<Camera className="h-4 w-4" />}
-                        title="방문 기록"
-                        body="사용자의 체크인·메모·사진·수정 요청이 구조화됩니다."
+                        title="사용자 피드백"
+                        body="방문 메모와 수정 의견은 내부 검토 신호로 분리해 저장합니다."
                         order={4}
                       />
                       <CycleNode
                         step="06"
                         icon={<ShieldCheck className="h-4 w-4" />}
-                        title="신뢰 신호 강화"
-                        body="최근 방문 확인이 다음 여행자의 플랜과 상담에 반영됩니다."
+                        title="사업화 확장"
+                        body="지역 소비 분산, 기관 데이터 활용 사례, B2B 리포트로 확장합니다."
                         tone="mint"
                         order={5}
                       />
@@ -577,20 +574,20 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                   eyebrow="How It Works"
                   title={
                     <>
-                      사용자는 여행을 고르고,
+                      사용자는 여행팩을 만들고,
                       <br />
-                      시스템은 근거를 고릅니다.
+                      심사위원은 근거를 확인합니다.
                     </>
                   }
-                  body="경진대회 버전의 방향성은 단순 추천앱이 아니라 지역별 근거 현황, 신뢰기반 RAG, 사용자 기록이 다시 신뢰 신호가 되는 순환 구조입니다."
+                  body="랜딩은 홍보 페이지가 아니라 제품 시연의 입구입니다. 첫 클릭부터 지역 선택, 공공데이터 후보, AI 판정, PDF 플랜까지 실제 흐름으로 이어집니다."
                 />
                 <div className="mt-8 grid gap-4 lg:grid-cols-5">
                   {[
-                    ['1', '지역 선택', '지역별 근거 현황과 약한 순간을 먼저 확인합니다.'],
-                    ['2', '하루방 에이전트', '매 턴 DB 후보를 다시 조회해 자연어로 조립합니다.'],
-                    ['3', '여행팩 생성', '근거 배지와 접근성 신호를 포함해 일정으로 묶습니다.'],
-                    ['4', '여행플랜 저장', '현재 확정 버전을 따라가기 쉬운 PDF 플랜으로 정리합니다.'],
-                    ['5', '방문 기록', '체크인 데이터가 다음 추천의 신뢰 신호가 됩니다.'],
+                    ['1', '지역 선택', '제주 12권역별 공공데이터 후보와 약한 순간을 먼저 확인합니다.'],
+                    ['2', '조건 입력', '기간·동행·목적·12종 순간 카드로 필요한 데이터 범위를 좁힙니다.'],
+                    ['3', 'AI 판정', '날씨, 이동, 수정요청, 데이터 부족 신호를 분리합니다.'],
+                    ['4', '여행팩 생성', '근거 배지와 접근성 신호를 포함해 일정으로 묶습니다.'],
+                    ['5', '시연·제출', 'PDF 플랜과 데이터 활용 근거로 제품 완성도를 설명합니다.'],
                   ].map(([step, title, body]) => (
                     <div key={step} className="rounded-2xl border border-orange-100/70 bg-white p-4 shadow-sm">
                       <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-citrus text-[13px] font-bold text-white">
@@ -609,14 +606,14 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full bg-citrus/10 px-3 py-1.5 text-[11px] font-bold text-citrus-2">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Open Dashboard
+                    Competition Demo
                   </div>
                   <h2 className="mt-4 font-serif-kr text-[31px] font-bold leading-tight text-basalt">
-                    이제 실제 여행팩을 만들어 볼 차례입니다.
+                    이제 실제 서비스 시연으로 들어갑니다.
                   </h2>
                   <p className="mt-3 max-w-2xl text-[14px] leading-7 text-basalt-2">
-                    진입하면 지역 정밀 설정, 하루방 에이전트 추천, 근거 기반 장소 카드, PDF 여행플랜까지
-                    한 흐름으로 확인할 수 있습니다.
+                    진입하면 지역 정밀 설정, 하루방 에이전트, 근거 기반 장소 카드, 날씨·교통·수정요청 신호,
+                    PDF 여행플랜까지 한 흐름으로 확인할 수 있습니다.
                   </p>
                 </div>
 
