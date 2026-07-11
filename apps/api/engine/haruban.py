@@ -1262,16 +1262,78 @@ def _template_free_advice(last_user: str) -> str:
     if "제주시" in last_user:
         return (
             "제주시는 처음 여행에서 동선을 잡기 좋은 출발점이에요. "
-            "먼저 공항에서 가까운 권역, 바다 산책, 오름 산책, 로컬 시장, 조용한 카페처럼 "
+            "도착일에는 공항에서 가까운 원도심·해안 산책 흐름을 가볍게 잡고, 바다 산책, 오름 산책, 로컬 시장, 조용한 카페처럼 "
             "원하는 순간을 1~2개만 고른 뒤 지도에서 지역을 선택해 보세요. "
             "구체적인 장소명은 공공데이터로 확인되는 후보만 따로 좁혀드릴게요."
         )
     return (
-        "제주가 처음이라면 지역을 먼저 넓게 나누고, 하루에 한 권역만 잡는 방식이 좋아요. "
-        "첫째 날은 도착 시간에 맞춰 가벼운 산책이나 카페, 둘째 날은 오름·바다·시장 중 핵심 순간, "
+        "제주가 처음이라면 제주시, 애월·한림, 성산·구좌, 서귀포처럼 지역을 먼저 넓게 나누고 하루에 한 권역만 잡는 방식이 좋아요. "
+        "첫째 날은 제주시나 공항 근처에서 가볍게 시작하고, 둘째 날은 성산·구좌의 오름·바다나 애월·한림의 카페·해안 중 하나를 고르는 식이 안정적입니다. "
         "마지막 날은 공항 이동을 고려한 짧은 코스로 잡아보세요. "
         "지도에서 지역과 담고 싶은 순간을 고르면 확인된 후보만 근거와 함께 좁혀드릴게요."
     )
+
+
+def _is_specific_fact_or_search_question(text_in: str) -> bool:
+    return bool(re.search(
+        r"추천|맛집|식당|카페|오름|바다|바닷가|해변|해수욕장|해산물|해물|점심|저녁|"
+        r"몇\s*개|몇\s*곳|리스트|후보|한\s*곳|한곳|하나|가볼\s*만한|갈\s*만한|"
+        r"운영시간|휴무|폐업|축제|행사|공연|이벤트|리뷰|블로그|검증|팩트체크|"
+        r"주소|주차|정류소|대중교통|수정\s*요청|수정요청",
+        text_in,
+    ))
+
+
+def _template_general_question_answer(last_user: str) -> str:
+    if re.search(r"제주\s*공항|제주국제공항", last_user) and re.search(
+        r"어느\s*지역|어디\s*지역|지역에\s*있|어디에\s*있|위치|권역",
+        last_user,
+    ):
+        return (
+            "제주공항은 여행 권역으로 보면 제주시 쪽에 있어요. "
+            "도착일이나 출발일에는 제주시 권역을 가볍게 잡는 편이 동선이 편합니다. "
+            "다만 특정 숙소·식당·운영시간처럼 바뀔 수 있는 정보는 공공데이터나 웹 출처로 따로 확인해서 안내할게요."
+        )
+
+    if "제주시" in last_user and re.search(r"처음|흐름|동선|어떻게|시작", last_user):
+        return (
+            "제주시는 공항을 기준으로 도착일이나 출발일 동선을 잡기 좋은 권역이에요. "
+            "처음이라면 공항 근처에서 시작해 원도심, 해안 산책, 시장이나 카페처럼 부담이 작은 흐름으로 잡는 편이 좋습니다. "
+            "구체적인 장소는 지역과 순간을 고르면 제주를 담다가 확인한 공공데이터 기준 후보만 골라드릴게요."
+        )
+
+    if re.search(r"제주.*처음|처음.*제주", last_user) and re.search(r"지역|어디|권역|좋", last_user):
+        return (
+            "제주가 처음이라면 제주시, 애월·한림, 성산·구좌, 서귀포를 큰 권역으로 나눠 보면 좋아요. "
+            "공항 접근성과 짧은 동선은 제주시, 카페·해안 흐름은 애월·한림, 오름·일출·바다 조합은 성산·구좌, 폭포·남쪽 바다는 서귀포가 잡기 쉽습니다. "
+            "하루에 한 권역만 잡고, 선택한 지역에서 공공데이터로 확인되는 장소 후보를 좁히는 방식이 가장 안정적입니다."
+        )
+
+    if re.search(r"공항.*근처|근처.*공항|도착일|출발일", last_user) and not _is_specific_fact_or_search_question(last_user):
+        return (
+            "도착일과 출발일은 공항 이동 시간을 먼저 비워두고 제주시 권역에서 짧게 보는 흐름이 안전해요. "
+            "짐 이동이 있으면 바다·오름처럼 이동 시간이 긴 순간보다 카페, 시장, 가벼운 산책을 앞에 두는 편이 좋습니다. "
+            "장소 후보는 지역과 순간을 고르면 공공데이터 기준으로 확인되는 곳만 따로 좁혀드릴게요."
+        )
+
+    return ""
+
+
+def _try_general_question_answer(messages_in: list[dict]) -> str:
+    conv = [
+        {"role": m.get("role"), "content": m.get("content") or ""}
+        for m in messages_in
+        if m.get("role") in {"user", "assistant"}
+    ]
+    last_user = _latest_user_text(conv)
+    if not last_user:
+        return ""
+    if _infer_place_detail_query(conv):
+        return ""
+    airport_question = bool(re.search(r"제주\s*공항|제주국제공항", last_user))
+    if not airport_question and _is_specific_fact_or_search_question(last_user):
+        return ""
+    return _template_general_question_answer(last_user)
 
 
 def _category_label(category: str | None) -> str:
@@ -1888,6 +1950,14 @@ def chat_turn(
     llm.complete_with_tools는 단일 system/user만 받아서, 여기서는 openai 클라이언트를
     직접 사용해 conv 배열 통째로 전달하고 도구 실행 루프를 돌린다. 모델·키 규칙은 유지.
     """
+    general_reply = _try_general_question_answer(messages_in)
+    if general_reply:
+        return HarubanTurn(
+            available=True,
+            reply_text=general_reply,
+            reason="general question template",
+        )
+
     if _should_answer_without_search(messages_in):
         last_user = next(
             (m.get("content") or "" for m in reversed(messages_in) if m.get("role") == "user"),

@@ -201,6 +201,73 @@ def test_haruban_routes_airport_region_question_to_web_search(monkeypatch):
     assert result["result"]["sources"][0]["title"] == "한국공항공사"
 
 
+def test_haruban_answers_airport_region_without_api_key(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+
+    result = haruban.chat_turn(
+        [{"role": "user", "content": "제주공항은 어느 지역에 있어?"}],
+        {},
+    )
+
+    assert result.available is True
+    assert "제주시" in result.reply_text
+    assert "공항" in result.reply_text
+    assert "호텔" not in result.reply_text
+    assert "웹에서 바로 확인" not in result.reply_text
+
+
+def test_haruban_answers_first_jeju_region_guide_without_api_key(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+
+    result = haruban.chat_turn(
+        [{"role": "user", "content": "제주는 처음인데 어떤 지역이 좋아?"}],
+        {},
+    )
+
+    assert result.available is True
+    assert "제주시" in result.reply_text
+    assert "성산" in result.reply_text
+    assert "애월" in result.reply_text
+    assert "공공데이터" in result.reply_text
+
+
+def test_haruban_answers_broad_jeju_city_guide_without_api_key(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+
+    result = haruban.chat_turn(
+        [{"role": "user", "content": "제주시를 처음 보면 어떤 흐름이 좋아?"}],
+        {},
+    )
+
+    assert result.available is True
+    assert "공항" in result.reply_text
+    assert "원도심" in result.reply_text
+    assert "장소" in result.reply_text
+
+
+def test_haruban_general_question_router_does_not_capture_place_recommendations(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_search_places",
+        lambda args: {
+            "intent": args.get("intent"),
+            "total_count": 1,
+            "regions": args.get("regions"),
+            "category": args.get("category"),
+            "items": [{"name": "테스트식당", "address": "제주시"}],
+        },
+    )
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+
+    result = haruban.chat_turn(
+        [{"role": "user", "content": "제주시 맛집 한 곳 추천해줘"}],
+        {},
+    )
+
+    assert "테스트식당" in result.reply_text
+    assert "한 곳만" in result.reply_text
+
+
 def test_haruban_augment_runner_serializes_suggestions(monkeypatch):
     class FakeSuggestion:
         field = "moments"
