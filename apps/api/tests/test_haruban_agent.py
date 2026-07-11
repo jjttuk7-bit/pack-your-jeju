@@ -156,6 +156,32 @@ def test_haruban_web_search_runner_serializes_sources(monkeypatch):
     assert result["sources"][0]["url"] == "https://www.visitjeju.net/"
 
 
+def test_build_web_search_plan_covers_source_roles():
+    plan = haruban._build_web_search_plan("구좌 맛집 추천", "혼자 점심")
+
+    assert 2 <= len(plan) <= 3
+    assert {item["source_class"] for item in plan} >= {"official", "experience"}
+    assert len({item["query"] for item in plan}) == len(plan)
+    assert all("구좌" in item["query"] for item in plan)
+
+
+def test_dedupe_sources_adds_class_and_checked_at():
+    sources = haruban._dedupe_sources([
+        {
+            "title": "비짓제주",
+            "url": "https://www.visitjeju.net/kr/detail/view?contentsid=1",
+        },
+        {
+            "title": "비짓제주 중복",
+            "url": "https://www.visitjeju.net/kr/detail/view?contentsid=1",
+        },
+    ])
+
+    assert len(sources) == 1
+    assert sources[0]["source_class"] == "official"
+    assert sources[0]["checked_at"]
+
+
 def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
     monkeypatch.setattr(
         haruban,

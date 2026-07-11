@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy import text
 
@@ -706,9 +707,60 @@ def _source_key(source: dict) -> str:
     return str(source.get("url") or source.get("title") or "").strip().lower()
 
 
+def _classify_web_source(url: str, title: str = "", snippet: str = "") -> str:
+    host = urlparse(url).netloc.lower()
+    text_in = f"{title} {snippet}".lower()
+    if (
+        host.endswith(".go.kr")
+        or host.endswith("visitjeju.net")
+        or any(cue in text_in for cue in ("공식 홈페이지", "공식 사이트", "제주특별자치도", "관광공사"))
+    ):
+        return "official"
+    if any(cue in host for cue in ("map.naver", "place.map.kakao", "booking", "catchtable")):
+        return "platform"
+    if any(cue in host for cue in ("blog.", "youtube.com", "youtu.be", "instagram.com")):
+        return "experience"
+    if any(cue in text_in for cue in ("블로그", "후기", "리뷰", "방문기")):
+        return "experience"
+    if any(cue in text_in for cue in ("지도", "예약", "지역 매체")):
+        return "platform"
+    return "web"
+
+
+def _build_web_search_plan(query: str, context: str = "") -> list[dict]:
+    clean_query = str(query or "").strip()
+    clean_context = str(context or "").strip()
+    if not clean_query:
+        return []
+    context_hint = f" {clean_context}" if clean_context else ""
+    candidates = [
+        {
+            "source_class": "official",
+            "query": f"{clean_query} 공식 운영 정보{context_hint}".strip(),
+        },
+        {
+            "source_class": "platform",
+            "query": f"{clean_query} 지도 예약 영업 상태{context_hint}".strip(),
+        },
+        {
+            "source_class": "experience",
+            "query": f"{clean_query} 최근 방문 후기 분위기{context_hint}".strip(),
+        },
+    ]
+    seen: set[str] = set()
+    result: list[dict] = []
+    for item in candidates:
+        key = item["query"].lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result[:3]
+
+
 def _dedupe_sources(sources: list[dict]) -> list[dict]:
     seen: set[str] = set()
     result: list[dict] = []
+    checked_at = datetime.now(timezone.utc).isoformat()
     for source in sources:
         url = str(source.get("url") or "").strip()
         title = str(source.get("title") or "").strip()
@@ -719,11 +771,16 @@ def _dedupe_sources(sources: list[dict]) -> list[dict]:
         if key in seen:
             continue
         seen.add(key)
-        item = {"title": title or url, "url": url}
+        item = {
+            "title": title or url,
+            "url": url,
+            "source_class": source.get("source_class") or _classify_web_source(url, title, snippet),
+            "checked_at": source.get("checked_at") or checked_at,
+        }
         if snippet:
             item["snippet"] = snippet
         result.append(item)
-    return result[:5]
+    return result[:8]
 
 
 def _extract_response_sources(resp: Any) -> list[dict]:
