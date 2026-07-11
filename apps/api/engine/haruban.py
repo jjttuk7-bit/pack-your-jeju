@@ -1178,6 +1178,48 @@ def _is_web_search_question(text_in: str) -> bool:
     ))
 
 
+def _is_explicit_public_data_question(text_in: str) -> bool:
+    return bool(re.search(
+        r"공공\s*데이터|내부\s*데이터|DB\s*기준|데이터\s*기준|후보\s*(?:수|개수)",
+        text_in,
+        re.IGNORECASE,
+    ))
+
+
+def _conversation_has_web_intent(conv: list[dict]) -> bool:
+    recent = conv[-6:]
+    prior_messages = recent[:-1] if recent and recent[-1].get("role") == "user" else recent
+    return any(
+        (
+            message.get("role") == "user"
+            and _is_web_search_question(message.get("content") or "")
+        )
+        or (
+            message.get("role") == "assistant"
+            and "웹 출처" in (message.get("content") or "")
+        )
+        for message in prior_messages
+    )
+
+
+def _should_use_web_research(conv: list[dict]) -> bool:
+    last_user = _latest_user_text(conv)
+    if _is_explicit_public_data_question(last_user):
+        return False
+    if _is_web_search_question(last_user):
+        return True
+    recommendation = bool(re.search(
+        r"추천|맛집|식당|카페|오름|관광|여행지|명소|해변|바다|시장|"
+        r"어디|정보|가장|베스트|더\s*(?:알려|추천)|비교",
+        last_user,
+    ))
+    contextual_followup = bool(re.search(
+        r"그중|그\s*중|하나만|한\s*곳|다른\s*곳|또|그러면|그럼",
+        last_user,
+    ))
+    return recommendation or (contextual_followup and _conversation_has_web_intent(conv))
+
+
 def _infer_place_detail_query(conv: list[dict]) -> str:
     last_user = _latest_user_text(conv).strip()
     if not last_user:
@@ -1591,7 +1633,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
         return _pool_context("verify_review", args, result)
 
-    if _is_web_search_question(last_user):
+    if _should_use_web_research(conv):
         args = {"query": last_user}
         filled = {k: v for k, v in (form_state or {}).items() if v not in (None, "", [], 0)}
         if filled:

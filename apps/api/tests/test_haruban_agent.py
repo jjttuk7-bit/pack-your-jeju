@@ -179,6 +179,96 @@ def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
     assert result["result"]["sources"][0]["title"] == "Visit Jeju"
 
 
+def test_haruban_keeps_web_intent_for_oreum_followup(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "구좌 오름을 웹 출처로 확인했습니다.",
+            "sources": [{"title": "Visit Jeju", "url": "https://www.visitjeju.net/"}],
+            "source_type": "web",
+        },
+    )
+    conv = [
+        {"role": "user", "content": "구좌에서 가볼 만한 지역들을 알려줘"},
+        {"role": "assistant", "content": "웹 출처를 확인해 구좌를 정리했습니다."},
+        {"role": "user", "content": "구좌의 오름들 정보는?"},
+    ]
+
+    result = haruban._build_search_pool_context(conv, {})
+
+    assert result["tool"] == "web_search_jeju"
+    assert "오름" in result["args"]["query"]
+
+
+def test_haruban_keeps_web_intent_for_restaurant_followup(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "구좌 맛집을 웹 출처로 확인했습니다.",
+            "sources": [{"title": "지역 매체", "url": "https://example.com/gujwa"}],
+            "source_type": "web",
+        },
+    )
+    conv = [
+        {"role": "user", "content": "구좌에서 가볼 만한 지역들을 알려줘"},
+        {"role": "assistant", "content": "웹 출처를 확인해 구좌를 정리했습니다."},
+        {"role": "user", "content": "구좌에서 가장 맛집은?"},
+    ]
+
+    result = haruban._build_search_pool_context(conv, {})
+
+    assert result["tool"] == "web_search_jeju"
+    assert "맛집" in result["args"]["query"]
+
+
+def test_haruban_routes_direct_restaurant_recommendation_to_web(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "제주시 맛집을 웹 출처로 비교했습니다.",
+            "sources": [{"title": "지역 매체", "url": "https://example.com/jeju"}],
+            "source_type": "web",
+        },
+    )
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "제주시 맛집 한 곳 추천해줘"}],
+        {},
+    )
+
+    assert result["tool"] == "web_search_jeju"
+
+
+def test_explicit_public_data_request_still_routes_to_search_places(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_search_places",
+        lambda args: {
+            "intent": args.get("intent"),
+            "total_count": 2,
+            "regions": args.get("regions"),
+            "category": args.get("category"),
+            "items": [{"name": "안돌오름", "address": "제주시 구좌읍"}],
+        },
+    )
+
+    result = haruban._build_search_pool_context(
+        [{"role": "user", "content": "공공데이터 기준으로 구좌 오름 후보 수를 알려줘"}],
+        {},
+    )
+
+    assert result["tool"] == "search_places"
+
+
 def test_haruban_routes_airport_region_question_to_web_search(monkeypatch):
     monkeypatch.setattr(
         haruban,
@@ -245,16 +335,16 @@ def test_haruban_answers_broad_jeju_city_guide_without_api_key(monkeypatch):
     assert "장소" in result.reply_text
 
 
-def test_haruban_general_question_router_does_not_capture_place_recommendations(monkeypatch):
+def test_haruban_general_question_router_sends_place_recommendations_to_web(monkeypatch):
     monkeypatch.setattr(
         haruban,
-        "_run_search_places",
+        "_run_web_search_jeju",
         lambda args: {
-            "intent": args.get("intent"),
-            "total_count": 1,
-            "regions": args.get("regions"),
-            "category": args.get("category"),
-            "items": [{"name": "테스트식당", "address": "제주시"}],
+            "available": True,
+            "query": args["query"],
+            "answer": "제주시 맛집 한 곳을 웹 출처로 비교했습니다.",
+            "sources": [{"title": "지역 매체", "url": "https://example.com/jeju"}],
+            "source_type": "web",
         },
     )
     monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
@@ -264,8 +354,8 @@ def test_haruban_general_question_router_does_not_capture_place_recommendations(
         {},
     )
 
-    assert "테스트식당" in result.reply_text
-    assert "한 곳만" in result.reply_text
+    assert "웹 출처" in result.reply_text
+    assert "공공데이터 기준 후보" not in result.reply_text
 
 
 def test_haruban_general_question_has_answer_contract(monkeypatch):
@@ -305,13 +395,13 @@ def test_haruban_search_pool_contract_for_weather(monkeypatch):
 def test_haruban_search_pool_contract_for_place_recommendation(monkeypatch):
     monkeypatch.setattr(
         haruban,
-        "_run_search_places",
+        "_run_web_search_jeju",
         lambda args: {
-            "intent": args.get("intent"),
-            "total_count": 1,
-            "regions": args.get("regions"),
-            "category": args.get("category"),
-            "items": [{"name": "테스트식당", "address": "제주시"}],
+            "available": True,
+            "query": args["query"],
+            "answer": "제주시 맛집을 웹 출처로 비교했습니다.",
+            "sources": [{"title": "지역 매체", "url": "https://example.com/jeju"}],
+            "source_type": "web",
         },
     )
 
@@ -320,9 +410,9 @@ def test_haruban_search_pool_contract_for_place_recommendation(monkeypatch):
         {},
     )
 
-    assert result["tool"] == "search_places"
-    assert result["contract"]["answer_type"] == "place_recommendation"
-    assert result["contract"]["source_type"] == "public_data"
+    assert result["tool"] == "web_search_jeju"
+    assert result["contract"]["answer_type"] == "fresh_web"
+    assert result["contract"]["source_type"] == "web"
 
 
 def test_haruban_search_pool_contract_for_web_search(monkeypatch):
