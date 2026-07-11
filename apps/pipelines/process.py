@@ -281,25 +281,25 @@ UPSERT_PLACE_SQL = text(
 def upsert_places(rows: list[ProcessedPlace]) -> int:
     if not rows:
         return 0
+    params = [
+        {
+            "external_id": r.external_id,
+            "name": r.name,
+            "category": r.category,
+            "region": r.region_normalized,
+            "address": r.address,
+            "lat": r.lat,
+            "lng": r.lng,
+            "info_type": r.info_type,
+            "valid_until": r.valid_until,
+            "amenities": json.dumps(r.amenities, ensure_ascii=False),
+            "source_url": r.source_url,
+        }
+        for r in rows
+    ]
     engine = db.get_engine()
     with engine.begin() as conn:
-        for r in rows:
-            conn.execute(
-                UPSERT_PLACE_SQL,
-                {
-                    "external_id": r.external_id,
-                    "name": r.name,
-                    "category": r.category,
-                    "region": r.region_normalized,
-                    "address": r.address,
-                    "lat": r.lat,
-                    "lng": r.lng,
-                    "info_type": r.info_type,
-                    "valid_until": r.valid_until,
-                    "amenities": json.dumps(r.amenities, ensure_ascii=False),
-                    "source_url": r.source_url,
-                },
-            )
+        conn.execute(UPSERT_PLACE_SQL, params)
     return len(rows)
 
 

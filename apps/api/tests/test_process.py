@@ -184,3 +184,34 @@ def test_process_item_phone_kept_when_real():
     p = proc.process_item(_base(phoneno="064-000-0000"), fetched_at=fetched_at)
     assert p is not None
     assert p.amenities["phone"] == "064-000-0000"
+
+
+def test_upsert_places_uses_single_batch_execute(monkeypatch):
+    fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
+    rows = [
+        proc.process_item(_base(contentsid=f"CNTS_{i}"), fetched_at=fetched_at)
+        for i in range(2)
+    ]
+    calls = []
+
+    class FakeConnection:
+        def execute(self, statement, params):
+            calls.append((statement, params))
+
+    class FakeBegin:
+        def __enter__(self):
+            return FakeConnection()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeEngine:
+        def begin(self):
+            return FakeBegin()
+
+    monkeypatch.setattr(proc.db, "get_engine", lambda: FakeEngine())
+
+    assert proc.upsert_places([row for row in rows if row is not None]) == 2
+    assert len(calls) == 1
+    assert isinstance(calls[0][1], list)
+    assert len(calls[0][1]) == 2
