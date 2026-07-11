@@ -4,15 +4,24 @@ from datetime import date
 from apps.api.engine import haruban
 
 
-def test_haruban_prompt_frames_gpt_5_mini_rag_agent():
+def test_haruban_prompt_frames_web_research_agent():
     prompt = haruban._BASE_SYSTEM_PROMPT
     assert "gpt-5-mini" in prompt
-    assert "RAG" in prompt
     assert "도구" in prompt
     assert "total_count" in prompt
-    assert "사용자의 자연어 질문을 먼저 이해" in prompt
-    assert "제주를 담다가 확인한 공공데이터 기준" in prompt
+    assert "이전 대화 맥락" in prompt
+    assert "웹 리서치" in prompt
+    assert "공공데이터 교차확인" in prompt
     assert "저희 DB/RAG 검색 기준" not in prompt
+
+
+def test_haruban_prompt_uses_web_research_answer_contract():
+    prompt = haruban._BASE_SYSTEM_PROMPT
+
+    assert "카카오·네이버·블로그 리뷰를 근거로 삼지 마라" not in prompt
+    assert "정보가 없으면 '저희가 참조하는 공공데이터 기준" not in prompt
+    for phrase in ("직접 결론", "후보별", "비교", "주의", "출처", "공공데이터 교차확인"):
+        assert phrase in prompt
 
 
 def test_search_places_tool_supports_count_questions():
@@ -255,6 +264,50 @@ def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
     assert result["tool"] == "web_search_jeju"
     assert "요즘" in result["args"]["query"]
     assert result["result"]["sources"][0]["title"] == "Visit Jeju"
+
+
+def test_web_failure_fallback_does_not_substitute_public_data_candidates():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "구좌에서 가장 맛집은?"},
+        {
+            "role": "tool",
+            "name": "web_search_jeju",
+            "content": json.dumps({
+                "available": False,
+                "research_status": "unavailable",
+                "reason": "web search returned no usable source",
+                "sources": [],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "웹 출처" in reply
+    assert "지역이나 순간을 하나 고르면" not in reply
+    assert "공공데이터 후보" not in reply
+
+
+def test_partial_web_fallback_discloses_partial_result_and_source_role():
+    reply = haruban._fallback_reply_from_tool_messages([
+        {"role": "user", "content": "구좌 오름을 알려줘"},
+        {
+            "role": "tool",
+            "name": "web_search_jeju",
+            "content": json.dumps({
+                "available": True,
+                "research_status": "partial",
+                "answer": "공식 출처에서 구좌 오름 한 곳을 확인했습니다.",
+                "sources": [{
+                    "title": "제주 안내",
+                    "url": "https://example.go.kr/oreum",
+                    "source_class": "official",
+                }],
+            }, ensure_ascii=False),
+        },
+    ])
+
+    assert "일부" in reply
+    assert "공식" in reply
+    assert reply.count("https://example.go.kr/oreum") == 1
 
 
 def test_haruban_keeps_web_intent_for_oreum_followup(monkeypatch):
