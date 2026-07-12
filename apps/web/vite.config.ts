@@ -24,10 +24,10 @@ export default defineConfig(() => {
         ],
         manifest: {
           id: '/',
-          name: 'Pack Your Jeju',
-          short_name: 'PYJ',
+          name: '제주를 담다',
+          short_name: '제주를 담다',
           description:
-            '제주 특화 · 근거로 검증된 여행 준비. 짐 싸기 전에, 그 순간이 진짜인지부터 확인합니다.',
+            '가고 싶은 순간을 고르면 나만의 제주 여행이 시작됩니다.',
           start_url: '/',
           scope: '/',
           display: 'standalone',
@@ -58,7 +58,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+          globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,woff2}'],
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [
             /^\/api\//,
