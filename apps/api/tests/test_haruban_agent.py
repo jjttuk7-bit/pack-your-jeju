@@ -240,6 +240,51 @@ def test_extract_response_sources_supports_dict_url_citations():
     assert sources[0]["title"] == "성산 식당"
 
 
+def test_single_web_search_forces_search_with_explicit_jeju_region_context(monkeypatch):
+    captured = {}
+    response = SimpleNamespace(
+        output_text="성산읍 맛집을 웹에서 확인했습니다.",
+        output=[{
+            "type": "message",
+            "content": [{
+                "type": "output_text",
+                "text": "성산읍 맛집을 웹에서 확인했습니다.",
+                "annotations": [{
+                    "type": "url_citation",
+                    "url": "https://example.com/seongsan-food",
+                    "title": "성산읍 맛집",
+                }],
+            }],
+        }],
+    )
+
+    class FakeResponses:
+        @staticmethod
+        def create(**kwargs):
+            captured.update(kwargs)
+            return response
+
+    monkeypatch.setattr(
+        openai,
+        "OpenAI",
+        lambda **_kwargs: SimpleNamespace(responses=FakeResponses()),
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    result = haruban._perform_single_web_search(
+        "성산의 맛집들은?",
+        context='{"regions": ["seongsan"]}',
+    )
+
+    assert result.available is True
+    assert captured["tool_choice"] == "required"
+    assert captured["max_tool_calls"] == 2
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["max_output_tokens"] >= 4000
+    assert "제주특별자치도 서귀포시 성산읍" in captured["input"]
+    assert "되묻지" in captured["input"]
+
+
 def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
     captured = {}
 

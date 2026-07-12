@@ -55,6 +55,21 @@ REGION_LABEL_KO: dict[str, str] = {
     "udo":       "우도",
 }
 
+WEB_REGION_CONTEXT_KO: dict[str, str] = {
+    "jeju_city": "제주특별자치도 제주시 도심권",
+    "seogwipo": "제주특별자치도 서귀포시 도심권",
+    "aewol": "제주특별자치도 제주시 애월읍",
+    "hallim": "제주특별자치도 제주시 한림읍",
+    "seongsan": "제주특별자치도 서귀포시 성산읍(성산일출봉 일대)",
+    "jocheon": "제주특별자치도 제주시 조천읍",
+    "gujwa": "제주특별자치도 제주시 구좌읍",
+    "andeok": "제주특별자치도 서귀포시 안덕면",
+    "daejeong": "제주특별자치도 서귀포시 대정읍",
+    "pyoseon": "제주특별자치도 서귀포시 표선면",
+    "namwon": "제주특별자치도 서귀포시 남원읍",
+    "udo": "제주특별자치도 제주시 우도면",
+}
+
 COMPANION_LABEL_KO: dict[str, str] = {
     "solo":    "혼자",
     "couple":  "연인과",
@@ -808,6 +823,28 @@ def _extract_response_sources(resp: Any) -> list[dict]:
     return _dedupe_sources(sources)
 
 
+def _web_search_context_text(context: str) -> str:
+    clean_context = str(context or "").strip()
+    if not clean_context:
+        return ""
+    try:
+        payload = json.loads(clean_context)
+    except (TypeError, ValueError):
+        return clean_context
+    if not isinstance(payload, dict):
+        return clean_context
+
+    regions = payload.get("regions") or []
+    if isinstance(regions, str):
+        regions = [regions]
+    region_names = [WEB_REGION_CONTEXT_KO.get(str(region), str(region)) for region in regions]
+    details = [f"여행 지역: {', '.join(region_names)}"] if region_names else []
+    remaining = {key: value for key, value in payload.items() if key != "regions"}
+    if remaining:
+        details.append(f"선택 조건: {json.dumps(remaining, ensure_ascii=False)}")
+    return "\n".join(details) or clean_context
+
+
 def _perform_single_web_search(
     query: str,
     context: str = "",
@@ -817,7 +854,7 @@ def _perform_single_web_search(
     import os
 
     clean_query = str(query or "").strip()
-    clean_context = str(context or "").strip()
+    clean_context = _web_search_context_text(context)
     if not clean_query:
         return WebSearchResult(available=False, query=clean_query, reason="query is required")
 
@@ -843,7 +880,9 @@ def _perform_single_web_search(
         "공식 사이트, 지도·예약 플랫폼, 최근 방문 후기까지 폭넓게 검색하고 서로 비교하세요.",
     )
     prompt = (
-        "제주 여행 질문을 웹에서 조사하세요. 출처가 직접 뒷받침하는 내용만 한국어로 설명하고, "
+        "이 서비스는 제주 여행 전용입니다. 반드시 웹 검색 도구를 사용해 질문을 조사하세요. "
+        "사용자가 선택한 제주 지역은 확정된 조건이므로 다른 지역인지 되묻지 마세요. "
+        "출처가 직접 뒷받침하는 내용만 한국어로 설명하고, "
         "장소명·주소·운영시간·가격은 확인된 범위만 말하세요. "
         f"{role_instruction}\n\n"
         f"질문: {clean_query}"
@@ -862,8 +901,11 @@ def _perform_single_web_search(
             resp = client.responses.create(
                 model=llm.MODEL,
                 tools=[{"type": tool_type}],
+                tool_choice="required",
+                max_tool_calls=2,
+                reasoning={"effort": "low"},
                 input=prompt,
-                max_output_tokens=2500,
+                max_output_tokens=4000,
             )
             answer = (getattr(resp, "output_text", "") or "").strip()
             sources = [
