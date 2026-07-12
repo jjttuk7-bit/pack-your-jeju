@@ -35,7 +35,7 @@ from apps.api.engine import weather as weather_mod
 
 
 logger = logging.getLogger(__name__)
-WEB_SEARCH_TIMEOUT_SECONDS = 15.0
+WEB_SEARCH_TIMEOUT_SECONDS = 60.0
 
 
 # ─── 한글 라벨 (하이라이트 문구 조립용) ───
@@ -793,10 +793,16 @@ def _dedupe_sources(sources: list[dict]) -> list[dict]:
 def _extract_response_sources(resp: Any) -> list[dict]:
     sources: list[dict] = []
     for output in getattr(resp, "output", []) or []:
-        for content in getattr(output, "content", []) or []:
-            for annotation in getattr(content, "annotations", []) or []:
-                url = getattr(annotation, "url", "") or ""
-                title = getattr(annotation, "title", "") or ""
+        content_items = output.get("content", []) if isinstance(output, dict) else getattr(output, "content", [])
+        for content in content_items or []:
+            annotations = content.get("annotations", []) if isinstance(content, dict) else getattr(content, "annotations", [])
+            for annotation in annotations or []:
+                if isinstance(annotation, dict):
+                    url = annotation.get("url", "") or ""
+                    title = annotation.get("title", "") or ""
+                else:
+                    url = getattr(annotation, "url", "") or ""
+                    title = getattr(annotation, "title", "") or ""
                 if url or title:
                     sources.append({"title": title, "url": url})
     return _dedupe_sources(sources)
@@ -832,7 +838,10 @@ def _perform_single_web_search(
         "official": "공식 운영 주체·지자체·공공기관 출처를 우선 확인하세요.",
         "platform": "지도·예약·지역 매체에서 위치와 현재 이용 정보를 확인하세요.",
         "experience": "최근 블로그·영상·사용자 후기에서 반복되는 경험 경향을 확인하세요.",
-    }.get(source_class, "질문에 직접 관련된 신뢰 가능한 웹 출처를 확인하세요.")
+    }.get(
+        source_class,
+        "공식 사이트, 지도·예약 플랫폼, 최근 방문 후기까지 폭넓게 검색하고 서로 비교하세요.",
+    )
     prompt = (
         "제주 여행 질문을 웹에서 조사하세요. 출처가 직접 뒷받침하는 내용만 한국어로 설명하고, "
         "장소명·주소·운영시간·가격은 확인된 범위만 말하세요. "
@@ -854,11 +863,14 @@ def _perform_single_web_search(
                 model=llm.MODEL,
                 tools=[{"type": tool_type}],
                 input=prompt,
-                max_output_tokens=1400,
+                max_output_tokens=2500,
             )
             answer = (getattr(resp, "output_text", "") or "").strip()
             sources = [
-                {**source, "source_class": source_class}
+                {
+                    **source,
+                    **({"source_class": source_class} if source_class != "web" else {}),
+                }
                 for source in _extract_response_sources(resp)
             ]
             return WebSearchResult(
@@ -883,55 +895,19 @@ def _perform_single_web_search(
 
 
 def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
-    """복수 검색 관점을 실행하고 usable source가 있는 결과만 병합한다."""
+    """Responses API built-in web search 한 번으로 질문 전체를 조사한다."""
     clean_query = str(query or "").strip()
     if not clean_query:
         return WebSearchResult(available=False, query=clean_query, reason="query is required")
-
-    plan = _build_web_search_plan(clean_query, context)
-    executed_queries: list[str] = []
-    results: list[WebSearchResult] = []
-    for item in plan:
-        planned_query = item["query"]
-        executed_queries.append(planned_query)
-        results.append(_perform_single_web_search(
-            planned_query,
-            context=context,
-            source_class=item["source_class"],
-        ))
-
-    successful = [result for result in results if result.available and result.sources]
-    if not successful and clean_query not in executed_queries:
-        executed_queries.append(clean_query)
-        retry = _perform_single_web_search(clean_query, context=context, source_class="web")
-        results.append(retry)
-        if retry.available and retry.sources:
-            successful.append(retry)
-
-    if not successful:
-        reasons = _unique_preserve_order([result.reason for result in results if result.reason])
-        return WebSearchResult(
-            available=False,
-            query=clean_query,
-            reason="; ".join(reasons) or "web search returned no usable source",
-            queries=executed_queries,
-            research_status="unavailable",
-        )
-
-    answers = [result.answer for result in successful if result.answer]
-    sources = _dedupe_sources([
-        source
-        for result in successful
-        for source in result.sources
-    ])
-    status = "sufficient" if len(successful) == len(results) else "partial"
+    result = _perform_single_web_search(clean_query, context=context, source_class="web")
     return WebSearchResult(
-        available=True,
+        available=result.available,
         query=clean_query,
-        answer="\n\n".join(_unique_preserve_order(answers)),
-        sources=sources,
-        queries=executed_queries,
-        research_status=status,
+        answer=result.answer,
+        sources=_dedupe_sources(result.sources),
+        reason=result.reason,
+        queries=[clean_query],
+        research_status="sufficient" if result.available else "unavailable",
     )
 
 

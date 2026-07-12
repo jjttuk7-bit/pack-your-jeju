@@ -195,56 +195,49 @@ def test_dedupe_sources_adds_class_and_checked_at():
     assert sources[0]["checked_at"]
 
 
-def test_web_research_merges_partial_results(monkeypatch):
-    plan = [
-        {"source_class": "official", "query": "구좌 오름 공식"},
-        {"source_class": "platform", "query": "구좌 오름 지도"},
-        {"source_class": "experience", "query": "구좌 오름 후기"},
-    ]
-    monkeypatch.setattr(haruban, "_build_web_search_plan", lambda query, context="": plan)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch):
+    calls = []
 
     def fake_single(query, context="", source_class="web"):
-        if source_class == "official":
-            return haruban.WebSearchResult(
-                available=True,
-                query=query,
-                answer="공식 출처에서 구좌 오름 정보를 확인했습니다.",
-                sources=[{"title": "비짓제주", "url": "https://www.visitjeju.net/oreum"}],
-            )
-        return haruban.WebSearchResult(available=False, query=query, reason="no usable result")
+        calls.append((query, context, source_class))
+        return haruban.WebSearchResult(
+            available=True,
+            query=query,
+            answer="성산 맛집을 웹에서 확인했습니다.",
+            sources=[{"title": "성산 안내", "url": "https://example.com/seongsan"}],
+            research_status="sufficient",
+        )
 
     monkeypatch.setattr(haruban, "_perform_single_web_search", fake_single, raising=False)
 
-    result = haruban._perform_web_search_jeju("구좌 오름 추천")
+    result = haruban._perform_web_search_jeju("성산의 맛집들은?", context="혼자 여행")
 
     assert result.available is True
-    assert result.research_status == "partial"
-    assert result.queries == [item["query"] for item in plan]
-    assert len(result.sources) == 1
+    assert result.research_status == "sufficient"
+    assert calls == [("성산의 맛집들은?", "혼자 여행", "web")]
+    assert result.queries == ["성산의 맛집들은?"]
 
 
-def test_web_research_retries_once_when_all_planned_queries_are_empty(monkeypatch):
-    plan = [
-        {"source_class": "official", "query": "구좌 맛집 공식"},
-        {"source_class": "experience", "query": "구좌 맛집 후기"},
-    ]
-    calls = []
-    monkeypatch.setattr(haruban, "_build_web_search_plan", lambda query, context="": plan)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+def test_extract_response_sources_supports_dict_url_citations():
+    response = SimpleNamespace(output=[{
+        "type": "message",
+        "content": [{
+            "type": "output_text",
+            "text": "성산 맛집 안내",
+            "annotations": [{
+                "type": "url_citation",
+                "url": "https://example.com/restaurant",
+                "title": "성산 식당",
+                "start_index": 0,
+                "end_index": 6,
+            }],
+        }],
+    }])
 
-    def fake_single(query, context="", source_class="web"):
-        calls.append(query)
-        return haruban.WebSearchResult(available=False, query=query, reason="empty")
+    sources = haruban._extract_response_sources(response)
 
-    monkeypatch.setattr(haruban, "_perform_single_web_search", fake_single, raising=False)
-
-    result = haruban._perform_web_search_jeju("구좌에서 가장 맛집은?")
-
-    assert result.available is False
-    assert result.research_status == "unavailable"
-    assert len(calls) == 3
-    assert calls[-1] == "구좌에서 가장 맛집은?"
+    assert sources[0]["url"] == "https://example.com/restaurant"
+    assert sources[0]["title"] == "성산 식당"
 
 
 def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
@@ -266,6 +259,7 @@ def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
     result = haruban._perform_single_web_search("구좌 오름 공식", source_class="official")
 
     assert result.available is False
+    assert haruban.WEB_SEARCH_TIMEOUT_SECONDS >= 45
     assert captured["timeout"] == haruban.WEB_SEARCH_TIMEOUT_SECONDS
     assert captured["max_retries"] == 0
     assert "provider timeout" in caplog.text
