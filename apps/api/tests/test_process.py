@@ -204,6 +204,43 @@ def test_process_item_phone_kept_when_real():
     assert p.amenities["phone"] == "064-000-0000"
 
 
+def test_process_item_keeps_visitjeju_representative_photo():
+    fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
+    p = proc.process_item(
+        _base(
+            repPhoto={
+                "photoid": {
+                    "imgpath": "https://api.cdn.visitjeju.net/full.webp",
+                    "thumbnailpath": "https://api.cdn.visitjeju.net/thumb.webp",
+                }
+            }
+        ),
+        fetched_at=fetched_at,
+    )
+
+    assert p is not None
+    assert p.amenities["thumbnail_path"] == "https://api.cdn.visitjeju.net/thumb.webp"
+    assert p.amenities["image_path"] == "https://api.cdn.visitjeju.net/full.webp"
+
+
+def test_process_item_uses_full_photo_when_thumbnail_is_missing():
+    fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
+    p = proc.process_item(
+        _base(repPhoto={"photoid": {"imgpath": "https://api.cdn.visitjeju.net/full.webp"}}),
+        fetched_at=fetched_at,
+    )
+
+    assert p is not None
+    assert p.amenities["thumbnail_path"] == "https://api.cdn.visitjeju.net/full.webp"
+
+
+def test_place_upsert_merges_existing_amenities():
+    sql = str(proc.UPSERT_PLACE_SQL)
+
+    assert "COALESCE(place.amenities" in sql
+    assert "|| EXCLUDED.amenities" in sql
+
+
 def test_upsert_places_uses_single_batch_execute(monkeypatch):
     fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
     rows = [

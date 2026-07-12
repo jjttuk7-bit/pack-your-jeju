@@ -2080,8 +2080,10 @@ function PackItemCard({
   onTogglePlanItem?: (item: TravelPlanItem) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // 썸네일: 제주 ITS API로 병합된 visitjeju CDN 이미지. 결측 시 렌더 안 함.
-  const thumbnail = (it.amenities as any)?.thumbnail_path as string | undefined;
+  // VisitJeju 대표사진을 우선 사용하고, 기존 ITS 이미지 키도 호환한다.
+  const media = (it.amenities ?? {}) as Record<string, unknown>;
+  const thumbnail = [media.thumbnail_path, media.image_path, media.img_path]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0);
   return (
     <div
       className={`rounded-2xl border bg-[#FDFBF7] transition overflow-hidden ${

@@ -207,6 +207,25 @@ def build_source_url(external_id: str) -> str:
     return f"https://www.visitjeju.net/kr/detail/view?contentsid={external_id}"
 
 
+def _representative_photo(item: dict) -> tuple[str | None, str | None]:
+    rep_photo = item.get("repPhoto")
+    if not isinstance(rep_photo, dict):
+        return None, None
+    photo = rep_photo.get("photoid")
+    if not isinstance(photo, dict):
+        return None, None
+
+    image_path = photo.get("imgpath")
+    thumbnail_path = photo.get("thumbnailpath")
+    image = image_path.strip() if isinstance(image_path, str) and image_path.strip() else None
+    thumbnail = (
+        thumbnail_path.strip()
+        if isinstance(thumbnail_path, str) and thumbnail_path.strip()
+        else image
+    )
+    return thumbnail, image
+
+
 def process_item(item: dict, *, fetched_at: datetime) -> ProcessedPlace | None:
     """단일 raw 아이템 → ProcessedPlace. 스킵 조건은 None 반환."""
     ext_id = item.get("contentsid")
@@ -244,6 +263,12 @@ def process_item(item: dict, *, fetched_at: datetime) -> ProcessedPlace | None:
     phone = item.get("phoneno")
     if isinstance(phone, str) and phone and phone != "*":
         amenities["phone"] = phone
+
+    thumbnail_path, image_path = _representative_photo(item)
+    if thumbnail_path:
+        amenities["thumbnail_path"] = thumbnail_path
+    if image_path:
+        amenities["image_path"] = image_path
 
     return ProcessedPlace(
         external_id=ext_id,
@@ -283,7 +308,7 @@ UPSERT_PLACE_SQL = text(
         lng = EXCLUDED.lng,
         info_type = EXCLUDED.info_type,
         valid_until = EXCLUDED.valid_until,
-        amenities = EXCLUDED.amenities,
+        amenities = COALESCE(place.amenities, '{}'::jsonb) || EXCLUDED.amenities,
         source_url = EXCLUDED.source_url,
         updated_at = now()
     """
