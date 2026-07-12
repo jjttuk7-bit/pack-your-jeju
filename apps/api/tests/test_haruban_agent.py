@@ -31,7 +31,7 @@ def test_haruban_prompt_uses_web_research_answer_contract():
 def test_haruban_prompt_requires_scannable_markdown_answers():
     prompt = haruban._BASE_SYSTEM_PROMPT
 
-    for phrase in ("Markdown", "한눈에 보기", "최대 6곳", "A/B/C/D", "반복하지"):
+    for phrase in ("Markdown", "## 한눈에 보기", "## 추천 장소", "## 방문 팁", "1,800자", "최대 6곳", "A/B/C/D", "반복하지"):
         assert phrase in prompt
     assert "답변 길이는 고정하지 않고" not in prompt
 
@@ -292,6 +292,8 @@ def test_single_web_search_forces_search_with_explicit_jeju_region_context(monke
     assert "제주특별자치도 서귀포시 성산읍" in captured["input"]
     assert "되묻지" in captured["input"]
     assert "Markdown" in captured["input"]
+    assert "## 한눈에 보기" in captured["input"]
+    assert "1,800자" in captured["input"]
     assert "최대 6곳" in captured["input"]
     assert "A/B/C/D" in captured["input"]
 
