@@ -14,6 +14,7 @@ import {
   ListChecks,
   Plus,
   PackageCheck,
+  Move,
 } from 'lucide-react';
 import HarubangMark from './marks/HarubangMark';
 import type {
@@ -62,6 +63,51 @@ interface FormStateSnapshot {
   purpose: PurposeValue;
   days: number;
   startDate: string;
+}
+
+interface PanelRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+interface PanelInteraction {
+  mode: 'move' | 'resize';
+  direction?: ResizeDirection;
+  startX: number;
+  startY: number;
+  startRect: PanelRect;
+}
+
+const PANEL_MARGIN = 12;
+const PANEL_MIN_WIDTH = 340;
+const PANEL_MIN_HEIGHT = 420;
+
+function initialPanelRect(): PanelRect {
+  const width = Math.min(440, window.innerWidth - PANEL_MARGIN * 2);
+  const height = Math.min(650, window.innerHeight - PANEL_MARGIN * 2);
+  return {
+    x: window.innerWidth - width - 20,
+    y: window.innerHeight - height - 20,
+    width,
+    height,
+  };
+}
+
+function clampPanelRect(rect: PanelRect): PanelRect {
+  const maxWidth = Math.max(PANEL_MIN_WIDTH, window.innerWidth - PANEL_MARGIN * 2);
+  const maxHeight = Math.max(PANEL_MIN_HEIGHT, window.innerHeight - PANEL_MARGIN * 2);
+  const width = Math.min(Math.max(rect.width, PANEL_MIN_WIDTH), maxWidth);
+  const height = Math.min(Math.max(rect.height, PANEL_MIN_HEIGHT), maxHeight);
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(rect.x, PANEL_MARGIN), window.innerWidth - width - PANEL_MARGIN),
+    y: Math.min(Math.max(rect.y, PANEL_MARGIN), window.innerHeight - height - PANEL_MARGIN),
+  };
 }
 
 function snapshotForm(info: TravelInfo, moments: MomentId[]): FormStateSnapshot {
@@ -118,10 +164,13 @@ export default function HarubanChat({
   const [loading, setLoading] = useState(false);
   const [introLoading, setIntroLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [panelRect, setPanelRect] = useState<PanelRect | null>(null);
   const [pendingSuggestion, setPendingSuggestion] =
     useState<HarubanFormSuggestion | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const introRequestSeqRef = useRef(0);
+  const interactionRef = useRef<PanelInteraction | null>(null);
 
   // 임계 도달 1회 트리거 관리.
   //  - hasTriggeredRef: 임계 첫 충족 후 인사 준비를 이미 한 번 했는지.
@@ -144,6 +193,106 @@ export default function HarubanChat({
   const hasFormChangedSinceIntro =
     lastIntroSnapshotRef.current !== null &&
     isDifferentSnapshot(currentSnapshot, lastIntroSnapshotRef.current);
+
+  useEffect(() => {
+    const syncViewport = () => {
+      const desktop = window.innerWidth >= 768;
+      setIsDesktop(desktop);
+      if (desktop) {
+        setPanelRect((current) => clampPanelRect(current ?? initialPanelRect()));
+      }
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, []);
+
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      const interaction = interactionRef.current;
+      if (!interaction || !isDesktop) return;
+
+      const dx = event.clientX - interaction.startX;
+      const dy = event.clientY - interaction.startY;
+      const start = interaction.startRect;
+
+      if (interaction.mode === 'move') {
+        setPanelRect(clampPanelRect({
+          ...start,
+          x: start.x + dx,
+          y: start.y + dy,
+        }));
+        return;
+      }
+
+      const direction = interaction.direction ?? 'se';
+      let next = { ...start };
+
+      if (direction.includes('e')) {
+        next.width = Math.min(
+          Math.max(PANEL_MIN_WIDTH, start.width + dx),
+          window.innerWidth - start.x - PANEL_MARGIN,
+        );
+      }
+      if (direction.includes('s')) {
+        next.height = Math.min(
+          Math.max(PANEL_MIN_HEIGHT, start.height + dy),
+          window.innerHeight - start.y - PANEL_MARGIN,
+        );
+      }
+      if (direction.includes('w')) {
+        const right = start.x + start.width;
+        next.x = Math.min(
+          Math.max(PANEL_MARGIN, start.x + dx),
+          right - PANEL_MIN_WIDTH,
+        );
+        next.width = right - next.x;
+      }
+      if (direction.includes('n')) {
+        const bottom = start.y + start.height;
+        next.y = Math.min(
+          Math.max(PANEL_MARGIN, start.y + dy),
+          bottom - PANEL_MIN_HEIGHT,
+        );
+        next.height = bottom - next.y;
+      }
+      setPanelRect(clampPanelRect(next));
+    };
+
+    const endInteraction = () => {
+      interactionRef.current = null;
+      document.body.style.removeProperty('user-select');
+      document.body.style.removeProperty('cursor');
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endInteraction);
+    window.addEventListener('pointercancel', endInteraction);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', endInteraction);
+      window.removeEventListener('pointercancel', endInteraction);
+      endInteraction();
+    };
+  }, [isDesktop]);
+
+  const beginPanelInteraction = (
+    event: React.PointerEvent,
+    mode: PanelInteraction['mode'],
+    direction?: ResizeDirection,
+  ) => {
+    if (!isDesktop || !panelRect || event.button !== 0) return;
+    event.preventDefault();
+    interactionRef.current = {
+      mode,
+      direction,
+      startX: event.clientX,
+      startY: event.clientY,
+      startRect: panelRect,
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = mode === 'move' ? 'grabbing' : `${direction}-resize`;
+  };
 
   // 새 메시지 도착 시 아래로 스크롤
   useEffect(() => {
@@ -322,23 +471,37 @@ export default function HarubanChat({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-[7.25rem] right-5 z-40 w-[390px] max-w-[calc(100vw-2.5rem)] h-[570px] max-h-[calc(100vh-8rem)] rounded-2xl bg-white shadow-2xl border-2 border-earth flex flex-col"
+            style={isDesktop && panelRect ? {
+              left: panelRect.x,
+              top: panelRect.y,
+              width: panelRect.width,
+              height: panelRect.height,
+            } : undefined}
+            className="fixed bottom-4 left-4 right-4 z-40 flex h-[min(680px,calc(100vh-2rem))] w-auto flex-col overflow-hidden rounded-xl border-2 border-[#2D6F65] bg-white shadow-[0_24px_70px_rgba(24,52,48,0.32),0_4px_16px_rgba(24,52,48,0.18)] md:bottom-auto md:left-auto md:right-auto md:max-h-none"
             id="haruban-panel"
           >
             {/* 헤더 */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-earth/60 bg-[#FDF6EA] rounded-t-2xl">
+            <div
+              onPointerDown={(event) => beginPanelInteraction(event, 'move')}
+              className="flex cursor-default items-center gap-3 border-b border-[#2D6F65]/35 bg-[#F8FBF9] px-4 py-3.5 select-none md:cursor-move"
+              title={isDesktop ? '드래그해서 창 이동' : undefined}
+            >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-100 bg-white shadow-sm">
                 <HarubangMark className="h-11 w-11" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-serif-kr font-bold text-[15px] text-basalt">하루방 에이전트</div>
                 <div className="text-[10.5px] text-basalt-2/70 leading-tight">
-                  gpt-5-mini 제주 여행 웹 리서치
+                  제주 여행을 함께 찾고 정리해드려요
                 </div>
               </div>
+              {isDesktop && (
+                <Move className="h-4 w-4 shrink-0 text-[#2D6F65]/60" aria-hidden="true" />
+              )}
               <button
                 type="button"
                 onClick={() => setOpen(false)}
+                onPointerDown={(event) => event.stopPropagation()}
                 className="p-1.5 rounded-full hover:bg-black/5 transition"
                 aria-label="닫기"
               >
@@ -356,7 +519,7 @@ export default function HarubanChat({
                 <div className="text-[12px] text-basalt-2/70 leading-relaxed px-1">
                   제주에서 궁금한 지역이나 여행 취향을 편하게 물어보세요.
                   <br />
-                  gpt-5-mini가 최신 웹 정보를 폭넓게 검색해 맛집·명소·숙소·교통을 비교해 드립니다.
+                  하루방 에이전트가 최신 웹 정보를 폭넓게 검색해 맛집·명소·숙소·교통을 비교해 드립니다.
                   <br />
                   <span className="text-basalt-2/50">
                     필요한 경우 비짓제주·공공데이터도 교차 확인하고 출처와 확인 시점을 함께 알려드려요.
@@ -395,12 +558,12 @@ export default function HarubanChat({
 
               {introLoading && (
                 <div className="flex items-center gap-1.5 text-[11px] text-basalt-2/60 px-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> gpt-5-mini가 공공데이터 근거를 확인하고 있어요...
+                  <Loader2 className="w-3 h-3 animate-spin" /> 하루방 에이전트가 여행 근거를 확인하고 있어요...
                 </div>
               )}
               {loading && (
                 <div className="flex items-center gap-1.5 text-[11px] text-basalt-2/60 px-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> gpt-5-mini가 질문을 해석하고 근거를 확인 중이에요...
+                  <Loader2 className="w-3 h-3 animate-spin" /> 하루방 에이전트가 질문을 해석하고 정보를 확인 중이에요...
                 </div>
               )}
               {error && (
@@ -459,10 +622,54 @@ export default function HarubanChat({
                 </button>
               </div>
             </div>
+
+            {isDesktop && (
+              <>
+                <ResizeHandle direction="n" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="s" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="e" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="w" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="ne" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="nw" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="se" onPointerDown={beginPanelInteraction} />
+                <ResizeHandle direction="sw" onPointerDown={beginPanelInteraction} />
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function ResizeHandle({
+  direction,
+  onPointerDown,
+}: {
+  direction: ResizeDirection;
+  onPointerDown: (
+    event: React.PointerEvent,
+    mode: PanelInteraction['mode'],
+    direction?: ResizeDirection,
+  ) => void;
+}) {
+  const positions: Record<ResizeDirection, string> = {
+    n: 'top-0 left-4 right-4 h-1.5 cursor-n-resize',
+    s: 'bottom-0 left-4 right-4 h-1.5 cursor-s-resize',
+    e: 'right-0 bottom-4 top-4 w-1.5 cursor-e-resize',
+    w: 'left-0 bottom-4 top-4 w-1.5 cursor-w-resize',
+    ne: 'right-0 top-0 h-4 w-4 cursor-ne-resize',
+    nw: 'left-0 top-0 h-4 w-4 cursor-nw-resize',
+    se: 'bottom-0 right-0 h-4 w-4 cursor-se-resize',
+    sw: 'bottom-0 left-0 h-4 w-4 cursor-sw-resize',
+  };
+
+  return (
+    <div
+      aria-hidden="true"
+      onPointerDown={(event) => onPointerDown(event, 'resize', direction)}
+      className={`absolute z-10 touch-none ${positions[direction]}`}
+    />
   );
 }
 
