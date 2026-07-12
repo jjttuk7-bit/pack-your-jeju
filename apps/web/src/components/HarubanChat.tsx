@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   X,
   Send,
@@ -479,13 +481,13 @@ function MessageBubble({
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[86%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed ${
+        className={`${isUser ? 'max-w-[86%]' : 'max-w-[96%]'} px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed ${
           isUser
             ? 'bg-citrus text-white rounded-br-md'
             : 'bg-[#FDF6EA] text-basalt border border-earth/60 rounded-bl-md'
         }`}
       >
-        <div>{content}</div>
+        {isUser ? <div className="whitespace-pre-wrap">{content}</div> : <AssistantMarkdown content={content} />}
         {!isUser && contract && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-earth/50 pt-2 text-[10px] leading-none text-basalt-2/70">
             {sourceLabel && (
@@ -509,6 +511,73 @@ function MessageBubble({
         )}
       </div>
     </div>
+  );
+}
+
+function AssistantMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ children }) => (
+          <h2 className="mb-2 mt-1 font-serif-kr text-[16px] font-bold leading-snug text-basalt">
+            {children}
+          </h2>
+        ),
+        h2: ({ children }) => (
+          <h2 className="mb-1.5 mt-4 border-b border-earth/60 pb-1.5 font-serif-kr text-[15px] font-bold leading-snug text-basalt first:mt-0">
+            {children}
+          </h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="mb-1 mt-3 text-[13px] font-bold leading-snug text-basalt first:mt-0">
+            {children}
+          </h3>
+        ),
+        p: ({ children }) => (
+          <p className="my-1.5 break-words leading-[1.75] first:mt-0 last:mb-0">{children}</p>
+        ),
+        ul: ({ children }) => (
+          <ul className="my-2 space-y-1 pl-4 marker:text-citrus-2" style={{ listStyleType: 'disc' }}>
+            {children}
+          </ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="my-2 space-y-2.5 pl-5 marker:font-bold marker:text-citrus-2" style={{ listStyleType: 'decimal' }}>
+            {children}
+          </ol>
+        ),
+        li: ({ children }) => <li className="pl-0.5 leading-[1.7]">{children}</li>,
+        strong: ({ children }) => <strong className="font-bold text-basalt">{children}</strong>,
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-[#A84422] underline decoration-[#D97745]/50 underline-offset-2 transition-colors hover:text-citrus focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-citrus"
+          >
+            {children}
+          </a>
+        ),
+        blockquote: ({ children }) => (
+          <blockquote className="my-2 border-l-2 border-citrus-2 bg-white/60 px-2.5 py-1 text-basalt-2">
+            {children}
+          </blockquote>
+        ),
+        hr: () => <hr className="my-3 border-earth/70" />,
+        table: ({ children }) => (
+          <div className="my-2 overflow-x-auto rounded-md border border-earth/70 bg-white/50">
+            <table className="min-w-full border-collapse text-left text-[11px]">{children}</table>
+          </div>
+        ),
+        th: ({ children }) => (
+          <th className="whitespace-nowrap border-b border-earth bg-[#F8EAD4] px-2 py-1.5 font-bold">{children}</th>
+        ),
+        td: ({ children }) => <td className="border-b border-earth/40 px-2 py-1.5 align-top">{children}</td>,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
 }
 
