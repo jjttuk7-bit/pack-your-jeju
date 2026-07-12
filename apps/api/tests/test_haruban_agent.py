@@ -1020,6 +1020,61 @@ def test_haruban_does_not_treat_region_category_query_as_place_detail():
     assert args["category"] == "oreum"
 
 
+def test_haruban_routes_first_place_to_visit_question_to_web_search(monkeypatch):
+    captured = {}
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {
+            "available": True,
+            "query": args["query"],
+            "answer": "제주시 첫 방문 후보를 웹 출처로 비교했습니다.",
+            "sources": [{"title": "제주 관광 공식", "url": "https://example.com/jeju"}],
+            "source_type": "web",
+        }
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+    conv = [{"role": "user", "content": "제주시에서 제일 첫번째로 방문하면 좋은 곳을 알려줘"}]
+
+    assert haruban._infer_place_detail_query(conv) == ""
+    result = haruban._build_search_pool_context(conv, {"regions": ["jeju_city"]})
+
+    assert result["tool"] == "web_search_jeju"
+    assert captured["query"] == "제주시에서 제일 첫번째로 방문하면 좋은 곳을 알려줘"
+
+
+def test_haruban_retries_web_search_once_with_broader_query(monkeypatch):
+    calls = []
+
+    def fake_single(query, context="", source_class="web"):
+        calls.append((query, context, source_class))
+        if len(calls) == 1:
+            return haruban.WebSearchResult(
+                available=False,
+                query=query,
+                reason="web search returned no usable source",
+            )
+        return haruban.WebSearchResult(
+            available=True,
+            query=query,
+            answer="재검색으로 확인한 제주 추천입니다.",
+            sources=[{"title": "공식 출처", "url": "https://example.com/official"}],
+        )
+
+    monkeypatch.setattr(haruban, "_perform_single_web_search", fake_single)
+
+    result = haruban._perform_web_search_jeju(
+        "제주시에서 처음 방문하기 좋은 곳",
+        context='{"regions":["jeju_city"],"companion":"solo"}',
+    )
+
+    assert result.available is True
+    assert len(calls) == 2
+    assert calls[1][0] != calls[0][0]
+    assert "제주특별자치도 제주시" in calls[1][0]
+    assert result.queries == [calls[0][0], calls[1][0]]
+
+
 def test_haruban_infers_beach_category_from_user_text():
     conv = [
         {"role": "user", "content": "제주시에 있는 바닷가 알려줘"},

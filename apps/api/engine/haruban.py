@@ -943,18 +943,53 @@ def _perform_single_web_search(
 
 
 def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
-    """Responses API built-in web search 한 번으로 질문 전체를 조사한다."""
+    """Responses API 웹검색을 실행하고 출처가 없으면 지역 맥락으로 한 번 재검색한다."""
     clean_query = str(query or "").strip()
     if not clean_query:
         return WebSearchResult(available=False, query=clean_query, reason="query is required")
+    queries = [clean_query]
     result = _perform_single_web_search(clean_query, context=context, source_class="web")
+    if not result.available:
+        region_scope = "제주"
+        try:
+            payload = json.loads(context) if context else {}
+        except (TypeError, ValueError):
+            payload = {}
+        if isinstance(payload, dict):
+            raw_regions = payload.get("regions") or []
+            if isinstance(raw_regions, str):
+                raw_regions = [raw_regions]
+            region_labels = [
+                WEB_REGION_CONTEXT_KO.get(str(region), str(region))
+                for region in raw_regions
+                if region
+            ]
+            if region_labels:
+                region_scope = ", ".join(region_labels)
+        retry_query = (
+            f"{region_scope} {clean_query} 공식 관광 정보 지도 최근 방문 후기"
+        ).strip()
+        queries.append(retry_query)
+        retry_result = _perform_single_web_search(
+            retry_query,
+            context=context,
+            source_class="web",
+        )
+        if retry_result.available:
+            result = retry_result
+        elif retry_result.reason:
+            result = WebSearchResult(
+                available=False,
+                query=clean_query,
+                reason=f"first: {result.reason}; retry: {retry_result.reason}",
+            )
     return WebSearchResult(
         available=result.available,
         query=clean_query,
         answer=result.answer,
         sources=_dedupe_sources(result.sources),
         reason=result.reason,
-        queries=[clean_query],
+        queries=queries,
         research_status="sufficient" if result.available else "unavailable",
     )
 
@@ -1383,7 +1418,8 @@ def _should_use_web_research(conv: list[dict]) -> bool:
         return True
     recommendation = bool(re.search(
         r"추천|맛집|식당|카페|오름|관광|여행지|명소|해변|바다|시장|"
-        r"어디|정보|가장|베스트|더\s*(?:알려|추천)|비교",
+        r"어디|정보|가장|베스트|좋은\s*곳|방문.*좋|가면.*좋|첫\s*번째|"
+        r"더\s*(?:알려|추천)|비교",
         last_user,
     ))
     contextual_followup = bool(re.search(
@@ -1413,14 +1449,18 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
     if _is_general_advice_text(last_user) or _is_region_category_query(last_user):
         return ""
 
-    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|어떤|위치|주소|하\.*", last_user))
+    asks_detail = bool(re.search(r"자세|상세|관해|대해|어때|뭐야|어떤|위치|주소", last_user))
     asks_detail = asks_detail or _is_fix_request_question(last_user) or _is_transit_question(last_user)
-    asks_list = bool(re.search(r"추천|리스트|몇\s*개|몇\s*곳|후보|어디|맛집들|식당들", last_user))
+    asks_list = bool(re.search(
+        r"추천|리스트|몇\s*개|몇\s*곳|후보|어디|맛집들|식당들|좋은\s*곳|"
+        r"방문.*좋|가면.*좋|첫\s*번째",
+        last_user,
+    ))
     if not asks_detail or asks_list:
         return ""
 
     cleaned = re.sub(
-        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|어떤거야|어떤가요|수정\s*요청\s*내역|수정요청내역|수정\s*요청|수정\s*이력|주의\s*내용|교통\s*편|주차장?|정류소|버스\s*정류장?|대중교통|교통|이동|있어|있나요|가능|하\.*)",
+        r"(?i)(에\s*관해|에\s*대해|관해|대해|자세히|상세히|정보|위치|주소|알려줘|알려주세요|어때|뭐야|어떤거야|어떤가요|수정\s*요청\s*내역|수정요청내역|수정\s*요청|수정\s*이력|주의\s*내용|교통\s*편|주차장?|정류소|버스\s*정류장?|대중교통|교통|이동|있어|있나요|가능)",
         " ",
         last_user,
     )
