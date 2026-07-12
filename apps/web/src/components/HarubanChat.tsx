@@ -331,7 +331,7 @@ export default function HarubanChat({
               <div className="flex-1 min-w-0">
                 <div className="font-serif-kr font-bold text-[15px] text-basalt">하루방 에이전트</div>
                 <div className="text-[10.5px] text-basalt-2/70 leading-tight">
-                  gpt-5-mini 공공데이터 여행 조율
+                  gpt-5-mini 제주 여행 웹 리서치
                 </div>
               </div>
               <button
@@ -352,12 +352,12 @@ export default function HarubanChat({
             >
               {entries.length === 0 && !introLoading && (
                 <div className="text-[12px] text-basalt-2/70 leading-relaxed px-1">
-                  안녕하세요. 제주 여행 준비를 돕는 하루방 에이전트입니다.
+                  제주에서 궁금한 지역이나 여행 취향을 편하게 물어보세요.
                   <br />
-                  질문을 주시면 gpt-5-mini가 의도를 먼저 해석하고, 필요한 공공데이터 근거를 확인해 답변드릴게요.
+                  gpt-5-mini가 최신 웹 정보를 폭넓게 검색해 맛집·명소·숙소·교통을 비교해 드립니다.
                   <br />
                   <span className="text-basalt-2/50">
-                    장소명·개수·운영 정보는 조회된 근거 밖에서 지어내지 않습니다.
+                    필요한 경우 비짓제주·공공데이터도 교차 확인하고 출처와 확인 시점을 함께 알려드려요.
                   </span>
                 </div>
               )}
