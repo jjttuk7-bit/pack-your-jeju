@@ -252,8 +252,9 @@ function Hero({ onEnter, isUnlocked }: { onEnter: () => void; isUnlocked: boolea
       <img
         src="/images/landing-jeju-hero.jpg"
         alt="푸른 제주 바다와 오름, 한라산으로 이어지는 해안길"
-        className="absolute inset-0 -z-30 h-full w-full object-cover object-[62%_center] sm:object-center"
+        className="pyj-hero-cinematic absolute inset-0 -z-30 h-full w-full object-cover object-[62%_center] sm:object-center"
       />
+      <div aria-hidden="true" className="pyj-hero-light pointer-events-none absolute inset-0 -z-20" />
       <div className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(5,27,31,0.82)_0%,rgba(5,27,31,0.48)_42%,rgba(5,27,31,0.08)_75%),linear-gradient(0deg,rgba(5,20,23,0.46)_0%,transparent_45%)]" />
 
       <nav className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-12 lg:py-7">
