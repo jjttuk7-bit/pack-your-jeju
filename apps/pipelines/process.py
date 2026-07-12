@@ -115,17 +115,7 @@ def _get_nested_value(node: Any) -> str | None:
     return None
 
 
-def resolve_region(item: dict) -> str | None:
-    """region2cd → region1cd → 주소 키워드 순으로 12값에 매핑."""
-    r2 = _get_nested_value(item.get("region2cd"))
-    if r2 and r2 in REGION2CD_TO_NORMALIZED:
-        return REGION2CD_TO_NORMALIZED[r2]
-
-    r1 = _get_nested_value(item.get("region1cd"))
-    if r1 and r1 in REGION1CD_FALLBACK:
-        return REGION1CD_FALLBACK[r1]
-
-    # 주소 폴백
+def _resolve_region_from_address(item: dict) -> str | None:
     for field in ("address", "roadaddress"):
         addr = item.get(field)
         if isinstance(addr, str):
@@ -133,6 +123,23 @@ def resolve_region(item: dict) -> str | None:
                 if kw in addr:
                     return region
     return None
+
+
+def resolve_region(item: dict) -> str | None:
+    """region2cd → region1cd → 주소 키워드 순으로 12값에 매핑."""
+    r2 = _get_nested_value(item.get("region2cd"))
+    if r2 and r2 in REGION2CD_TO_NORMALIZED:
+        return REGION2CD_TO_NORMALIZED[r2]
+
+    r1 = _get_nested_value(item.get("region1cd"))
+    if r1 == "region3":
+        address_region = _resolve_region_from_address(item)
+        if address_region:
+            return address_region
+    if r1 and r1 in REGION1CD_FALLBACK:
+        return REGION1CD_FALLBACK[r1]
+
+    return _resolve_region_from_address(item)
 
 
 def _has_kw(text_lower: str, kws: tuple[str, ...]) -> bool:
@@ -213,6 +220,11 @@ def process_item(item: dict, *, fetched_at: datetime) -> ProcessedPlace | None:
     if category is None:
         return None
 
+    if category == "festival":
+        title_years = [int(value) for value in re.findall(r"(?<!\d)(20\d{2})(?!\d)", name)]
+        if title_years and max(title_years) < fetched_at.year:
+            return None
+
     region = resolve_region(item)
     if region is None:
         return None  # 지역 매핑 실패는 스킵 (조용히 상위로 병합 금지)
@@ -277,6 +289,10 @@ UPSERT_PLACE_SQL = text(
     """
 )
 
+DELETE_PLACE_SQL = text(
+    "DELETE FROM place WHERE external_id = ANY(:external_ids)"
+)
+
 
 def upsert_places(rows: list[ProcessedPlace]) -> int:
     if not rows:
@@ -303,6 +319,16 @@ def upsert_places(rows: list[ProcessedPlace]) -> int:
     return len(rows)
 
 
+def delete_places(external_ids: list[str]) -> int:
+    ids = list(dict.fromkeys(external_id for external_id in external_ids if external_id))
+    if not ids:
+        return 0
+    engine = db.get_engine()
+    with engine.begin() as conn:
+        conn.execute(DELETE_PLACE_SQL, {"external_ids": ids})
+    return len(ids)
+
+
 def process_from_raw_source(*, limit: int | None = None) -> int:
     """raw_source(source='visitjeju', tombstoned=false)의 payload를 place로 정제 적재."""
     engine = db.get_engine()
@@ -310,6 +336,7 @@ def process_from_raw_source(*, limit: int | None = None) -> int:
     if limit is not None:
         q += f" ORDER BY fetched_at DESC LIMIT {int(limit)}"
     rows_out: list[ProcessedPlace] = []
+    discarded_ids: list[str] = []
     with engine.connect() as conn:
         for row in conn.execute(text(q)):
             payload = row.payload
@@ -321,7 +348,11 @@ def process_from_raw_source(*, limit: int | None = None) -> int:
             processed = process_item(payload, fetched_at=fetched_at)
             if processed is not None:
                 rows_out.append(processed)
-    return upsert_places(rows_out)
+            else:
+                discarded_ids.append(str(row.external_id))
+    upserted = upsert_places(rows_out)
+    delete_places(discarded_ids)
+    return upserted
 
 
 def process_from_probe_dump(dump_path: str, *, limit: int | None = 20) -> int:

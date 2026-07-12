@@ -51,6 +51,15 @@ def test_address_keyword_fallback_when_codes_missing():
     assert proc.resolve_region(it) == "seongsan"
 
 
+def test_island_group_uses_address_before_udo_fallback_for_marado():
+    it = _base(
+        region2cd=None,
+        region1cd={"value": "region3", "label": "섬 속의 섬"},
+        address="제주특별자치도 서귀포시 대정읍 마라로 87",
+    )
+    assert proc.resolve_region(it) == "daejeong"
+
+
 def test_region_none_when_all_signals_missing():
     it = _base(region2cd=None, region1cd=None, address=None, roadaddress=None)
     assert proc.resolve_region(it) is None
@@ -153,6 +162,15 @@ def test_process_item_c5_returns_festival_place():
     assert p.category == "festival"
 
 
+def test_process_item_drops_festival_with_past_year_in_title():
+    fetched_at = datetime(2026, 7, 12, tzinfo=timezone.utc)
+    it = _base(
+        contentscd={"value": "c5", "label": "축제/행사"},
+        title="2025 우도 하고수동 해수욕장 썸머페스티벌",
+    )
+    assert proc.process_item(it, fetched_at=fetched_at) is None
+
+
 def test_process_item_ok_returns_processed_place():
     fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
     p = proc.process_item(_base(), fetched_at=fetched_at)
@@ -215,3 +233,28 @@ def test_upsert_places_uses_single_batch_execute(monkeypatch):
     assert len(calls) == 1
     assert isinstance(calls[0][1], list)
     assert len(calls[0][1]) == 2
+
+
+def test_delete_places_uses_single_reconciliation_query(monkeypatch):
+    calls = []
+
+    class FakeConnection:
+        def execute(self, statement, params):
+            calls.append((statement, params))
+
+    class FakeBegin:
+        def __enter__(self):
+            return FakeConnection()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeEngine:
+        def begin(self):
+            return FakeBegin()
+
+    monkeypatch.setattr(proc.db, "get_engine", lambda: FakeEngine())
+
+    assert proc.delete_places(["OLD_1", "OLD_2"]) == 2
+    assert len(calls) == 1
+    assert calls[0][1] == {"external_ids": ["OLD_1", "OLD_2"]}
