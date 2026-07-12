@@ -15,6 +15,7 @@ import {
   Plus,
   PackageCheck,
   Move,
+  ExternalLink,
 } from 'lucide-react';
 import HarubangMark from './marks/HarubangMark';
 import type {
@@ -33,6 +34,7 @@ import {
   type HarubanChatMessage,
   type HarubanFormSuggestion,
   type HarubanIntroResponse,
+  type HarubanWebPlaceCandidate,
 } from '../api';
 import { MOMENTS } from '../data';
 
@@ -53,7 +55,12 @@ interface HarubanChatProps {
 // 카드 리스트를 별도 슬롯으로 두어 배지·주소·근거 액션을 대화 흐름과 분리한다.
 type ChatEntry =
   | { kind: 'user'; content: string }
-  | { kind: 'assistant'; content: string; contract?: HarubanAnswerContract }
+  | {
+      kind: 'assistant';
+      content: string;
+      contract?: HarubanAnswerContract;
+      placeCandidates?: HarubanWebPlaceCandidate[];
+    }
   | { kind: 'intro'; intro: HarubanIntroResponse; formSnapshot: FormStateSnapshot };
 
 interface FormStateSnapshot {
@@ -391,7 +398,12 @@ export default function HarubanChat({
       }
       setEntries((prev) => [
         ...prev,
-        { kind: 'assistant', content: resp.reply_text, contract: resp.answer_contract },
+        {
+          kind: 'assistant',
+          content: resp.reply_text,
+          contract: resp.answer_contract,
+          placeCandidates: resp.place_candidates ?? [],
+        },
       ]);
       if (resp.form_suggestion) {
         setPendingSuggestion(resp.form_suggestion);
@@ -534,12 +546,20 @@ export default function HarubanChat({
                 if (entry.kind === 'assistant') {
                   if (!entry.content) return null;
                   return (
-                    <MessageBubble
-                      key={i}
-                      role="assistant"
-                      content={entry.content}
-                      contract={entry.contract}
-                    />
+                    <div key={i} className="space-y-2.5">
+                      <MessageBubble
+                        role="assistant"
+                        content={entry.content}
+                        contract={entry.contract}
+                      />
+                      {entry.placeCandidates && entry.placeCandidates.length > 0 && (
+                        <WebPlaceCandidatePicker
+                          candidates={entry.placeCandidates}
+                          selectedPlanItems={selectedPlanItems}
+                          onAddPlanItem={onAddPlanItem}
+                        />
+                      )}
+                    </div>
                   );
                 }
                 // intro — 현재 폼 상태를 함께 넘겨 이미 포함된 조건은 disabled 처리.
@@ -670,6 +690,108 @@ function ResizeHandle({
       onPointerDown={(event) => onPointerDown(event, 'resize', direction)}
       className={`absolute z-10 touch-none ${positions[direction]}`}
     />
+  );
+}
+
+function WebPlaceCandidatePicker({
+  candidates,
+  selectedPlanItems,
+  onAddPlanItem,
+}: {
+  candidates: HarubanWebPlaceCandidate[];
+  selectedPlanItems: TravelPlanItem[];
+  onAddPlanItem: (item: TravelPlanItem) => void;
+}) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [addedIds, setAddedIds] = useState<string[]>([]);
+  const planIds = useMemo(
+    () => new Set(selectedPlanItems.map((item) => item.id)),
+    [selectedPlanItems],
+  );
+
+  const toggleCandidate = (candidate: HarubanWebPlaceCandidate) => {
+    const planId = `web-${candidate.id}`;
+    if (planIds.has(planId) || addedIds.includes(candidate.id)) return;
+    setSelectedIds((current) => current.includes(candidate.id)
+      ? current.filter((id) => id !== candidate.id)
+      : [...current, candidate.id]);
+  };
+
+  const addSelected = () => {
+    const selected = candidates.filter((candidate) => selectedIds.includes(candidate.id));
+    selected.forEach((candidate) => onAddPlanItem(planItemFromWebCandidate(candidate)));
+    setAddedIds((current) => [...new Set([...current, ...selected.map((candidate) => candidate.id)])]);
+    setSelectedIds([]);
+  };
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-[#2D6F65]/35 bg-[#F4FAF7]">
+      <div className="flex items-center justify-between gap-3 border-b border-[#2D6F65]/20 px-3 py-2.5">
+        <div>
+          <p className="text-[11.5px] font-bold text-basalt">검색한 장소를 플랜에 담기</p>
+          <p className="mt-0.5 text-[9.5px] text-basalt-2/65">원문 출처와 검색 시점을 함께 보관합니다.</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[9.5px] font-bold text-[#2D6F65]">
+          {candidates.length}곳
+        </span>
+      </div>
+
+      <div className="divide-y divide-[#2D6F65]/15">
+        {candidates.map((candidate) => {
+          const alreadyAdded = planIds.has(`web-${candidate.id}`) || addedIds.includes(candidate.id);
+          const checked = alreadyAdded || selectedIds.includes(candidate.id);
+          return (
+            <label
+              key={candidate.id}
+              className={`flex gap-2.5 px-3 py-2.5 ${alreadyAdded ? 'bg-[#E9F4EE]' : 'cursor-pointer hover:bg-white/70'}`}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={alreadyAdded}
+                onChange={() => toggleCandidate(candidate)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#2D6F65]"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-start justify-between gap-2">
+                  <span className="font-bold text-[11.5px] leading-snug text-basalt">{candidate.name}</span>
+                  {alreadyAdded && (
+                    <span className="shrink-0 text-[9px] font-bold text-[#2D6F65]">플랜에 담김</span>
+                  )}
+                </span>
+                {(candidate.address || candidate.note) && (
+                  <span className="mt-1 block text-[10px] leading-relaxed text-basalt-2/75 line-clamp-2">
+                    {candidate.address || candidate.note}
+                  </span>
+                )}
+                <a
+                  href={candidate.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  className="mt-1 inline-flex items-center gap-1 text-[9.5px] font-semibold text-[#A84422] underline underline-offset-2"
+                >
+                  {candidate.source_title || '원문 보기'}
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-[#2D6F65]/20 bg-white/70 p-2.5">
+        <button
+          type="button"
+          onClick={addSelected}
+          disabled={selectedIds.length === 0}
+          className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#2D6F65] px-3 text-[11.5px] font-bold text-white transition hover:bg-[#245B53] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <PackageCheck className="h-3.5 w-3.5" />
+          선택한 {selectedIds.length}곳을 플랜에 담기
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1008,6 +1130,25 @@ function planItemFromHighlight(highlight: import('../api').HarubanIntroHighlight
     region: highlight.region,
     address: highlight.address,
     note: highlight.note,
+  };
+}
+
+function planItemFromWebCandidate(candidate: HarubanWebPlaceCandidate): TravelPlanItem {
+  return {
+    id: `web-${candidate.id}`,
+    name: candidate.name,
+    moment: candidate.moment || 'web_search',
+    source: 'web_search',
+    badge: 'reference',
+    external_id: candidate.id,
+    region: candidate.region || null,
+    address: candidate.address ?? null,
+    note: candidate.note ?? null,
+    check_required: ['operating', 'web_source'],
+    source_title: candidate.source_title,
+    source_url: candidate.source_url,
+    checked_at: candidate.checked_at,
+    search_query: candidate.search_query,
   };
 }
 

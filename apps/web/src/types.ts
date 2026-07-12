@@ -70,7 +70,7 @@ export interface TravelPlanItem {
   id: string;
   name: string;
   moment: MomentId | string;
-  source: 'public_data' | 'user_added';
+  source: 'public_data' | 'web_search' | 'user_added';
   badge?: BadgeKind;
   external_id?: string;
   region?: string | null;
@@ -83,6 +83,10 @@ export interface TravelPlanItem {
   trust_score?: number;
   score_breakdown?: TrustScoreBreakdown;
   check_required?: string[];
+  source_title?: string | null;
+  source_url?: string | null;
+  checked_at?: string | null;
+  search_query?: string | null;
 }
 
 export type VisitCheckStatus =

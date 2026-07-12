@@ -1075,6 +1075,68 @@ def test_haruban_retries_web_search_once_with_broader_query(monkeypatch):
     assert result.queries == [calls[0][0], calls[1][0]]
 
 
+def test_haruban_extracts_structured_candidates_from_web_answer():
+    answer = """
+## 추천 장소
+- **이호테우해변**
+  - 특징: 공항에서 가까운 해변 산책지입니다.
+  - 위치: 제주시 이호동.
+  - [Visit Jeju](https://www.visitjeju.net/example-iho)
+- **용두암**
+  - 추천 이유: 짧은 해안 산책에 적합합니다.
+  - [공식 안내](https://www.visitjeju.net/example-yongduam)
+"""
+    candidates = haruban._extract_web_place_candidates(
+        answer,
+        [
+            {"title": "Visit Jeju", "url": "https://www.visitjeju.net/example-iho"},
+            {"title": "공식 안내", "url": "https://www.visitjeju.net/example-yongduam"},
+        ],
+        "제주시 첫 방문 추천",
+        '{"regions":["jeju_city"],"moments":["beach_walk"]}',
+    )
+
+    assert [candidate["name"] for candidate in candidates] == ["이호테우해변", "용두암"]
+    assert candidates[0]["region"] == "jeju_city"
+    assert candidates[0]["moment"] == "beach_walk"
+    assert candidates[0]["source_url"] == "https://www.visitjeju.net/example-iho"
+    assert "공항에서 가까운" in candidates[0]["note"]
+
+
+def test_haruban_turn_exposes_web_candidates_without_second_llm_call(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda args: {
+            "available": True,
+            "query": args["query"],
+            "answer": "## 추천 장소\n- **용두암**: 짧은 해안 산책",
+            "sources": [{"title": "공식", "url": "https://example.com/yongduam"}],
+            "place_candidates": [{
+                "id": "web-abc",
+                "name": "용두암",
+                "region": "jeju_city",
+                "moment": "beach_walk",
+                "note": "짧은 해안 산책",
+                "source_title": "공식",
+                "source_url": "https://example.com/yongduam",
+                "checked_at": "2026-07-13T00:00:00+00:00",
+                "search_query": args["query"],
+            }],
+            "source_type": "web",
+        },
+    )
+
+    result = haruban.chat_turn(
+        [{"role": "user", "content": "제주시에서 가볼 만한 곳 추천해줘"}],
+        {"regions": ["jeju_city"], "moments": ["beach_walk"]},
+    )
+
+    assert result.available is True
+    assert result.place_candidates[0]["name"] == "용두암"
+
+
 def test_haruban_infers_beach_category_from_user_text():
     conv = [
         {"role": "user", "content": "제주시에 있는 바닷가 알려줘"},

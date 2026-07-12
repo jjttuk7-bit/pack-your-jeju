@@ -620,7 +620,7 @@ function filterPlanItemsForCurrentPack(
   const currentNames = new Set(packItems.map((item) => normalizePlaceKey(item.name)));
 
   return planItems.filter((item) => {
-    if (item.source === 'user_added') return true;
+    if (item.source !== 'public_data') return true;
     if (item.external_id && currentExternalIds.has(item.external_id)) return true;
     return currentNames.has(normalizePlaceKey(item.name));
   });
@@ -946,9 +946,15 @@ function PlanItemRow({
             <span className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold border ${
               item.source === 'public_data'
                 ? 'bg-mint/10 text-mint border-mint/20'
+                : item.source === 'web_search'
+                  ? 'bg-[#E9F4EE] text-[#2D6F65] border-[#2D6F65]/20'
                 : 'bg-amber-50 text-amber-700 border-amber-100'
             }`}>
-              {item.source === 'public_data' ? '공공데이터 후보' : '사용자 추가'}
+              {item.source === 'public_data'
+                ? '공공데이터 후보'
+                : item.source === 'web_search'
+                  ? '하루방 웹검색'
+                  : '사용자 추가'}
             </span>
             {moment && (
               <span className="text-[9.5px] font-semibold text-citrus-2 bg-citrus/10 rounded-full px-2 py-0.5">
@@ -966,6 +972,17 @@ function PlanItemRow({
             <p className="mt-0.5 text-[10.5px] text-basalt-2 leading-relaxed line-clamp-2">
               {item.address || item.note}
             </p>
+          )}
+          {item.source === 'web_search' && item.source_url && (
+            <a
+              href={item.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-[9.5px] font-semibold text-[#A84422] underline underline-offset-2"
+            >
+              {item.source_title || '검색 원문 보기'}
+              <ExternalLink className="h-2.5 w-2.5" />
+            </a>
           )}
         </div>
         <button
@@ -1030,7 +1047,9 @@ function PlanItemRow({
           className="w-full resize-none rounded-xl border border-earth bg-white/82 px-3 py-2 text-[11.5px] leading-relaxed text-basalt outline-none placeholder:text-basalt-2/45 focus:ring-2 focus:ring-citrus/25"
         />
         <p className="text-[9.5px] leading-relaxed text-basalt-2/70">
-          이 메모는 신뢰도 업데이트와 별도로 `공공데이터 수정요청 큐`에 전달 대기 상태로 저장됩니다.
+          {item.source === 'public_data'
+            ? '이 메모는 원본을 바로 수정하지 않고 공공데이터 수정요청 신호로 분리해 저장됩니다.'
+            : '이 메모는 검색 당시 출처와 분리된 사용자 방문 신호로 저장됩니다.'}
         </p>
       </div>
 
@@ -1580,7 +1599,11 @@ function buildSelectedPlanLines(
     items.forEach((item) => {
       const moment = MOMENTS.find((m) => m.id === item.moment)?.title
         ?? (item.source === 'user_added' ? '사용자 추가' : String(item.moment));
-      const source = item.source === 'public_data' ? shareBadgeLabel(item.badge ?? 'reference') : '검증 전 메모';
+      const source = item.source === 'public_data'
+        ? shareBadgeLabel(item.badge ?? 'reference')
+        : item.source === 'web_search'
+          ? '하루방 웹검색 출처'
+          : '검증 전 메모';
       const visit = visitChecks[item.id];
       lines.push(`- ${item.name}`);
       lines.push(`  · 순간: ${moment}`);

@@ -171,6 +171,20 @@ export interface HarubanChatResponse {
   tool_trace: any[];
   reason: string;
   answer_contract?: HarubanAnswerContract;
+  place_candidates?: HarubanWebPlaceCandidate[];
+}
+export interface HarubanWebPlaceCandidate {
+  id: string;
+  name: string;
+  region: string;
+  moment: string;
+  address?: string | null;
+  note?: string | null;
+  source_title: string;
+  source_url: string;
+  source_class?: 'official' | 'platform' | 'experience' | 'web' | string;
+  checked_at: string;
+  search_query: string;
 }
 export interface HarubanAnswerContract {
   answer_type: string;

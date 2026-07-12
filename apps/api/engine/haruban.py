@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
@@ -823,6 +824,104 @@ def _extract_response_sources(resp: Any) -> list[dict]:
     return _dedupe_sources(sources)
 
 
+def _extract_web_place_candidates(
+    answer: str,
+    sources: list[dict],
+    query: str,
+    context: str = "",
+) -> list[dict]:
+    """웹검색 Markdown에서 출처가 연결된 고유 장소만 플랜 후보로 구조화한다."""
+    clean_answer = str(answer or "")
+    if not clean_answer:
+        return []
+
+    try:
+        payload = json.loads(context) if context else {}
+    except (TypeError, ValueError):
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    raw_regions = payload.get("regions") or []
+    raw_moments = payload.get("moments") or []
+    if isinstance(raw_regions, str):
+        raw_regions = [raw_regions]
+    if isinstance(raw_moments, str):
+        raw_moments = [raw_moments]
+    region = next((str(value) for value in raw_regions if value), "")
+    moment = next((str(value) for value in raw_moments if value), "")
+    if not moment:
+        category = _infer_category_from_text(query, payload)
+        moment = next(
+            (key for key, value in filters_mod.MOMENT_TO_CATEGORY.items() if value == category),
+            category or "web_search",
+        )
+
+    source_by_url = {
+        str(source.get("url") or "").strip(): source
+        for source in sources
+        if source.get("url")
+    }
+    matches = list(re.finditer(r"\*\*([^*\n]{2,80})\*\*", clean_answer))
+    checked_at = datetime.now(timezone.utc).isoformat()
+    candidates: list[dict] = []
+    seen_names: set[str] = set()
+    ignored_names = {"한눈에 보기", "추천 장소", "방문 팁", "공공데이터 교차확인"}
+
+    for index, match in enumerate(matches):
+        name = re.sub(r"^\s*\d+[.)]\s*", "", match.group(1)).strip()
+        name_key = _normalize_place_name(name)
+        if not name_key or name in ignored_names or name_key in seen_names:
+            continue
+        segment_end = matches[index + 1].start() if index + 1 < len(matches) else len(clean_answer)
+        segment = clean_answer[match.end():segment_end]
+        urls = re.findall(r"\]\((https?://[^)\s]+)\)", segment)
+        source_url = next((url for url in urls if url), "")
+        if not source_url and len(sources) == 1:
+            source_url = str(sources[0].get("url") or "")
+        if not source_url:
+            continue
+        source = source_by_url.get(source_url, {})
+
+        note = ""
+        address = ""
+        for raw_line in segment.splitlines():
+            line = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", raw_line)
+            line = re.sub(r"^[\s>*-]+", "", line).strip()
+            if not line:
+                continue
+            if re.match(r"(?:위치|주소)\s*[:：]", line):
+                address = re.sub(r"^(?:위치|주소)\s*[:：]\s*", "", line).strip()
+                continue
+            if re.match(r"(?:특징|추천 이유|이유)\s*[:：]", line):
+                note = re.sub(r"^(?:특징|추천 이유|이유)\s*[:：]\s*", "", line).strip()
+                break
+        if not note:
+            plain = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", segment)
+            plain = re.sub(r"[#>*_`-]+", " ", plain)
+            note = re.sub(r"\s+", " ", plain).strip()[:180]
+
+        external_id = "web-" + hashlib.sha1(
+            f"{name_key}|{source_url}".encode("utf-8")
+        ).hexdigest()[:16]
+        candidates.append({
+            "id": external_id,
+            "name": name,
+            "region": region,
+            "moment": moment or "web_search",
+            "address": address or None,
+            "note": note[:240] or None,
+            "source_title": source.get("title") or source_url,
+            "source_url": source_url,
+            "source_class": source.get("source_class") or _classify_web_source(source_url),
+            "checked_at": source.get("checked_at") or checked_at,
+            "search_query": query,
+        })
+        seen_names.add(name_key)
+        if len(candidates) >= 6:
+            break
+    return candidates
+
+
 def _web_search_context_text(context: str) -> str:
     clean_context = str(context or "").strip()
     if not clean_context:
@@ -998,11 +1097,18 @@ def _run_web_search_jeju(args: dict) -> dict:
     query = str(args.get("query") or "").strip()
     context = str(args.get("context") or "").strip()
     result = _perform_web_search_jeju(query, context=context)
+    place_candidates = _extract_web_place_candidates(
+        result.answer,
+        result.sources,
+        result.query,
+        context,
+    ) if result.available else []
     return {
         "available": result.available,
         "query": result.query,
         "answer": result.answer,
         "sources": result.sources,
+        "place_candidates": place_candidates,
         "queries": list(getattr(result, "queries", []) or [result.query]),
         "research_status": getattr(
             result,
@@ -2297,6 +2403,7 @@ class HarubanTurn:
     tool_trace: list[dict] = field(default_factory=list)  # 디버깅용
     reason: str = ""
     answer_contract: dict = field(default_factory=dict)
+    place_candidates: list[dict] = field(default_factory=list)
 
 
 def chat_turn(
@@ -2389,6 +2496,7 @@ def chat_turn(
                 tool_trace=trace,
                 reason="OPENAI_API_KEY not set; used search pool fallback",
                 answer_contract=search_pool.get("contract") or {},
+                place_candidates=(search_pool.get("result") or {}).get("place_candidates") or [],
             )
         return HarubanTurn(available=False, reason="OPENAI_API_KEY not set", tool_trace=trace)
 
@@ -2399,6 +2507,7 @@ def chat_turn(
         form_state,
         answer_contract=(search_pool.get("contract") if search_pool else None),
         preloaded_tool=(search_pool.get("tool") if search_pool else None),
+        place_candidates=(search_pool.get("result") or {}).get("place_candidates") or [] if search_pool else [],
     )
 
 
@@ -2409,6 +2518,7 @@ def _chat_turn_raw(
     form_state: dict | None = None,
     answer_contract: dict | None = None,
     preloaded_tool: str | None = None,
+    place_candidates: list[dict] | None = None,
 ) -> HarubanTurn:
     """openai client를 직접 사용해 conv 배열 통째 전달 + tool 실행 루프."""
     import os
@@ -2422,6 +2532,7 @@ def _chat_turn_raw(
         return HarubanTurn(available=False, reason=f"openai import failed: {e}")
 
     client = OpenAI(api_key=key)
+    resolved_candidates = list(place_candidates or [])
     form_suggestion: dict | None = None
     available_tools = [] if preloaded_tool else TOOLS
     tool_choice = "none" if preloaded_tool else "auto"
@@ -2455,6 +2566,7 @@ def _chat_turn_raw(
                 form_suggestion=form_suggestion,
                 tool_trace=trace,
                 answer_contract=answer_contract or {},
+                place_candidates=resolved_candidates,
             )
 
         # 도구 호출들을 실제로 실행하고 tool role 메시지 추가.
@@ -2516,6 +2628,7 @@ def _chat_turn_raw(
         tool_trace=trace,
         reason=f"max iterations ({max_iterations}) reached",
         answer_contract=answer_contract or {},
+        place_candidates=resolved_candidates,
     )
 
 
