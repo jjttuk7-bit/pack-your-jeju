@@ -4,7 +4,9 @@ LLM 실호출 없이 폴백 경로만 검증 (CLAUDE.md 절대 규칙 6).
 """
 from __future__ import annotations
 
-from apps.api.engine.assemble import _template_intro, compose_intro
+from types import SimpleNamespace
+
+from apps.api.engine.assemble import _item_to_dict, _template_intro, compose_intro
 from apps.api.engine.trust import Fallback, Section
 
 
@@ -35,3 +37,24 @@ def test_compose_intro_falls_back_when_no_api_key(monkeypatch):
     assert intro.llm_used is False
     assert "OPENAI_API_KEY" in intro.reason
     assert "오름" in intro.text
+
+
+def test_itinerary_item_keeps_photo_amenities():
+    item = SimpleNamespace(
+        name="새별오름",
+        badge="verified",
+        external_id="CONT_1",
+        sources=[],
+        freshness={},
+        transit={},
+        note=None,
+        region_normalized="aewol",
+        trust_score=90,
+        score_breakdown={},
+        check_required=[],
+        amenities={"thumbnail_path": "https://api.cdn.visitjeju.net/thumb.webp"},
+    )
+
+    serialized = _item_to_dict("oreum", item)
+
+    assert serialized["amenities"]["thumbnail_path"].endswith("thumb.webp")

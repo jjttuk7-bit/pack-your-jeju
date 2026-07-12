@@ -138,6 +138,7 @@ def _item_to_dict(moment: str, it) -> dict:
         "freshness": it.freshness,
         "transit": it.transit,
         "note": it.note,
+        "amenities": getattr(it, "amenities", {}),
         "region_normalized": getattr(it, "region_normalized", ""),
         "trust_score": getattr(it, "trust_score", 0),
         "score_breakdown": getattr(it, "score_breakdown", {}),
