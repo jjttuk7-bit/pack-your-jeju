@@ -318,6 +318,26 @@ DELETE_PLACE_SQL = text(
     "DELETE FROM place WHERE external_id = ANY(:external_ids)"
 )
 
+BACKFILL_PLACE_PHOTOS_SQL = text(
+    """
+    UPDATE place
+       SET amenities = COALESCE(place.amenities, '{}'::jsonb)
+           || jsonb_strip_nulls(jsonb_build_object(
+               'thumbnail_path', COALESCE(
+                   NULLIF(raw_source.payload #>> '{repPhoto,photoid,thumbnailpath}', ''),
+                   NULLIF(raw_source.payload #>> '{repPhoto,photoid,imgpath}', '')
+               ),
+               'image_path', NULLIF(raw_source.payload #>> '{repPhoto,photoid,imgpath}', '')
+           )),
+           updated_at = now()
+      FROM raw_source
+     WHERE raw_source.source = 'visitjeju'
+       AND raw_source.tombstoned = false
+       AND raw_source.external_id = place.external_id
+       AND NULLIF(raw_source.payload #>> '{repPhoto,photoid,imgpath}', '') IS NOT NULL
+    """
+)
+
 
 def upsert_places(rows: list[ProcessedPlace]) -> int:
     if not rows:
@@ -352,6 +372,13 @@ def delete_places(external_ids: list[str]) -> int:
     with engine.begin() as conn:
         conn.execute(DELETE_PLACE_SQL, {"external_ids": ids})
     return len(ids)
+
+
+def backfill_place_photos() -> int:
+    engine = db.get_engine()
+    with engine.begin() as conn:
+        result = conn.execute(BACKFILL_PLACE_PHOTOS_SQL)
+        return result.rowcount or 0
 
 
 def process_from_raw_source(*, limit: int | None = None) -> int:
@@ -404,10 +431,13 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
     p = argparse.ArgumentParser(description="raw_source(visitjeju) → place 정제")
     p.add_argument("--from-probe", metavar="PATH", help="probe json에서 즉시 seed 적재")
+    p.add_argument("--backfill-photos-only", action="store_true")
     p.add_argument("--limit", type=int, default=None)
     args = p.parse_args(argv)
 
-    if args.from_probe:
+    if args.backfill_photos_only:
+        n = backfill_place_photos()
+    elif args.from_probe:
         n = process_from_probe_dump(args.from_probe, limit=args.limit)
     else:
         n = process_from_raw_source(limit=args.limit)

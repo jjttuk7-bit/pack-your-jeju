@@ -241,6 +241,14 @@ def test_place_upsert_merges_existing_amenities():
     assert "|| EXCLUDED.amenities" in sql
 
 
+def test_photo_backfill_reads_visitjeju_photo_json_in_database():
+    sql = str(proc.BACKFILL_PLACE_PHOTOS_SQL)
+
+    assert "repPhoto,photoid,thumbnailpath" in sql
+    assert "repPhoto,photoid,imgpath" in sql
+    assert "COALESCE(place.amenities" in sql
+
+
 def test_upsert_places_uses_single_batch_execute(monkeypatch):
     fetched_at = datetime(2026, 7, 4, tzinfo=timezone.utc)
     rows = [
