@@ -122,6 +122,54 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
               </div>
             </section>
 
+            <section className="overflow-hidden bg-[#EEE3D1]">
+              <div className="mx-auto grid max-w-[1600px] lg:grid-cols-[1.2fr_0.7fr] lg:items-stretch">
+                <motion.div
+                  initial={{ opacity: 0, x: -24 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative aspect-[4/3] min-h-[320px] lg:aspect-auto lg:min-h-[660px]"
+                >
+                  <img
+                    src="/images/landing-jeju-illustration.jpg"
+                    alt="한라산과 돌담길, 감귤나무와 돌하르방을 그린 제주 풍경"
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                  />
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 22 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.35 }}
+                  transition={{ duration: 0.65, delay: 0.12 }}
+                  className="flex items-center px-6 py-14 sm:px-10 sm:py-20 lg:px-12 xl:px-16"
+                >
+                  <div className="max-w-md">
+                    <p className="text-[11px] font-bold tracking-[0.2em] text-[#B14E2D]">제주를 담다</p>
+                    <h2 className="mt-5 font-serif-kr text-[36px] font-bold leading-[1.18] text-[#282B29] sm:text-[42px]">
+                      <span className="lg:whitespace-nowrap">당신이 만나고 싶은</span>
+                      <br />제주를 담습니다.
+                    </h2>
+                    <div className="mt-7 h-px w-12 bg-[#B14E2D]" />
+                    <p className="mt-7 text-[14px] leading-7 text-[#62645F] sm:text-[15px]">
+                      바다를 걷는 아침도, 오름 위에서 맞는 바람도,
+                      <br className="hidden xl:block" /> 시장 골목에서 발견한 한 끼도.
+                      <br />마음이 머무는 순간을 고르면 나만의 제주 여행이 시작됩니다.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={enterApp}
+                      className="mt-9 inline-flex min-h-12 items-center gap-2 border-b border-[#3E4641] pb-1 text-[14px] font-bold text-[#303733] transition hover:border-[#B14E2D] hover:text-[#B14E2D] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B14E2D]"
+                    >
+                      나만의 제주 시작하기
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            </section>
+
             <section className="bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
               <div className="mx-auto max-w-7xl">
                 <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
