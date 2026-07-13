@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, Home } from 'lucide-react';
+import { MessageSquareText, ShieldCheck, Home } from 'lucide-react';
 import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus } from './types';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
+import TravelFeedback from './components/TravelFeedback';
 import HarubanChat from './components/HarubanChat';
 import LandingPage from './components/LandingPage';
 import TrustMapDashboard from './components/TrustMapDashboard';
@@ -75,7 +76,7 @@ function migrateSavedTravel(saved: any): SavedTravel {
   const step =
     saved.step === 'dashboard' && (regions.length === 0 || selectedMomentIds.length === 0)
       ? 'setup'
-      : saved.step === 'dashboard' || saved.step === 'verify' || saved.step === 'setup'
+      : saved.step === 'dashboard' || saved.step === 'feedback' || saved.step === 'verify' || saved.step === 'setup'
         ? saved.step
         : 'setup';
   if (!Array.isArray(info.regions)) {
@@ -198,6 +199,7 @@ export default function App() {
 
   const goToVerify = () => setState(prev => ({ ...prev, step: 'verify' }));
   const goToDashboard = () => setState(prev => ({ ...prev, step: 'dashboard' }));
+  const goToFeedback = () => setState(prev => ({ ...prev, step: 'feedback' }));
 
   // 하루방 폼 반영 제안 승인 시. 빈 값은 기존 값을 덮어쓰지 않는다.
   const handleHarubanApply = (
@@ -457,6 +459,15 @@ export default function App() {
                 내 팩
               </button>
               <button
+                onClick={goToFeedback}
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition inline-flex items-center gap-1 ${
+                  state.step === 'feedback' ? 'bg-citrus text-white shadow-jeju-chip' : 'text-basalt-2 hover:text-basalt'
+                }`}
+              >
+                <MessageSquareText className="w-3 h-3" />
+                여행 피드백
+              </button>
+              <button
                 onClick={goToVerify}
                 className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition inline-flex items-center gap-1 ${
                   state.step === 'verify'
@@ -521,8 +532,14 @@ export default function App() {
                   onAddCustomPlanItem={handleAddCustomPlanItem}
                   onRemovePlanItem={handleRemovePlanItem}
                   onSetVisitCheck={handleSetVisitCheck}
+                  onOpenFeedback={goToFeedback}
                   onReset={handleReset}
                 />
+              </motion.div>
+            )}
+            {state.step === 'feedback' && (
+              <motion.div key="feedback-view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }} className="w-full">
+                <TravelFeedback info={state.info} planItems={state.selectedPlanItems || []} visitChecks={state.visitChecks || {}} onSetVisitCheck={handleSetVisitCheck} onOpenPlan={goToDashboard} />
               </motion.div>
             )}
             {state.step === 'verify' && (

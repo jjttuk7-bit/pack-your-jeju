@@ -117,7 +117,7 @@ export interface SavedTravel {
   checkedMemoryIds: string[];
   customBasicItems: string[];
   customMomentItems: Record<MomentId, string[]>;
-  step: 'setup' | 'dashboard' | 'verify';
+  step: 'setup' | 'dashboard' | 'feedback' | 'verify';
   customMemories?: string[];
   selectedPlanItems?: TravelPlanItem[];
   visitChecks?: Record<string, VisitCheck>;

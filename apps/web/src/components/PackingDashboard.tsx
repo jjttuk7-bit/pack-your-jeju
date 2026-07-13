@@ -68,6 +68,7 @@ interface Props {
   onAddCustomPlanItem: (item: TravelPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
   onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
+  onOpenFeedback: () => void;
   onReset: () => void;
 }
 
@@ -158,6 +159,7 @@ export default function PackingDashboard(props: Props) {
     onAddCustomPlanItem,
     onRemovePlanItem,
     onSetVisitCheck,
+    onOpenFeedback,
     onReset,
   } = props;
 
@@ -477,9 +479,10 @@ export default function PackingDashboard(props: Props) {
       )}
 
       {packResp && !loading && !error && (
-        <TrustFeedbackLoopCard
+        <FeedbackSummaryCard
           planItems={selectedPlanItems}
           visitChecks={visitChecks}
+          onOpenFeedback={onOpenFeedback}
         />
       )}
         </aside>
@@ -1297,7 +1300,41 @@ type FeedbackDashboardSummary = {
   entries: FeedbackDashboardEntry[];
 };
 
-function TrustFeedbackLoopCard({
+function FeedbackSummaryCard({
+  planItems,
+  visitChecks,
+  onOpenFeedback,
+}: {
+  planItems: TravelPlanItem[];
+  visitChecks: Record<string, VisitCheck>;
+  onOpenFeedback: () => void;
+}) {
+  const dashboard = buildFeedbackDashboard(planItems, visitChecks);
+  return (
+    <div className="rounded-[20px] border border-mint/25 bg-[#F4FBF8] p-4 shadow-pyj-card">
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-mint">
+        <ClipboardCheck className="h-3 w-3" /> 여행 피드백
+      </span>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div>
+          <strong className="font-serif-kr text-[22px] text-basalt">{dashboard.total}건</strong>
+          <p className="mt-0.5 text-[10.5px] text-basalt-2">
+            변경·불일치 {dashboard.changed}건 · 수정요청 {dashboard.queued}건
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenFeedback}
+          className="shrink-0 rounded-full border border-mint/30 bg-white px-3 py-1.5 text-[10.5px] font-bold text-mint transition hover:bg-mint hover:text-white"
+        >
+          전체 보기 →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LegacyTrustFeedbackLoopCard({
   planItems,
   visitChecks,
 }: {
