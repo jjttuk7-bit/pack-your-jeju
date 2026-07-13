@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Loader2,
@@ -25,6 +25,7 @@ import {
   Trash2,
   ClipboardCheck,
   CloudSun,
+  GripVertical,
 } from 'lucide-react';
 import type {
   TravelInfo,
@@ -133,6 +134,18 @@ const PLAN_PACKING_ITEMS: Record<string, PlanPackingSuggestion[]> = {
   ],
 };
 
+const PLAN_SIDEBAR_STORAGE_KEY = 'pyj-plan-sidebar-width';
+const PLAN_SIDEBAR_DEFAULT_WIDTH = 460;
+const PLAN_SIDEBAR_MIN_WIDTH = 360;
+const PLAN_SIDEBAR_MAX_WIDTH = 680;
+const PLAN_CONTENT_MIN_WIDTH = 520;
+
+function savedPlanSidebarWidth(): number {
+  const saved = Number(window.localStorage.getItem(PLAN_SIDEBAR_STORAGE_KEY));
+  if (!Number.isFinite(saved)) return PLAN_SIDEBAR_DEFAULT_WIDTH;
+  return Math.min(Math.max(saved, PLAN_SIDEBAR_MIN_WIDTH), PLAN_SIDEBAR_MAX_WIDTH);
+}
+
 export default function PackingDashboard(props: Props) {
   const {
     info,
@@ -158,6 +171,73 @@ export default function PackingDashboard(props: Props) {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState<boolean>(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [planSidebarWidth, setPlanSidebarWidth] = useState(savedPlanSidebarWidth);
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const resizingSidebarRef = useRef(false);
+
+  useEffect(() => {
+    const finishResize = () => {
+      if (!resizingSidebarRef.current) return;
+      resizingSidebarRef.current = false;
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+    };
+    const resizeSidebar = (event: PointerEvent) => {
+      if (!resizingSidebarRef.current || !dashboardRef.current) return;
+      const bounds = dashboardRef.current.getBoundingClientRect();
+      const availableMaximum = bounds.width - PLAN_CONTENT_MIN_WIDTH - 28;
+      const maximum = Math.max(
+        PLAN_SIDEBAR_MIN_WIDTH,
+        Math.min(PLAN_SIDEBAR_MAX_WIDTH, availableMaximum),
+      );
+      const nextWidth = Math.min(
+        Math.max(event.clientX - bounds.left, PLAN_SIDEBAR_MIN_WIDTH),
+        maximum,
+      );
+      setPlanSidebarWidth(Math.round(nextWidth));
+    };
+
+    window.addEventListener('pointermove', resizeSidebar);
+    window.addEventListener('pointerup', finishResize);
+    window.addEventListener('pointercancel', finishResize);
+    return () => {
+      window.removeEventListener('pointermove', resizeSidebar);
+      window.removeEventListener('pointerup', finishResize);
+      window.removeEventListener('pointercancel', finishResize);
+      finishResize();
+    };
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(PLAN_SIDEBAR_STORAGE_KEY, String(planSidebarWidth));
+  }, [planSidebarWidth]);
+
+  useEffect(() => {
+    const fitSidebarToViewport = () => {
+      if (!dashboardRef.current || window.innerWidth < 1024) return;
+      const maximum = Math.max(
+        PLAN_SIDEBAR_MIN_WIDTH,
+        Math.min(
+          PLAN_SIDEBAR_MAX_WIDTH,
+          dashboardRef.current.getBoundingClientRect().width - PLAN_CONTENT_MIN_WIDTH - 28,
+        ),
+      );
+      setPlanSidebarWidth((current) => Math.min(current, Math.round(maximum)));
+    };
+    fitSidebarToViewport();
+    window.addEventListener('resize', fitSidebarToViewport);
+    return () => window.removeEventListener('resize', fitSidebarToViewport);
+  }, []);
+
+  const beginSidebarResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    resizingSidebarRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const resetSidebarWidth = () => setPlanSidebarWidth(PLAN_SIDEBAR_DEFAULT_WIDTH);
 
   const handleDownloadPlan = async () => {
     if (pdfLoading) return;
@@ -265,9 +345,15 @@ export default function PackingDashboard(props: Props) {
   ]);
 
   return (
-    <div className="w-full max-w-[1500px] mx-auto" id="packing-dashboard">
-      <div className="grid gap-5 xl:gap-7 lg:grid-cols-[460px_minmax(0,1fr)] lg:items-start">
-        <aside className="space-y-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-2 pyj-side-scroll">
+    <div
+      ref={dashboardRef}
+      className="w-full max-w-[1500px] mx-auto"
+      id="packing-dashboard"
+      style={{ '--plan-sidebar-width': `${planSidebarWidth}px` } as React.CSSProperties}
+    >
+      <div className="grid gap-5 xl:gap-7 lg:grid-cols-[var(--plan-sidebar-width)_minmax(0,1fr)] lg:items-start">
+        <div className="relative lg:sticky lg:top-6">
+        <aside className="space-y-5 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-2 pyj-side-scroll">
       {/* 요약 카드 */}
       <div
         className="rounded-[24px] border border-orange-100/60 bg-white shadow-pyj-card p-5 space-y-3"
@@ -397,6 +483,19 @@ export default function PackingDashboard(props: Props) {
         />
       )}
         </aside>
+        <button
+          type="button"
+          onPointerDown={beginSidebarResize}
+          onDoubleClick={resetSidebarWidth}
+          className="absolute -right-[18px] top-0 bottom-0 z-20 hidden w-5 touch-none cursor-col-resize items-center justify-center lg:flex"
+          title="드래그해서 플랜 영역 너비 조절 · 더블클릭으로 초기화"
+          aria-label="플랜 영역 너비 조절"
+        >
+          <span className="flex h-16 w-4 items-center justify-center rounded-full border border-[#2D6F65]/35 bg-white/95 text-[#2D6F65] shadow-md transition hover:border-[#2D6F65]/65 hover:bg-[#F4FAF7]">
+            <GripVertical className="h-4 w-4" />
+          </span>
+        </button>
+        </div>
 
         <main className="space-y-5">
       {packResp && !loading && !error && (
