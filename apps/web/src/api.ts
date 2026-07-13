@@ -10,6 +10,7 @@ import type {
   TravelInfo,
   MomentId,
   PackResponse,
+  CandidatePageResponse,
   RegionCoveragePreview,
   VisitSignalResponse,
   VisitCheckStatus,
@@ -63,6 +64,27 @@ export function requestPack(info: TravelInfo, moments: MomentId[]): Promise<Pack
   const notes = info.specialNotes?.trim();
   if (notes) body.special_notes = notes;
   return post<PackResponse>('/pack', body);
+}
+
+export function requestCandidatePage(
+  info: TravelInfo,
+  moments: MomentId[],
+  moment: MomentId | string,
+  cursor: string,
+): Promise<CandidatePageResponse> {
+  const body: Record<string, unknown> = {
+    regions: info.regions,
+    start_date: info.startDate,
+    days: info.durationDays,
+    companion: info.companion,
+    purpose: info.purpose,
+    moments,
+    moment,
+    cursor,
+  };
+  const notes = info.specialNotes?.trim();
+  if (notes) body.special_notes = notes;
+  return post<CandidatePageResponse>('/pack/candidates', body);
 }
 
 export function requestRegionCoveragePreview(

@@ -239,7 +239,13 @@ export interface SectionDto {
   moment: MomentId | string;
   items: PackItemDto[];
   fallback: { reason: FallbackReason; message: string; stats: any } | null;
+  total_count?: number;
+  shown_count?: number;
+  has_more?: boolean;
+  next_cursor?: string | null;
 }
+
+export type CandidatePageResponse = SectionDto;
 
 export interface ItineraryItemDto extends PackItemDto {
   moment: MomentId | string;

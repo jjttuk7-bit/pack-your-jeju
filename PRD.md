@@ -43,6 +43,7 @@
   "moments": ["oreum", "local_market", "sunset"]   // MOMENT_CARDS.md의 card_id
 }
 ```
+
 ```jsonc
 // 응답
 {
@@ -76,6 +77,16 @@
   "log_id": "..."
 }
 ```
+
+각 `sections[]`는 기존 필드 외에 `total_count`, `shown_count`, `has_more`, `next_cursor`를 선택적으로 포함한다. 구형 클라이언트는 이 필드를 무시할 수 있다.
+
+### POST `/pack/candidates`
+
+- 입력: 기존 `/pack` 조건 + 단일 `moment` + 이전 응답의 선택적 `cursor`
+- 출력: 해당 순간의 다음 후보 5곳과 `total_count`, `shown_count`, `has_more`, `next_cursor`
+- 정확 지역 후보를 먼저 제공하고 인근 권역 후보는 `인근 지역 결과`로 표시한다.
+- cursor는 정확 지역 우선·확인 신호·갱신 시점·내부 식별자의 정렬 키를 담은 불투명 값이며 최대 512자다.
+- 기존 `/pack`, PDF와 요일별 일정 후보는 변경하지 않는다.
 
 ### POST `/verify` (킥1 데모용)
 - 입력: `{ "text": "카카오/블로그 리뷰 원문" }`

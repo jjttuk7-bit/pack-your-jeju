@@ -22,6 +22,7 @@ from apps.api.engine.filters import MomentFilter
 from apps.api.engine.search import (
     PlaceHit,
     TransitCheck,
+    search_candidate_page,
     search_relaxed,
     search_strict,
     transit_check,
@@ -69,6 +70,8 @@ class Section:
     items: list[BadgedItem]
     fallback: Fallback | None
     observed_reasons: list[Reason]  # 관측용 (retrieval_miss가 recovery된 경우 포함)
+    total_count: int | None = None
+    next_cursor: str | None = None
 
 
 @dataclass(frozen=True)
@@ -391,6 +394,7 @@ def judge_section(
 ) -> Section:
     now = datetime.now(timezone.utc)
     strict = (strict_fn or _strict_default)(mf, limit)
+    uses_default_search = strict_fn is None and relaxed_fn is None
 
     if strict:
         items = [badge_item(h, mf, now=now, weather_snapshot=weather_snapshot) for h in strict]
@@ -411,7 +415,15 @@ def judge_section(
                     )
                     for h in topups[: max(0, limit - len(items))]
                 )
-        return Section(moment=mf.moment, items=items, fallback=None, observed_reasons=observed_reasons)
+        page = search_candidate_page(mf, limit=limit) if uses_default_search else None
+        return Section(
+            moment=mf.moment,
+            items=items,
+            fallback=None,
+            observed_reasons=observed_reasons,
+            total_count=page.total_count if page else len(items),
+            next_cursor=page.next_cursor if page else None,
+        )
 
     # strict 실패 → relaxed 재시도 (retrieval_miss 관측용 기록)
     relaxed = (relaxed_fn or _relaxed_default)(mf, limit)
@@ -420,11 +432,14 @@ def judge_section(
             badge_item(h, mf, now=now, note="인근 지역 결과", weather_snapshot=weather_snapshot)
             for h in relaxed
         ]
+        page = search_candidate_page(mf, limit=limit) if uses_default_search else None
         return Section(
             moment=mf.moment,
             items=items,
             fallback=None,
             observed_reasons=["retrieval_miss"],
+            total_count=page.total_count if page else len(items),
+            next_cursor=page.next_cursor if page else None,
         )
 
     # 여전히 없음 → coverage_gap
@@ -440,6 +455,8 @@ def judge_section(
             },
         ),
         observed_reasons=["coverage_gap"],
+        total_count=0,
+        next_cursor=None,
     )
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from collections import Counter
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 import os
@@ -30,6 +31,7 @@ from apps.api.engine import filters as filters_mod
 from apps.api.engine import haruban as haruban_mod
 from apps.api.engine import packpdf as packpdf_mod
 from apps.api.engine import region_coverage as region_coverage_mod
+from apps.api.engine import search as search_mod
 from apps.api.engine import trust as trust_mod
 from apps.api.engine import visit_signals as visit_signals_mod
 from apps.api.engine import verify as verify_mod
@@ -80,6 +82,11 @@ class PackBody(BaseModel):
     # 사용자 자유 텍스트. 사실 검증에는 영향 없음(폼이 구조화 필터를 이미 제공).
     # assemble.py의 감성 문구 톤에만 반영 — 새 장소·수치·시간 생성 금지 원칙 유지.
     special_notes: str | None = Field(default=None, max_length=500)
+
+
+class CandidatePageBody(PackBody):
+    moment: str
+    cursor: str | None = Field(default=None, max_length=512)
 
 
 VisitSignalStatus = Literal[
@@ -284,6 +291,67 @@ def pack(body: PackBody) -> dict[str, Any]:
         "packing_additions": [],
         "log_id": log_id,
     }
+
+
+@app.post("/pack/candidates")
+def pack_candidates(body: CandidatePageBody) -> dict[str, Any]:
+    try:
+        req = filters_mod.PackRequest.from_dict(body.model_dump())
+        filters = filters_mod.build_filters(req)
+    except (
+        ValidationError,
+        ValueError,
+        filters_mod.UnknownRegion,
+        filters_mod.UnknownMoment,
+        filters_mod.UnknownCompanion,
+        filters_mod.UnknownPurpose,
+    ) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": type(exc).__name__, "message": str(exc)},
+        ) from exc
+
+    moment_filter = next(
+        (item for item in filters.per_moment if item.moment == body.moment),
+        None,
+    )
+    if moment_filter is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "UnknownMoment", "message": "moment must be included in moments"},
+        )
+
+    try:
+        page = search_mod.search_candidate_page(moment_filter, cursor=body.cursor)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "InvalidCursor", "message": str(exc)},
+        ) from exc
+
+    now = datetime.now(timezone.utc)
+    items = [
+        trust_mod.badge_item(
+            hit,
+            moment_filter,
+            now=now,
+            note=(
+                "인근 지역 결과"
+                if hit.region_normalized not in moment_filter.regions
+                else None
+            ),
+        )
+        for hit in page.items
+    ]
+    section = trust_mod.Section(
+        moment=body.moment,
+        items=items,
+        fallback=None,
+        observed_reasons=[],
+        total_count=page.total_count,
+        next_cursor=page.next_cursor,
+    )
+    return _serialize_section(section)
 
 
 @app.post("/pack/pdf")
@@ -500,7 +568,7 @@ def verify(body: VerifyBody) -> dict[str, Any]:
 
 
 def _serialize_section(section: trust_mod.Section) -> dict:
-    return {
+    payload = {
         "moment": section.moment,
         "items": [
             {
@@ -536,6 +604,16 @@ def _serialize_section(section: trust_mod.Section) -> dict:
             else None
         ),
     }
+    if section.total_count is not None:
+        payload.update(
+            {
+                "total_count": section.total_count,
+                "shown_count": len(section.items),
+                "has_more": section.next_cursor is not None,
+                "next_cursor": section.next_cursor,
+            }
+        )
+    return payload
 
 
 def _public_weather_snapshot(snapshot: dict | None) -> dict:

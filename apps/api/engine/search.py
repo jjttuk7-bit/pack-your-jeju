@@ -16,10 +16,13 @@
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
@@ -75,6 +78,31 @@ class TransitCheck:
     bus_walkable: bool
 
 
+@dataclass(frozen=True)
+class CandidatePage:
+    items: list[PlaceHit]
+    total_count: int
+    has_more: bool
+    next_cursor: str | None
+
+
+@dataclass(frozen=True)
+class CandidateCursor:
+    exact_rank: int
+    fix_rank: int
+    updated_at: datetime
+    row_id: int
+    total_count: int = 0
+    seen_count: int = 0
+
+
+@dataclass(frozen=True)
+class CandidateBatch:
+    items: list[PlaceHit]
+    last_cursor: CandidateCursor | None
+    has_more: bool
+
+
 # ---- 검색 SQL ----
 
 _BASE_SELECT = """
@@ -87,6 +115,55 @@ _BASE_SELECT = """
        AND category = ANY(:categories)
      ORDER BY has_fix_request DESC, updated_at DESC, id ASC
      LIMIT :limit
+"""
+
+_CANDIDATE_PAGE_SELECT = """
+    SELECT id,
+           COALESCE(updated_at, TIMESTAMPTZ '1970-01-01 00:00:00+00') AS cursor_updated_at,
+           CASE WHEN region_normalized = ANY(:exact_regions) THEN 1 ELSE 0 END AS exact_rank,
+           CASE WHEN has_fix_request THEN 1 ELSE 0 END AS fix_rank,
+           external_id, name, category, region_normalized, address,
+           lat, lng, info_type, valid_until, amenities,
+           has_fix_request, tombstoned, source_url, hygiene_grade
+      FROM place
+     WHERE tombstoned = false
+       AND region_normalized = ANY(:regions)
+       AND category = ANY(:categories)
+       {cursor_clause}
+     ORDER BY (region_normalized = ANY(:exact_regions)) DESC,
+              has_fix_request DESC,
+              COALESCE(updated_at, TIMESTAMPTZ '1970-01-01 00:00:00+00') DESC,
+              id ASC
+     LIMIT :fetch_limit
+"""
+
+_CANDIDATE_CURSOR_CLAUSE = """
+       AND (
+            CASE WHEN region_normalized = ANY(:exact_regions) THEN 1 ELSE 0 END < :cursor_exact
+         OR (
+              CASE WHEN region_normalized = ANY(:exact_regions) THEN 1 ELSE 0 END = :cursor_exact
+              AND CASE WHEN has_fix_request THEN 1 ELSE 0 END < :cursor_fix
+            )
+         OR (
+              CASE WHEN region_normalized = ANY(:exact_regions) THEN 1 ELSE 0 END = :cursor_exact
+              AND CASE WHEN has_fix_request THEN 1 ELSE 0 END = :cursor_fix
+              AND COALESCE(updated_at, TIMESTAMPTZ '1970-01-01 00:00:00+00') < :cursor_updated_at
+            )
+         OR (
+              CASE WHEN region_normalized = ANY(:exact_regions) THEN 1 ELSE 0 END = :cursor_exact
+              AND CASE WHEN has_fix_request THEN 1 ELSE 0 END = :cursor_fix
+              AND COALESCE(updated_at, TIMESTAMPTZ '1970-01-01 00:00:00+00') = :cursor_updated_at
+              AND id > :cursor_id
+            )
+       )
+"""
+
+_CANDIDATE_COUNT_SELECT = """
+    SELECT COUNT(*)
+      FROM place
+     WHERE tombstoned = false
+       AND region_normalized = ANY(:regions)
+       AND category = ANY(:categories)
 """
 # 정렬 규칙 (정직함 시연 정책):
 #   1) has_fix_request DESC — 신뢰 하향 신호가 있는 항목을 오히려 상위로 올려
@@ -137,6 +214,173 @@ def _row_to_hit(r) -> PlaceHit:
         tombstoned=bool(r.tombstoned),
         source_url=r.source_url,
         hygiene_grade=r.hygiene_grade,
+    )
+
+
+def _expanded_regions(mf: MomentFilter) -> tuple[str, ...]:
+    expanded: set[str] = set()
+    for region in mf.regions:
+        expanded.update(REGION_GROUP.get(region, (region,)))
+    return tuple(sorted(expanded))
+
+
+def _query_candidate_batch(
+    mf: MomentFilter,
+    *,
+    cursor: CandidateCursor | None,
+    limit: int,
+) -> CandidateBatch:
+    params = {
+        "regions": list(_expanded_regions(mf)),
+        "exact_regions": list(mf.regions),
+        "categories": [mf.primary_category],
+        "fetch_limit": limit + 1,
+    }
+    if cursor:
+        params.update(
+            {
+                "cursor_exact": cursor.exact_rank,
+                "cursor_fix": cursor.fix_rank,
+                "cursor_updated_at": cursor.updated_at,
+                "cursor_id": cursor.row_id,
+            }
+        )
+    query = _CANDIDATE_PAGE_SELECT.format(
+        cursor_clause=_CANDIDATE_CURSOR_CLAUSE if cursor else "",
+    )
+    with db.get_engine().connect() as conn:
+        rows = conn.execute(text(query), params).all()
+    has_more = len(rows) > limit
+    visible_rows = rows[:limit]
+    last = visible_rows[-1] if visible_rows else None
+    return CandidateBatch(
+        items=[_row_to_hit(row) for row in visible_rows],
+        last_cursor=(
+            CandidateCursor(
+                exact_rank=int(last.exact_rank),
+                fix_rank=int(last.fix_rank),
+                updated_at=last.cursor_updated_at,
+                row_id=int(last.id),
+            )
+            if last
+            else None
+        ),
+        has_more=has_more,
+    )
+
+
+def count_candidates(mf: MomentFilter) -> int:
+    with db.get_engine().connect() as conn:
+        value = conn.execute(
+            text(_CANDIDATE_COUNT_SELECT),
+            {
+                "regions": list(_expanded_regions(mf)),
+                "categories": [mf.primary_category],
+            },
+        ).scalar_one()
+    return int(value)
+
+
+def _encode_cursor(cursor: CandidateCursor) -> str:
+    payload = json.dumps(
+        {
+            "exact": cursor.exact_rank,
+            "fix": cursor.fix_rank,
+            "updated_at": cursor.updated_at.isoformat(),
+            "id": cursor.row_id,
+            "total": cursor.total_count,
+            "seen": cursor.seen_count,
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def _decode_cursor(cursor: str | None) -> CandidateCursor | None:
+    if not cursor:
+        return None
+    if len(cursor) > 512:
+        raise ValueError("invalid candidate cursor")
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+        exact_rank = payload["exact"]
+        fix_rank = payload["fix"]
+        row_id = payload["id"]
+        total_count = payload["total"]
+        seen_count = payload["seen"]
+        updated_at = datetime.fromisoformat(payload["updated_at"])
+        if (
+            type(exact_rank) is not int
+            or exact_rank not in (0, 1)
+            or type(fix_rank) is not int
+            or fix_rank not in (0, 1)
+            or type(row_id) is not int
+            or row_id < 1
+            or type(total_count) is not int
+            or total_count < 0
+            or type(seen_count) is not int
+            or seen_count < 0
+            or seen_count > total_count
+            or updated_at.tzinfo is None
+        ):
+            raise ValueError
+        return CandidateCursor(
+            exact_rank,
+            fix_rank,
+            updated_at,
+            row_id,
+            total_count,
+            seen_count,
+        )
+    except (
+        ValueError,
+        TypeError,
+        KeyError,
+        UnicodeDecodeError,
+        binascii.Error,
+        json.JSONDecodeError,
+    ) as exc:
+        raise ValueError("invalid candidate cursor") from exc
+
+
+def search_candidate_page(
+    mf: MomentFilter,
+    *,
+    cursor: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    page_fn: Callable[..., CandidateBatch] | None = None,
+    count_fn: Callable[[MomentFilter], int] | None = None,
+) -> CandidatePage:
+    decoded_cursor = _decode_cursor(cursor)
+    batch = (page_fn or _query_candidate_batch)(mf, cursor=decoded_cursor, limit=limit)
+    seen_count = (decoded_cursor.seen_count if decoded_cursor else 0) + len(batch.items)
+    if decoded_cursor:
+        total_count = (
+            max(decoded_cursor.total_count, seen_count + 1)
+            if batch.has_more
+            else seen_count
+        )
+    else:
+        total_count = (count_fn or count_candidates)(mf)
+        if batch.has_more:
+            total_count = max(total_count, seen_count + 1)
+        else:
+            total_count = seen_count
+    next_cursor = (
+        replace(
+            batch.last_cursor,
+            total_count=total_count,
+            seen_count=seen_count,
+        )
+        if batch.has_more and batch.last_cursor
+        else None
+    )
+    return CandidatePage(
+        items=batch.items,
+        total_count=total_count,
+        has_more=batch.has_more,
+        next_cursor=_encode_cursor(next_cursor) if next_cursor else None,
     )
 
 

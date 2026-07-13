@@ -41,7 +41,8 @@ import type {
   WeatherSnapshotDto,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
-import { requestPack, requestVisitSignal } from '../api';
+import { requestCandidatePage, requestPack, requestVisitSignal } from '../api';
+import { hasFinishedCandidateSection, mergeCandidateSection } from '../candidatePagination';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 import PlaceDetail from './PlaceDetail';
@@ -166,6 +167,9 @@ export default function PackingDashboard(props: Props) {
   const [packResp, setPackResp] = useState<PackResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [candidatePageState, setCandidatePageState] = useState<
+    Record<string, { loading: boolean; error: string | null }>
+  >({});
   // 뷰 스위처: 순간별(기본) vs 요일별. 응답의 itinerary가 있어야 요일별 활성.
   const [viewMode, setViewMode] = useState<'moments' | 'itinerary'>('moments');
   // PDF 저장 상태
@@ -313,6 +317,44 @@ export default function PackingDashboard(props: Props) {
     }
   };
 
+  const handleLoadMoreCandidates = async (section: SectionDto) => {
+    if (!section.next_cursor || candidatePageState[section.moment]?.loading) return;
+    setCandidatePageState((current) => ({
+      ...current,
+      [section.moment]: { loading: true, error: null },
+    }));
+    try {
+      const page = await requestCandidatePage(
+        info,
+        selectedMomentIds,
+        section.moment,
+        section.next_cursor,
+      );
+      setPackResp((previous) => {
+        if (!previous) return previous;
+        return {
+          ...previous,
+          sections: previous.sections.map((current) => {
+            if (current.moment !== section.moment) return current;
+            return mergeCandidateSection(current, page);
+          }),
+        };
+      });
+      setCandidatePageState((current) => ({
+        ...current,
+        [section.moment]: { loading: false, error: null },
+      }));
+    } catch (candidateError: any) {
+      setCandidatePageState((current) => ({
+        ...current,
+        [section.moment]: {
+          loading: false,
+          error: candidateError?.message || '다른 후보를 불러오지 못했습니다.',
+        },
+      }));
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function fetchPack() {
@@ -320,7 +362,10 @@ export default function PackingDashboard(props: Props) {
       setError(null);
       try {
         const resp = await requestPack(info, selectedMomentIds);
-        if (!cancelled) setPackResp(resp);
+        if (!cancelled) {
+          setPackResp(resp);
+          setCandidatePageState({});
+        }
       } catch (e: any) {
         if (!cancelled) setError(e.message || String(e));
       } finally {
@@ -587,6 +632,8 @@ export default function PackingDashboard(props: Props) {
             section={section}
             selectedPlanIds={selectedPlanIds}
             onTogglePlanItem={onTogglePlanItem}
+            pageState={candidatePageState[section.moment]}
+            onLoadMore={handleLoadMoreCandidates}
           />
         </React.Fragment>
       ))}
@@ -2432,10 +2479,14 @@ function SectionCard({
   section,
   selectedPlanIds,
   onTogglePlanItem,
+  pageState,
+  onLoadMore,
 }: {
   section: SectionDto;
   selectedPlanIds: Set<string>;
   onTogglePlanItem: (item: TravelPlanItem) => void;
+  pageState?: { loading: boolean; error: string | null };
+  onLoadMore: (section: SectionDto) => void;
 }) {
   const moment = MOMENTS.find((m) => m.id === section.moment);
   const title = moment?.title ?? section.moment;
@@ -2453,11 +2504,18 @@ function SectionCard({
           </div>
         )}
         <h3 className="font-serif-kr font-bold text-[15px] text-basalt tracking-tight">{title}</h3>
-        {!section.fallback && section.items.length > 0 && (
+        {!section.fallback && section.items.length > 0 && section.total_count !== undefined ? (
+          <span
+            data-testid={`candidate-progress-${section.moment}`}
+            className="ml-auto text-[10.5px] font-bold text-basalt-2/60"
+          >
+            전체 {section.total_count.toLocaleString()}곳 중 {section.items.length.toLocaleString()}곳
+          </span>
+        ) : !section.fallback && section.items.length > 0 ? (
           <span className="ml-auto text-[10.5px] font-bold text-basalt-2/60 uppercase tracking-wider">
             {section.items.length}곳
           </span>
-        )}
+        ) : null}
       </div>
 
       {section.fallback && fb ? (
@@ -2473,20 +2531,53 @@ function SectionCard({
       ) : section.items.length === 0 ? (
         <p className="text-xs text-stone-400">결과가 없습니다.</p>
       ) : (
-        <div className="grid gap-3 xl:grid-cols-2">
-          {section.items.map((it) => {
-            const planItem = toPlanItem({ ...it, moment: section.moment } as ItineraryItemDto);
-            return (
-              <PackItemCard
-                key={it.external_id}
-                it={it}
-                planItem={planItem}
-                inPlan={selectedPlanIds.has(planItem.id)}
-                onTogglePlanItem={onTogglePlanItem}
-              />
-            );
-          })}
-        </div>
+        <>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {section.items.map((it) => {
+              const planItem = toPlanItem({ ...it, moment: section.moment } as ItineraryItemDto);
+              return (
+                <PackItemCard
+                  key={it.external_id}
+                  it={it}
+                  planItem={planItem}
+                  inPlan={selectedPlanIds.has(planItem.id)}
+                  onTogglePlanItem={onTogglePlanItem}
+                />
+              );
+            })}
+          </div>
+
+          {section.total_count !== undefined && (
+          <div className="border-t border-earth/70 pt-3 text-center">
+            {pageState?.error && (
+              <p className="mb-2 text-[11px] font-medium text-rose-700" role="alert">
+                {pageState.error}
+              </p>
+            )}
+            {section.has_more && section.next_cursor ? (
+              <button
+                type="button"
+                onClick={() => onLoadMore(section)}
+                disabled={pageState?.loading}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-citrus/30 bg-citrus/10 px-5 text-[12px] font-bold text-citrus-2 transition hover:border-citrus/60 hover:bg-citrus/15 disabled:cursor-wait disabled:opacity-60"
+              >
+                {pageState?.loading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    다른 후보를 불러오는 중
+                  </>
+                ) : (
+                  '다른 후보 5곳 보기'
+                )}
+              </button>
+            ) : hasFinishedCandidateSection(section) ? (
+              <p className="text-[11px] font-semibold text-basalt-2/70">
+                전체 후보를 모두 확인했습니다.
+              </p>
+            ) : null}
+          </div>
+          )}
+        </>
       )}
     </div>
   );
