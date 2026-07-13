@@ -12,6 +12,8 @@ import {
   Route,
   Search,
   Sparkles,
+  SlidersHorizontal,
+  PackageCheck,
 } from 'lucide-react';
 import CitrusMark from './marks/CitrusMark';
 
@@ -62,6 +64,41 @@ const planningSteps = [
     icon: Route,
     title: '나만의 여행이 완성돼요',
     body: '하루방이 최신 정보를 살펴보고 비교해, 바로 떠날 수 있는 플랜으로 정리해요.',
+  },
+];
+
+const journeySteps = [
+  {
+    number: '01',
+    icon: Search,
+    verb: '발견하다',
+    title: '흩어진 제주를 한 번에 찾고',
+    body: '하루방이 맛집·바다·오름·숙소를 최신 웹에서 찾아 출처와 함께 모아요.',
+    signal: '최신 웹 리서치',
+  },
+  {
+    number: '02',
+    icon: SlidersHorizontal,
+    verb: '비교하다',
+    title: '내 여행에 맞게 비교하고',
+    body: '일정과 동행자, 취향을 기준으로 공식 정보와 후기, 공공데이터를 함께 살펴봐요.',
+    signal: '선택 이유와 근거',
+  },
+  {
+    number: '03',
+    icon: PackageCheck,
+    verb: '담아두다',
+    title: '끌리는 장소만 플랜에 담고',
+    body: '검색에서 찾은 장소와 확인된 후보를 골라 일정과 준비물로 바로 이어가요.',
+    signal: '나만의 여행 플랜',
+  },
+  {
+    number: '04',
+    icon: MessageCircle,
+    verb: '기록하다',
+    title: '직접 만난 제주를 남겨요',
+    body: '방문 뒤 달라진 정보와 만족도를 기록해 다음 여행의 더 좋은 근거로 만들어요.',
+    signal: '실제 방문 경험',
   },
 ];
 
@@ -163,6 +200,86 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                       className="mt-9 inline-flex min-h-12 items-center gap-2 border-b border-[#3E4641] pb-1 text-[14px] font-bold text-[#303733] transition hover:border-[#B14E2D] hover:text-[#B14E2D] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B14E2D]"
                     >
                       나만의 제주 시작하기
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            </section>
+
+            <section className="overflow-hidden bg-[#17453F] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28">
+              <div className="mx-auto max-w-7xl">
+                <div className="grid gap-8 lg:grid-cols-[1fr_0.7fr] lg:items-end">
+                  <div className="max-w-3xl">
+                    <p className="text-[11px] font-bold tracking-[0.2em] text-[#F2A36D]">여행이 좋아지는 흐름</p>
+                    <h2 className="mt-4 font-serif-kr text-[38px] font-bold leading-[1.14] sm:text-[48px]">
+                      찾는 시간은 줄이고,
+                      <br />제주를 만나는 시간은 늘려요.
+                    </h2>
+                  </div>
+                  <p className="max-w-xl text-[14px] leading-7 text-white/68 lg:justify-self-end">
+                    검색에서 끝나는 정보가 아니라, 비교하고 선택해 실제 여행으로 이어지는 하나의 흐름을 만듭니다.
+                  </p>
+                </div>
+
+                <div className="relative mt-16 lg:mt-20">
+                  <div aria-hidden="true" className="absolute bottom-0 left-[27px] top-0 w-px bg-white/20 lg:bottom-auto lg:left-0 lg:right-0 lg:top-[31px] lg:h-px lg:w-auto" />
+                  <div className="grid gap-12 lg:grid-cols-4 lg:gap-8">
+                    {journeySteps.map((step, index) => {
+                      const Icon = step.icon;
+                      return (
+                        <motion.article
+                          key={step.number}
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, amount: 0.3 }}
+                          transition={{ duration: 0.5, delay: index * 0.1 }}
+                          className="relative grid grid-cols-[56px_1fr] gap-5 lg:block"
+                        >
+                          <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-[#17453F] text-[#F2A36D] shadow-[0_0_0_8px_#17453F]">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="pt-1 lg:pt-0">
+                            <div className="flex items-center gap-2 lg:mt-7">
+                              <span className="text-[10px] font-bold text-[#F2A36D]">{step.number}</span>
+                              <span className="h-px w-5 bg-white/25" />
+                              <span className="text-[10px] font-bold tracking-[0.14em] text-white/55">{step.verb}</span>
+                            </div>
+                            <h3 className="mt-3 font-serif-kr text-[20px] font-bold leading-snug">{step.title}</h3>
+                            <p className="mt-3 text-[12.5px] leading-6 text-white/65">{step.body}</p>
+                            <p className="mt-4 inline-flex border-b border-[#F2A36D]/60 pb-1 text-[10.5px] font-bold text-[#F2A36D]">
+                              {step.signal}
+                            </p>
+                          </div>
+                        </motion.article>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  transition={{ duration: 0.6 }}
+                  className="mt-16 border-y border-white/20 py-8 lg:mt-20"
+                >
+                  <div className="flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] font-bold text-white/72">
+                      <span>웹 출처</span>
+                      <span className="text-[#F2A36D]">+</span>
+                      <span>공공데이터</span>
+                      <span className="text-[#F2A36D]">+</span>
+                      <span>실제 방문 경험</span>
+                      <ArrowRight className="mx-1 h-4 w-4 text-[#F2A36D]" />
+                      <span className="font-serif-kr text-[19px] text-white">나의 제주 플랜</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={enterApp}
+                      className="inline-flex min-h-12 w-fit items-center gap-2 bg-white px-5 text-[13px] font-bold text-[#17453F] transition hover:bg-[#F2A36D] hover:text-[#25292C] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+                    >
+                      나만의 제주를 담아보기
                       <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
