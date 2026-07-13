@@ -494,14 +494,15 @@ function JejuSilhouetteMap({
   onToggle: (region: RegionId) => void;
 }) {
   return (
-    <div className="relative mx-auto mt-4 aspect-[567/312] w-full max-w-4xl overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F8F2E7]">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,249,240,0.78))]" />
-      <svg
-        viewBox="0 0 567 312"
-        role="img"
-        aria-label="제주 행정구역 선택 지도"
-        className="absolute inset-0 h-full w-full"
-      >
+    <div className="mx-auto mt-4 w-full max-w-4xl">
+      <div className="relative aspect-[567/312] w-full overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F8F2E7]">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,249,240,0.78))]" />
+        <svg
+          viewBox="0 0 567 312"
+          role="img"
+          aria-label="제주 행정구역 선택 지도"
+          className="absolute inset-0 h-full w-full"
+        >
         <defs>
           <filter id="jejuRegionShadow" x="-8%" y="-8%" width="116%" height="116%">
             <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor="#8B6C49" floodOpacity="0.12" />
@@ -607,10 +608,21 @@ function JejuSilhouetteMap({
           <path d="M119 301 L129 296 L139 303 L129 309 Z" className="fill-stone-300" />
           <text x="108" y="309" className="fill-basalt-2 text-[11px]">마라도</text>
         </g>
-      </svg>
+        </svg>
 
-      <div className="absolute bottom-3 right-3 max-w-[240px] rounded-2xl border border-earth bg-white/82 px-3 py-2 text-[10.5px] leading-relaxed text-basalt-2 shadow-sm backdrop-blur">
-        지역 면을 누르면 우측 근거가 바뀝니다. 선택은 우측 버튼으로 플랜 후보에 담습니다.
+        <div
+          data-testid="desktop-map-instruction"
+          className="absolute bottom-3 right-3 hidden max-w-[240px] rounded-2xl border border-earth bg-white/82 px-3 py-2 text-[10.5px] leading-relaxed text-basalt-2 shadow-sm backdrop-blur sm:block"
+        >
+          지역 면을 누르면 우측 근거가 바뀝니다. 선택은 우측 버튼으로 플랜 후보에 담습니다.
+        </div>
+      </div>
+
+      <div
+        data-testid="mobile-map-instruction"
+        className="mt-2 rounded-2xl border border-earth bg-white/82 px-3 py-2 text-[11px] leading-relaxed text-basalt-2 shadow-sm sm:hidden"
+      >
+        지역 면을 누르면 아래 근거가 바뀝니다. 선택은 아래 버튼으로 플랜 후보에 담습니다.
       </div>
     </div>
   );
