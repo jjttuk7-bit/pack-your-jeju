@@ -187,7 +187,7 @@ CREATE INDEX IF NOT EXISTS plan_item_place_created_idx
 CREATE TABLE IF NOT EXISTS evidence (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   place_id BIGINT NOT NULL REFERENCES place(id) ON DELETE RESTRICT,
-  plan_item_id UUID REFERENCES plan_item(id) ON DELETE SET NULL,
+  plan_item_id UUID REFERENCES plan_item(id) ON DELETE RESTRICT,
   source_class TEXT NOT NULL CHECK (
     source_class IN ('official', 'platform', 'experience', 'public_data', 'user_feedback')
   ),
@@ -208,6 +208,7 @@ CREATE INDEX IF NOT EXISTS evidence_place_checked_idx
 CREATE TABLE IF NOT EXISTS visit_feedback (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   plan_item_id UUID NOT NULL REFERENCES plan_item(id) ON DELETE RESTRICT,
+  place_id BIGINT REFERENCES place(id) ON DELETE RESTRICT,
   author_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
   visit_status TEXT NOT NULL CHECK (
     visit_status IN ('visited', 'not_visited', 'could_not_find')
@@ -230,6 +231,8 @@ CREATE TABLE IF NOT EXISTS visit_feedback (
 );
 CREATE INDEX IF NOT EXISTS visit_feedback_plan_item_created_idx
   ON visit_feedback (plan_item_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS visit_feedback_place_created_idx
+  ON visit_feedback (place_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS visit_feedback_author_created_idx
   ON visit_feedback (author_id, created_at DESC);
 
