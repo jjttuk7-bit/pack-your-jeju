@@ -40,7 +40,7 @@ TABLE_FIELDS = {
         "payload", "created_at",
     ),
     "visit_feedback": (
-        "id", "plan_item_id", "place_id", "author_id", "visit_status",
+        "id", "plan_item_id", "place_id", "author_id", "idempotency_key", "visit_status",
         "operation_status", "mismatch_types", "experience_tags", "memo",
         "submission_weight", "moderation_status", "created_at",
     ),
@@ -150,6 +150,7 @@ def test_ledger_states_match_product_and_trust_engine_contracts():
 def test_plan_client_ids_are_idempotent():
     assert "UNIQUE (owner_scope_id, client_plan_id)" in _table_ddl("travel_plan")
     assert "UNIQUE (plan_id, client_item_id)" in _table_ddl("plan_item")
+    assert "UNIQUE (plan_item_id, author_id, idempotency_key)" in _table_ddl("visit_feedback")
 
 
 def test_plan_scope_survives_user_anonymization():

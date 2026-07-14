@@ -214,6 +214,7 @@ CREATE TABLE IF NOT EXISTS visit_feedback (
   plan_item_id UUID NOT NULL REFERENCES plan_item(id) ON DELETE RESTRICT,
   place_id BIGINT REFERENCES place(id) ON DELETE RESTRICT,
   author_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  idempotency_key TEXT NOT NULL,
   visit_status TEXT NOT NULL CHECK (
     visit_status IN ('visited', 'not_visited', 'could_not_find')
   ),
@@ -233,7 +234,8 @@ CREATE TABLE IF NOT EXISTS visit_feedback (
       'collecting_signals', 'needs_more_evidence', 'under_review', 'approved', 'rejected'
     )
   ),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (plan_item_id, author_id, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS visit_feedback_plan_item_created_idx
   ON visit_feedback (plan_item_id, created_at DESC);
