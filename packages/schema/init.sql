@@ -148,6 +148,8 @@ CREATE TABLE IF NOT EXISTS user_profile (
 CREATE TABLE IF NOT EXISTS travel_plan (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  -- Auth subject와 분리된 비식별 멱등 scope. 사용자 삭제 후에도 유지한다.
+  owner_scope_id UUID NOT NULL,
   client_plan_id TEXT NOT NULL,
   title TEXT,
   start_date DATE,
@@ -159,10 +161,10 @@ CREATE TABLE IF NOT EXISTS travel_plan (
     CHECK (visibility IN ('private', 'unlisted', 'public')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (owner_id, client_plan_id)
+  UNIQUE (owner_scope_id, client_plan_id)
 );
 CREATE INDEX IF NOT EXISTS travel_plan_owner_updated_idx
-  ON travel_plan (owner_id, updated_at DESC);
+  ON travel_plan (owner_scope_id, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS plan_item (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -276,11 +278,12 @@ CREATE TABLE IF NOT EXISTS moderation_case (
       'pending', 'running', 'sufficient', 'partial', 'conflicted', 'unavailable'
     )
   ),
+  priority_rank SMALLINT NOT NULL DEFAULT 20 CHECK (priority_rank BETWEEN 0 AND 100),
   opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS moderation_case_open_priority_idx
-  ON moderation_case (priority, opened_at)
+  ON moderation_case (priority_rank DESC, opened_at)
   WHERE status IN ('open', 'researching', 'review_pending');
 
 CREATE TABLE IF NOT EXISTS moderation_decision (

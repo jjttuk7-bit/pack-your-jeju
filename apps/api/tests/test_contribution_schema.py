@@ -27,7 +27,7 @@ TABLE_FIELDS = {
         "id", "auth_subject", "display_name", "role", "status", "created_at",
     ),
     "travel_plan": (
-        "id", "owner_id", "client_plan_id", "title", "start_date", "days",
+        "id", "owner_id", "owner_scope_id", "client_plan_id", "title", "start_date", "days",
         "regions", "companion", "purpose", "visibility", "created_at", "updated_at",
     ),
     "plan_item": (
@@ -148,23 +148,41 @@ def test_ledger_states_match_product_and_trust_engine_contracts():
 
 
 def test_plan_client_ids_are_idempotent():
-    assert "UNIQUE (owner_id, client_plan_id)" in _table_ddl("travel_plan")
+    assert "UNIQUE (owner_scope_id, client_plan_id)" in _table_ddl("travel_plan")
     assert "UNIQUE (plan_id, client_item_id)" in _table_ddl("plan_item")
 
 
-def test_ledger_indexes_cover_primary_read_paths():
-    normalized = " ".join(SCHEMA.split())
+def test_plan_scope_survives_user_anonymization():
+    ddl = _table_ddl("travel_plan")
+    assert "owner_scope_id UUID NOT NULL" in ddl
+    assert "owner_id UUID REFERENCES user_profile(id) ON DELETE SET NULL" in ddl
 
-    assert "ON travel_plan (owner_id, updated_at DESC)" in normalized
-    assert "ON visit_feedback (place_id, created_at DESC)" in normalized
-    assert (
-        "ON moderation_case (priority, opened_at) "
-        "WHERE status IN ('open', 'researching', 'review_pending')"
-    ) in normalized
-    assert (
-        "ON public_data_correction (place_id, claim_key, effective_from DESC) "
-        "WHERE revoked_at IS NULL"
-    ) in normalized
+
+def test_ledger_indexes_cover_primary_read_paths():
+    index_statements = {
+        " ".join(statement.split())
+        for statement in _split_statements(SCHEMA)
+        if statement.upper().startswith("CREATE INDEX")
+    }
+
+    assert any("ON travel_plan (owner_scope_id, updated_at DESC)" in s for s in index_statements)
+    assert any("ON visit_feedback (place_id, created_at DESC)" in s for s in index_statements)
+    assert any(
+        "ON moderation_case (priority_rank DESC, opened_at)" in s
+        and "WHERE status IN ('open', 'researching', 'review_pending')" in s
+        for s in index_statements
+    )
+    assert any(
+        "ON public_data_correction (place_id, claim_key, effective_from DESC)" in s
+        and "WHERE revoked_at IS NULL" in s
+        for s in index_statements
+    )
+
+
+def test_schema_does_not_add_place_updates_or_triggers():
+    ledger_sql = SCHEMA.split("-- 플랜 피드백 근거 원장", 1)[1]
+    assert re.search(r"UPDATE\s+(?:\w+\.)?place\s+SET", ledger_sql, re.IGNORECASE) is None
+    assert re.search(r"CREATE\s+TRIGGER", ledger_sql, re.IGNORECASE) is None
 
 
 def test_ledger_foreign_keys_preserve_records_and_anonymize_users():
