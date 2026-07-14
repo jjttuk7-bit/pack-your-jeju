@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS plan_item (
   place_id BIGINT REFERENCES place(id) ON DELETE RESTRICT,
   client_item_id TEXT NOT NULL,
   source_type TEXT NOT NULL CHECK (
-    source_type IN ('public_data', 'harubang_search', 'user_input', 'community_verified')
+    source_type IN ('public_data', 'web_search', 'user_input', 'community_verified')
   ),
   source_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   day INT CHECK (day >= 1),
@@ -197,7 +197,9 @@ CREATE TABLE IF NOT EXISTS evidence (
   url TEXT,
   checked_at TIMESTAMPTZ,
   support_status TEXT NOT NULL CHECK (
-    support_status IN ('supports', 'contradicts', 'uncertain')
+    support_status IN (
+      'supported', 'partially_supported', 'conflicted', 'inferred', 'unsupported'
+    )
   ),
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -222,10 +224,12 @@ CREATE TABLE IF NOT EXISTS visit_feedback (
   mismatch_types TEXT[] NOT NULL DEFAULT '{}'::text[],
   experience_tags TEXT[] NOT NULL DEFAULT '{}'::text[],
   memo TEXT,
-  submission_weight NUMERIC(4, 3) NOT NULL DEFAULT 0.500
-    CHECK (submission_weight BETWEEN 0 AND 1),
-  moderation_status TEXT NOT NULL DEFAULT 'pending' CHECK (
-    moderation_status IN ('pending', 'reviewing', 'accepted', 'rejected')
+  submission_weight NUMERIC(4, 3) NOT NULL DEFAULT 1.000
+    CHECK (submission_weight BETWEEN 0 AND 1.5),
+  moderation_status TEXT NOT NULL DEFAULT 'collecting_signals' CHECK (
+    moderation_status IN (
+      'collecting_signals', 'needs_more_evidence', 'under_review', 'approved', 'rejected'
+    )
   ),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -268,7 +272,9 @@ CREATE TABLE IF NOT EXISTS moderation_case (
   priority TEXT NOT NULL DEFAULT 'normal'
     CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   research_status TEXT NOT NULL DEFAULT 'pending' CHECK (
-    research_status IN ('pending', 'running', 'succeeded', 'partial', 'failed')
+    research_status IN (
+      'pending', 'running', 'sufficient', 'partial', 'conflicted', 'unavailable'
+    )
   ),
   opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -82,6 +82,16 @@ def _assert_check(table: str, column: str) -> None:
     assert re.search(rf"CHECK\s*\(\s*{column}\s+IN\s*\(", _table_ddl(table))
 
 
+def _check_values(table: str, column: str) -> set[str]:
+    match = re.search(
+        rf"{column}\s+IN\s*\((.*?)\)",
+        _table_ddl(table),
+        re.DOTALL,
+    )
+    assert match is not None
+    return set(re.findall(r"'([^']+)'", match.group(1)))
+
+
 def test_contribution_ledger_tables_exist():
     for table in LEDGER_TABLES:
         assert _table_ddl(table)
@@ -116,6 +126,25 @@ def test_contribution_ledger_has_explicit_domain_constraints():
         ("place_trust_profile", "freshness_status"),
     ):
         _assert_check(table, column)
+
+
+def test_ledger_states_match_product_and_trust_engine_contracts():
+    feedback = " ".join(_table_ddl("visit_feedback").split())
+
+    assert _check_values("plan_item", "source_type") == {
+        "public_data", "web_search", "user_input", "community_verified",
+    }
+    assert "submission_weight NUMERIC(4, 3) NOT NULL DEFAULT 1.000" in feedback
+    assert "CHECK (submission_weight BETWEEN 0 AND 1.5)" in feedback
+    assert _check_values("visit_feedback", "moderation_status") == {
+        "collecting_signals", "needs_more_evidence", "under_review", "approved", "rejected",
+    }
+    assert _check_values("moderation_case", "research_status") == {
+        "pending", "running", "sufficient", "partial", "conflicted", "unavailable",
+    }
+    assert _check_values("evidence", "support_status") == {
+        "supported", "partially_supported", "conflicted", "inferred", "unsupported",
+    }
 
 
 def test_plan_client_ids_are_idempotent():
