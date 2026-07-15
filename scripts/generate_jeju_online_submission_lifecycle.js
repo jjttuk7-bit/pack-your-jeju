@@ -45,7 +45,7 @@ function run(text, options = {}) {
   return new TextRun({
     text,
     font: 'Malgun Gothic',
-    size: options.size || 20,
+    size: options.size || 19,
     bold: options.bold || false,
     color: options.color || C.ink,
     italics: options.italics || false,
@@ -55,7 +55,7 @@ function run(text, options = {}) {
 function p(text, options = {}) {
   return new Paragraph({
     alignment: options.alignment || AlignmentType.LEFT,
-    spacing: options.spacing || { after: 105, line: 280 },
+    spacing: options.spacing || { after: 90, line: 255 },
     keepNext: options.keepNext,
     keepLines: options.keepLines,
     children: options.children || [run(text, options.run || {})],
@@ -64,7 +64,7 @@ function p(text, options = {}) {
 
 function linkP(prefix, label, url, suffix = '') {
   return new Paragraph({
-    spacing: { after: 105, line: 280 },
+    spacing: { after: 90, line: 255 },
     keepLines: true,
     children: [
       run(prefix),
@@ -81,7 +81,7 @@ function h1(text, options = {}) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
     pageBreakBefore: options.pageBreakBefore || false,
-    spacing: { before: 180, after: 110 },
+    spacing: { before: 140, after: 85 },
     keepNext: true,
     children: [run(text, { size: 28, bold: true, color: C.green })],
   });
@@ -99,9 +99,9 @@ function h2(text) {
 function bullet(text) {
   return new Paragraph({
     numbering: { reference: 'entry-bullets', level: 0 },
-    spacing: { after: 75, line: 260 },
+    spacing: { after: 65, line: 240 },
     keepLines: true,
-    children: [run(text, { size: 19 })],
+    children: [run(text, { size: 18 })],
   });
 }
 
@@ -146,14 +146,14 @@ function infoTable(rows) {
           width: { size: left, type: WidthType.DXA },
           borders,
           shading: { fill: index % 2 === 0 ? C.pale : 'F8FAF9', type: ShadingType.CLEAR },
-          margins: { top: 95, bottom: 95, left: 130, right: 130 },
+          margins: { top: 70, bottom: 70, left: 130, right: 130 },
           children: [p(row[0], { spacing: { after: 0 }, run: { size: 18, bold: true, color: C.green } })],
         }),
         new TableCell({
           width: { size: CONTENT - left, type: WidthType.DXA },
           borders,
-          margins: { top: 95, bottom: 95, left: 130, right: 130 },
-          children: [p(row[1], { spacing: { after: 0, line: 250 }, run: { size: 18 } })],
+          margins: { top: 70, bottom: 70, left: 130, right: 130 },
+          children: [p(row[1], { spacing: { after: 0, line: 235 }, run: { size: 18 } })],
         }),
       ],
     })),
@@ -230,7 +230,6 @@ const children = [
     ['글꼴·크기', 'Noto Sans KR 또는 기본 글꼴, 11pt'],
     ['소제목', '제안 개요부터 기대효과까지 각 제목을 굵게 표시'],
     ['본문', '왼쪽 정렬, 문단 사이 한 줄 유지'],
-    ['링크', '서비스 URL에 하이퍼링크 적용'],
   ]),
 
   h1('4. 대표이미지 권장안', { pageBreakBefore: true }),
