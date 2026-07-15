@@ -113,6 +113,7 @@ _BASE_SELECT = """
      WHERE tombstoned = false
        AND region_normalized = ANY(:regions)
        AND category = ANY(:categories)
+       AND valid_until >= :now
      ORDER BY has_fix_request DESC, updated_at DESC, id ASC
      LIMIT :limit
 """
@@ -129,6 +130,7 @@ _CANDIDATE_PAGE_SELECT = """
      WHERE tombstoned = false
        AND region_normalized = ANY(:regions)
        AND category = ANY(:categories)
+       AND valid_until >= :now
        {cursor_clause}
      ORDER BY (region_normalized = ANY(:exact_regions)) DESC,
               has_fix_request DESC,
@@ -164,6 +166,7 @@ _CANDIDATE_COUNT_SELECT = """
      WHERE tombstoned = false
        AND region_normalized = ANY(:regions)
        AND category = ANY(:categories)
+       AND valid_until >= :now
 """
 # 정렬 규칙 (정직함 시연 정책):
 #   1) has_fix_request DESC — 신뢰 하향 신호가 있는 항목을 오히려 상위로 올려
@@ -234,6 +237,7 @@ def _query_candidate_batch(
         "regions": list(_expanded_regions(mf)),
         "exact_regions": list(mf.regions),
         "categories": [mf.primary_category],
+        "now": datetime.now(timezone.utc),
         "fetch_limit": limit + 1,
     }
     if cursor:
@@ -276,6 +280,7 @@ def count_candidates(mf: MomentFilter) -> int:
             {
                 "regions": list(_expanded_regions(mf)),
                 "categories": [mf.primary_category],
+                "now": datetime.now(timezone.utc),
             },
         ).scalar_one()
     return int(value)
