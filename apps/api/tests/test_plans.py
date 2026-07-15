@@ -29,3 +29,15 @@ def test_create_plan_returns_structured_503_when_database_is_unavailable(monkeyp
 def test_plan_item_delete_requires_owner_and_unknown_route_is_404():
     response = client.delete("/plans/not-a-plan/items/not-an-item")
     assert response.status_code == 401
+
+
+def test_append_plan_item_requires_bearer():
+    response = client.post("/plans/p1/items", json={"client_item_id": "i1", "source_type": "user_input", "name": "직접 입력 장소"})
+    assert response.status_code == 401
+
+
+def test_web_search_item_requires_source_snapshot():
+    from apps.api.engine.plans import validate_plan_item_provenance
+    import pytest
+    with pytest.raises(ValueError, match="web_search_source_required"):
+        validate_plan_item_provenance({"source_type": "web_search", "name": "검색 장소", "source_snapshot": {}})

@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from apps.api import db
 from apps.api.auth import CurrentUser, require_user
-from apps.api.engine.plans import persist_plan
+from apps.api.engine.plans import add_plan_item, persist_plan
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -34,6 +34,21 @@ class PlanCreateBody(BaseModel):
     purpose: str | None = None
     visibility: str = Field(default="private", pattern="^(private|unlisted|public)$")
     items: list[PlanItemInput] = Field(default_factory=list, max_length=100)
+
+
+@router.post("/{plan_id}/items", status_code=201)
+def append_plan_item(plan_id: str, body: PlanItemInput, user: CurrentUser = Depends(require_user)):
+    engine = _engine_or_503()
+    try:
+        with engine.begin() as conn:
+            item_id = add_plan_item(conn, user, plan_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"error": str(exc)}) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"error": "plan_item_save_failed", "message": str(exc)}) from exc
+    return {"id": item_id, "client_item_id": body.client_item_id, "saved": True}
 
 
 def _engine_or_503():
