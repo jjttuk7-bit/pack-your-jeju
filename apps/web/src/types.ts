@@ -106,6 +106,8 @@ export interface VisitCheck {
   publicDataQueued?: boolean;
   publicDataStatus?: string;
   memo?: string;
+  operationStatus?: 'open' | 'closed' | 'temporarily_closed' | 'closure_suspected' | 'moved_suspected' | 'unknown';
+  mismatchTypes?: string[];
   updatedAt: string;
 }
 

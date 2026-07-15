@@ -98,6 +98,14 @@ export default function TravelFeedback({ info, planItems, visitChecks, onSetVisi
                   </div>
                   <div>
                     <div className="flex flex-wrap gap-1.5">{([['visited', '방문'], ['satisfied', '만족'], ['unsatisfied', '아쉬움'], ['info_mismatch', '정보 다름']] as const).map(([value, label]) => <FilterButton key={value} active={check?.status === value} onClick={() => onSetVisitCheck(item.id, value, { ...check, memo })}>{label}</FilterButton>)}</div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="text-[10px] font-semibold text-basalt-2">현장 운영 상태
+                        <select value={check?.operationStatus ?? 'unknown'} onChange={(event) => onSetVisitCheck(item.id, check?.status ?? 'visited', { ...check, memo, operationStatus: event.target.value as NonNullable<VisitCheck['operationStatus']> })} className="mt-1 h-8 w-full rounded-md border border-earth bg-white px-2 text-[10px] font-normal text-basalt outline-none focus:border-mint">
+                          <option value="unknown">확인하지 않음</option><option value="open">운영 중</option><option value="closed">휴무·폐업</option><option value="temporarily_closed">임시 휴무</option><option value="closure_suspected">폐업 의심</option><option value="moved_suspected">이전 의심</option>
+                        </select>
+                      </label>
+                      <div><span className="text-[10px] font-semibold text-basalt-2">달랐던 정보</span><div className="mt-1 flex flex-wrap gap-1">{['운영시간', '주소', '메뉴·요금', '분위기'].map((tag) => { const active = check?.mismatchTypes?.includes(tag); return <button key={tag} type="button" onClick={() => { const next = active ? (check?.mismatchTypes ?? []).filter((value) => value !== tag) : [...(check?.mismatchTypes ?? []), tag]; onSetVisitCheck(item.id, check?.status ?? 'info_mismatch', { ...check, memo, mismatchTypes: next }); }} className={`rounded-full border px-2 py-1 text-[9px] font-semibold ${active ? 'border-citrus bg-citrus/10 text-citrus-2' : 'border-earth bg-white text-basalt-2'}`}>{tag}</button>; })}</div></div>
+                    </div>
                     <textarea value={memo} onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="운영시간, 혼잡도, 실제 분위기처럼 다음 여행에 도움 될 경험을 남겨주세요." className="mt-2 min-h-[76px] w-full resize-y rounded-md border border-earth bg-white px-3 py-2 text-[11px] leading-relaxed outline-none focus:border-mint" />
                     <div className="mt-2 flex items-center justify-between gap-3"><span className="text-[9.5px] text-basalt-2">{item.source === 'public_data' ? '방문 신호·수정요청 분리 저장' : '현재 기기 여행 기록에 저장'}</span><button type="button" onClick={() => saveMemo(item)} className="rounded-md border border-mint/35 bg-white px-3 py-1.5 text-[10px] font-bold text-mint hover:bg-mint hover:text-white">메모 저장</button></div>
                   </div>
