@@ -367,7 +367,7 @@ export default function App() {
       </div>
 
       {/* Container */}
-      <div className="w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
+      <div className="relative z-10 w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
         <header className="relative overflow-hidden pt-2 pb-8" id="app-header">
