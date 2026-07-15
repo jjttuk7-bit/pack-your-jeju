@@ -971,11 +971,12 @@ function PlanBuilderCard({
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {planItems.map((item) => (
+        <div className="space-y-3">
+          {planItems.map((item, index) => (
             <PlanItemRow
               key={item.id}
               item={item}
+              index={index}
               visitCheck={visitChecks[item.id]}
               onRemovePlanItem={onRemovePlanItem}
               onSetVisitCheck={onSetVisitCheck}
@@ -1019,11 +1020,13 @@ function PlanBuilderCard({
 
 function PlanItemRow({
   item,
+  index,
   visitCheck,
   onRemovePlanItem,
   onSetVisitCheck,
 }: {
   item: TravelPlanItem;
+  index: number;
   visitCheck?: VisitCheck;
   onRemovePlanItem: (itemId: string) => void;
   onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
@@ -1088,8 +1091,11 @@ function PlanItemRow({
   };
 
   return (
-    <div className="rounded-2xl border border-earth bg-[#FDFBF7] p-3 space-y-2">
+    <article className="relative overflow-hidden rounded-2xl border border-[#D8C3A4] bg-[#FFFCF7] p-3 pl-4 shadow-[0_5px_18px_-14px_rgba(46,50,53,0.55)] space-y-2 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-gradient-to-b before:from-citrus before:to-[#E8B36D]" aria-label={`${index + 1}번 플랜 장소 ${item.name}`}>
       <div className="flex items-start gap-2">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-citrus/35 bg-citrus/10 text-[10px] font-extrabold text-citrus-2" aria-hidden="true">
+          {String(index + 1).padStart(2, '0')}
+        </span>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 mb-1">
             <span className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold border ${
@@ -1231,7 +1237,7 @@ function PlanItemRow({
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 }
 
