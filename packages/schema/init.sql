@@ -134,3 +134,198 @@ UPDATE place
  WHERE external_id = 'CNTS_200000000014203'
    AND name = '애월오누이 제주'
    AND tombstoned = true;
+
+-- 플랜 피드백 근거 원장. 공공데이터 원본과 사용자 기여를 분리해 보존한다.
+CREATE TABLE IF NOT EXISTS user_profile (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_subject TEXT NOT NULL UNIQUE,
+  display_name TEXT,
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'operator', 'admin')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'deleted')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS travel_plan (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  -- Auth subject와 분리된 비식별 멱등 scope. 사용자 삭제 후에도 유지한다.
+  owner_scope_id UUID NOT NULL,
+  client_plan_id TEXT NOT NULL,
+  title TEXT,
+  start_date DATE,
+  days INT CHECK (days BETWEEN 1 AND 365),
+  regions TEXT[] NOT NULL DEFAULT '{}'::text[],
+  companion TEXT,
+  purpose TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private'
+    CHECK (visibility IN ('private', 'unlisted', 'public')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (owner_scope_id, client_plan_id)
+);
+CREATE INDEX IF NOT EXISTS travel_plan_owner_updated_idx
+  ON travel_plan (owner_scope_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS plan_item (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  plan_id UUID NOT NULL REFERENCES travel_plan(id) ON DELETE RESTRICT,
+  place_id BIGINT REFERENCES place(id) ON DELETE RESTRICT,
+  client_item_id TEXT NOT NULL,
+  source_type TEXT NOT NULL CHECK (
+    source_type IN ('public_data', 'web_search', 'user_input', 'community_verified')
+  ),
+  source_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  day INT CHECK (day >= 1),
+  visit_date DATE,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (plan_id, client_item_id)
+);
+CREATE INDEX IF NOT EXISTS plan_item_plan_day_idx
+  ON plan_item (plan_id, day, created_at);
+CREATE INDEX IF NOT EXISTS plan_item_place_created_idx
+  ON plan_item (place_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS evidence (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  place_id BIGINT NOT NULL REFERENCES place(id) ON DELETE RESTRICT,
+  plan_item_id UUID REFERENCES plan_item(id) ON DELETE RESTRICT,
+  source_class TEXT NOT NULL CHECK (
+    source_class IN ('official', 'platform', 'experience', 'public_data', 'user_feedback')
+  ),
+  claim_type TEXT NOT NULL CHECK (claim_type IN ('fact', 'experience')),
+  claim_key TEXT NOT NULL,
+  claim_value JSONB NOT NULL,
+  url TEXT,
+  checked_at TIMESTAMPTZ,
+  support_status TEXT NOT NULL CHECK (
+    support_status IN (
+      'supported', 'partially_supported', 'conflicted', 'inferred', 'unsupported'
+    )
+  ),
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS evidence_place_checked_idx
+  ON evidence (place_id, checked_at DESC, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS visit_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  plan_item_id UUID NOT NULL REFERENCES plan_item(id) ON DELETE RESTRICT,
+  place_id BIGINT REFERENCES place(id) ON DELETE RESTRICT,
+  author_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  idempotency_key TEXT NOT NULL,
+  visit_status TEXT NOT NULL CHECK (
+    visit_status IN ('visited', 'not_visited', 'could_not_find')
+  ),
+  operation_status TEXT CHECK (
+    operation_status IN (
+      'open', 'closed', 'temporarily_closed', 'closure_suspected',
+      'moved_suspected', 'unknown'
+    )
+  ),
+  mismatch_types TEXT[] NOT NULL DEFAULT '{}'::text[],
+  experience_tags TEXT[] NOT NULL DEFAULT '{}'::text[],
+  memo TEXT,
+  submission_weight NUMERIC(4, 3) NOT NULL DEFAULT 1.000
+    CHECK (submission_weight BETWEEN 0 AND 1.5),
+  moderation_status TEXT NOT NULL DEFAULT 'collecting_signals' CHECK (
+    moderation_status IN (
+      'collecting_signals', 'needs_more_evidence', 'under_review', 'approved', 'rejected'
+    )
+  ),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (plan_item_id, author_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS visit_feedback_plan_item_created_idx
+  ON visit_feedback (plan_item_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS visit_feedback_place_created_idx
+  ON visit_feedback (place_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS visit_feedback_author_created_idx
+  ON visit_feedback (author_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS evidence_asset (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  feedback_id UUID NOT NULL REFERENCES visit_feedback(id) ON DELETE RESTRICT,
+  owner_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  asset_type TEXT NOT NULL CHECK (asset_type IN ('location', 'photo', 'receipt')),
+  storage_path TEXT NOT NULL,
+  verification_status TEXT NOT NULL DEFAULT 'unverified' CHECK (
+    verification_status IN ('unverified', 'verified', 'rejected', 'deleted')
+  ),
+  redacted_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS evidence_asset_feedback_idx
+  ON evidence_asset (feedback_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS moderation_case (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  place_id BIGINT NOT NULL REFERENCES place(id) ON DELETE RESTRICT,
+  case_type TEXT NOT NULL CHECK (
+    case_type IN (
+      'new_place', 'closure_suspected', 'relocation_suspected',
+      'info_mismatch', 'evidence_conflict'
+    )
+  ),
+  claim_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (
+    status IN ('open', 'researching', 'review_pending', 'resolved', 'dismissed')
+  ),
+  priority TEXT NOT NULL DEFAULT 'normal'
+    CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  research_status TEXT NOT NULL DEFAULT 'pending' CHECK (
+    research_status IN (
+      'pending', 'running', 'sufficient', 'partial', 'conflicted', 'unavailable'
+    )
+  ),
+  priority_rank SMALLINT NOT NULL DEFAULT 20 CHECK (priority_rank BETWEEN 0 AND 100),
+  opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderation_case_open_priority_idx
+  ON moderation_case (priority_rank DESC, opened_at)
+  WHERE status IN ('open', 'researching', 'review_pending');
+
+CREATE TABLE IF NOT EXISTS moderation_decision (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID NOT NULL REFERENCES moderation_case(id) ON DELETE RESTRICT,
+  reviewer_id UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('approve', 'hold', 'reject', 'revoke')),
+  rationale TEXT NOT NULL,
+  evidence_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
+  supersedes_id UUID REFERENCES moderation_decision(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderation_decision_case_created_idx
+  ON moderation_decision (case_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS place_trust_profile (
+  place_id BIGINT PRIMARY KEY REFERENCES place(id) ON DELETE RESTRICT,
+  identity_confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.000
+    CHECK (identity_confidence BETWEEN 0 AND 1),
+  operation_confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.000
+    CHECK (operation_confidence BETWEEN 0 AND 1),
+  freshness_status TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (freshness_status IN ('fresh', 'stale', 'unknown')),
+  field_confidence JSONB NOT NULL DEFAULT '{}'::jsonb,
+  reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
+  calculated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public_data_correction (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  place_id BIGINT NOT NULL REFERENCES place(id) ON DELETE RESTRICT,
+  claim_key TEXT NOT NULL,
+  corrected_value JSONB NOT NULL,
+  decision_id UUID NOT NULL REFERENCES moderation_decision(id) ON DELETE RESTRICT,
+  approved_by UUID REFERENCES user_profile(id) ON DELETE SET NULL,
+  effective_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+  supersedes_id UUID REFERENCES public_data_correction(id) ON DELETE RESTRICT,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS public_data_correction_current_idx
+  ON public_data_correction (place_id, claim_key, effective_from DESC)
+  WHERE revoked_at IS NULL;

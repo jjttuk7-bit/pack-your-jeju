@@ -37,6 +37,11 @@ from apps.api.engine import visit_signals as visit_signals_mod
 from apps.api.engine import verify as verify_mod
 from apps.api.engine import weather as weather_mod
 from apps.api.logging import log_pack, log_verify, measure_latency
+from apps.api.routes.plans import router as plans_router
+from apps.api.routes.feedback import router as feedback_router
+from apps.api.routes.evidence_assets import router as evidence_assets_router
+from apps.api.routes.corrections import router as corrections_router
+from apps.api.routes.moderation_admin import router as moderation_admin_router
 
 _bootstrap_result: dict = {"applied": 0, "failed": 0, "errors": []}
 
@@ -50,6 +55,11 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Pack Your Jeju API", lifespan=lifespan)
+app.include_router(plans_router)
+app.include_router(feedback_router)
+app.include_router(evidence_assets_router)
+app.include_router(corrections_router)
+app.include_router(moderation_admin_router)
 
 # CORS — 프론트(Vercel)에서 크로스오리진 호출 허용.
 # CORS_ALLOW_ORIGINS 환경변수에 콤마 구분으로 세팅 (예: "https://pack-your-jeju.vercel.app,http://localhost:3000")

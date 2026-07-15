@@ -359,7 +359,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen text-basalt font-sans relative flex flex-col items-center px-4 pt-8 pb-4 antialiased" id="app-root">
+    <div className={`min-h-screen text-basalt font-sans relative flex flex-col items-center px-4 pt-8 pb-4 antialiased ${state.step === 'setup' ? 'pyj-dashboard' : ''}`} id="app-root">
 
       {/* 하단 돌담 패턴 (지역감) */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 h-40 -z-10 opacity-70">
