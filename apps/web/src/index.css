@@ -4,7 +4,7 @@
 /* ────────────────────────────────────────────────
    제주를 담다 — 제주 로컬 감성 시스템
    -------------------------------------------------
-   Gowun Batang: 헤딩 감성 serif (고운바탕)
+   Pretendard/Noto Sans KR: 산세리프·고딕 헤딩과 본문
    Gaegu:        손글씨/감정 액센트
    Pretendard:   바디 (import 없음, fallback)
 
@@ -29,6 +29,9 @@
     --pyj-basalt-2:#6D7376;
     --pyj-mint:    #4A8779;
     --pyj-earth:   #C9A97F;
+    --pyj-sky:     #F4EBDD;
+    --pyj-ridge:   #A8B77A;
+    --pyj-ridge-deep: #718968;
   }
 
   html, body {
@@ -60,9 +63,46 @@
 }
 
 @layer utilities {
-  /* 헤딩용 감성 serif */
-  .font-serif-kr { font-family: 'Gowun Batang', 'Noto Serif KR', serif; }
+  /* 대시보드 전반: 산세리프·고딕 계층 */
+  .font-serif-kr { font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
   .font-hand     { font-family: 'Gaegu', 'Nanum Pen Script', cursive; }
+
+  .pyj-dashboard {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(900px 260px at 72% 0%, rgba(168, 183, 122, 0.28), transparent 72%),
+      radial-gradient(620px 260px at 4% 12%, rgba(255, 220, 170, 0.34), transparent 72%),
+      linear-gradient(180deg, #F5EEDF 0%, #F1E4CE 58%, #EBDDC8 100%);
+  }
+
+  .pyj-dashboard::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: -8%;
+    right: -8%;
+    height: 148px;
+    opacity: 0.68;
+    pointer-events: none;
+    background:
+      linear-gradient(174deg, transparent 0 42%, rgba(113, 137, 104, 0.58) 43% 49%, transparent 50%),
+      linear-gradient(176deg, transparent 0 58%, rgba(168, 183, 122, 0.62) 59% 69%, transparent 70%),
+      linear-gradient(180deg, rgba(255, 250, 239, 0.72), transparent 74%);
+    mask-image: linear-gradient(90deg, transparent, black 14%, black 86%, transparent);
+  }
+
+  .pyj-dashboard::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='.18'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+  }
 
   /* 카드 시스템 (Warm ivory · basalt-hint shadow) */
   .card-jeju {
