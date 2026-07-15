@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import re
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
@@ -94,6 +95,11 @@ def extract_pdf(reader: PdfReader) -> tuple[str, list[str]]:
     return body, uris
 
 
+def contains_text(body: str, phrase: str) -> bool:
+    compact = lambda value: re.sub(r"\s+", "", value)
+    return phrase in body or compact(phrase) in compact(body)
+
+
 def main() -> int:
     assert DOCX.exists(), f"DOCX not found: {DOCX}"
     assert PDF.exists(), f"PDF not found: {PDF}"
@@ -101,13 +107,15 @@ def main() -> int:
     docx_text = extract_docx_text(DOCX)
     reader = PdfReader(str(PDF))
     pdf_text, uris = extract_pdf(reader)
-    combined = docx_text + "\n" + pdf_text
-
     assert len(reader.pages) == 10, f"expected 10 pages, got {len(reader.pages)}"
-    missing_required = [item for item in REQUIRED if item not in combined]
-    present_forbidden = [item for item in FORBIDDEN if item in combined]
-    assert not missing_required, f"required phrases missing: {missing_required}"
-    assert not present_forbidden, f"forbidden overclaims present: {present_forbidden}"
+    missing_docx = [item for item in REQUIRED if not contains_text(docx_text, item)]
+    missing_pdf = [item for item in REQUIRED if not contains_text(pdf_text, item)]
+    forbidden_docx = [item for item in FORBIDDEN if contains_text(docx_text, item)]
+    forbidden_pdf = [item for item in FORBIDDEN if contains_text(pdf_text, item)]
+    assert not missing_docx, f"DOCX required phrases missing: {missing_docx}"
+    assert not missing_pdf, f"PDF required phrases missing: {missing_pdf}"
+    assert not forbidden_docx, f"DOCX forbidden overclaims present: {forbidden_docx}"
+    assert not forbidden_pdf, f"PDF forbidden overclaims present: {forbidden_pdf}"
     assert any(uri.rstrip("/") == SERVICE_URL for uri in uris), f"service URL annotation missing: {uris}"
 
     print(f"DOCX={DOCX.resolve()}")
