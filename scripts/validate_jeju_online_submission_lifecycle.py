@@ -19,7 +19,23 @@ PDF = Path(
 SERVICE_URL = "https://pack-your-jeju.vercel.app"
 
 REQUIRED = [
+    "여행으로 검증하고 다시 강화하는 제주 공공데이터",
     "공공데이터 라이프사이클",
+    "Python 기반 공공데이터 ETL",
+    "PostgreSQL",
+    "Full Text Search",
+    "pg_trgm",
+    "공영주차장 1km",
+    "버스정류장 500m",
+    "LLM Function Calling",
+    "RAG",
+    "Trust Engine",
+    "중복 제출 방지",
+    "React/Vite PWA",
+    "FastAPI",
+    "SQLAlchemy",
+    "Vercel",
+    "Railway",
     "공공데이터 후보",
     "하루방 웹검색",
     "사용자 직접입력",
@@ -29,17 +45,23 @@ REQUIRED = [
     "현재 MVP",
     "고도화 계획",
     "개인 1인 창업자",
+    "AI 엔지니어링 정규 교육과정을 모두 이수",
+    "공식 수료 절차",
+    "60개 이상의 웹 서비스·프로토타입 저장소",
+    "B2C→B2B→B2G",
     "04_제주를담다_공공데이터_라이프사이클_사업계획서.pdf",
     "04_제주를담다_공공데이터_라이프사이클_사업계획서.docx",
     SERVICE_URL,
 ]
 
 FORBIDDEN = [
+    "대표자",
     "팀원",
     "팀 역량",
     "04_제주를담다_최종_사업계획서.pdf",
     "04_제주를담다_최종_사업계획서.docx",
     "자동으로 공공데이터를 수정",
+    "DB에 있는 장소와 출처만 사용",
 ]
 
 
