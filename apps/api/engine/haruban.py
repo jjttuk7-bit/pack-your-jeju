@@ -2608,13 +2608,16 @@ def _chat_turn_raw(
     for it in range(max_iterations):
         completion_started = perf_counter()
         try:
-            resp = client.chat.completions.create(
+            request_kwargs = dict(
                 model=llm.MODEL,
                 messages=conv,
                 tools=available_tools,
                 tool_choice=tool_choice,
                 max_completion_tokens=600,
             )
+            if llm.MODEL.startswith("gpt-5"):
+                request_kwargs["reasoning_effort"] = "low"
+            resp = client.chat.completions.create(**request_kwargs)
         except Exception as e:
             logger.warning(
                 "haruban chat completion failed iteration=%d preloaded_tool=%s elapsed_ms=%.1f error=%s",

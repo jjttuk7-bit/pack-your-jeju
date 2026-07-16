@@ -375,6 +375,7 @@ def test_preloaded_search_pool_disables_duplicate_model_tool_calls(monkeypatch):
     assert turn.available is True
     assert captured["tools"] == []
     assert captured["tool_choice"] == "none"
+    assert captured["reasoning_effort"] == "low"
 
 
 def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
