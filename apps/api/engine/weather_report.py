@@ -23,6 +23,29 @@ PRECIPITATION_RANK = {
     "눈": 7,
     "강수형태 확인 중": 8,
 }
+MOMENT_WEATHER_PROFILE = {
+    "oreum": "outdoor_hike",
+    "gotjawal": "outdoor_hike",
+    "beach_walk": "coast",
+    "sunset": "coast",
+    "festival_event": "outdoor_event",
+    "local_market": "outdoor_event",
+    "culture_stop": "indoor",
+    "quiet_cafe": "indoor",
+    "local_food": "indoor",
+    "souvenir_shopping": "indoor",
+}
+OUTDOOR_PROFILES = {"outdoor_hike", "coast", "outdoor_event"}
+ACTUAL_PRECIPITATION = {
+    "비",
+    "비/눈",
+    "눈",
+    "소나기",
+    "빗방울",
+    "빗방울/눈날림",
+    "눈날림",
+}
+WEATHER_POLICY_VERSION = "weather-travel-v1"
 
 
 def _daypart_for_time(value: str) -> str | None:
@@ -102,3 +125,74 @@ def aggregate_dayparts(region: str, hourly_rows: list[dict[str, Any]]) -> list[d
                 }
             )
     return periods
+
+
+def evaluate_itinerary_impact(
+    item: dict[str, Any],
+    period: dict[str, Any],
+) -> dict[str, Any]:
+    """Evaluate one itinerary item against its region/date/daypart forecast."""
+    base = {
+        "item_id": item.get("id"),
+        "region": item.get("region"),
+        "date": item.get("date"),
+        "daypart": item.get("daypart"),
+        "policy_version": WEATHER_POLICY_VERSION,
+        "source_label": "기상청 예보 · 제주를 담다 여행 판단 기준",
+    }
+    if not period.get("available"):
+        return {
+            **base,
+            "status": "unknown",
+            "signals": [],
+            "reason": "해당 지역·시간대의 예보가 없어 일정 영향을 판단하지 않습니다.",
+        }
+
+    profile = MOMENT_WEATHER_PROFILE.get(str(item.get("moment") or ""))
+    if profile is None:
+        return {
+            **base,
+            "status": "unknown",
+            "signals": [],
+            "reason": "장소 유형이 분류되지 않아 날씨 영향을 임의로 판단하지 않습니다.",
+        }
+    if profile == "indoor":
+        return {
+            **base,
+            "profile": profile,
+            "status": "suitable",
+            "signals": [],
+            "reason": "실내 일정은 현재 비·바람 예보만으로 변경을 권하지 않습니다.",
+        }
+
+    probability = float(period.get("precipitation_probability_max") or 0)
+    wind_speed = float(period.get("wind_speed_max") or 0)
+    precipitation_type = str(period.get("precipitation_type") or "")
+    rain_signal = probability >= 40 or precipitation_type in ACTUAL_PRECIPITATION
+    wind_signal = profile in OUTDOOR_PROFILES and wind_speed >= 4
+    signals = [
+        signal
+        for signal, active in (("rain", rain_signal), ("wind", wind_signal))
+        if active
+    ]
+
+    if item.get("region") == "udo" and wind_speed >= 9:
+        status = "official_check"
+        reason = "강한 바람 예보가 있어 우도 이동편의 공식 운항 공지를 확인해야 합니다."
+    elif probability >= 70 or precipitation_type in ACTUAL_PRECIPITATION or wind_speed >= 9:
+        status = "adjust"
+        reason = "비 또는 강한 바람이 야외 일정에 영향을 줄 수 있어 시간 조정을 권합니다."
+    elif signals:
+        status = "prepare"
+        reason = "비나 바람에 대비한 준비와 이동 여유를 권합니다."
+    else:
+        status = "suitable"
+        reason = "현재 확인된 예보에서는 일정 변경이 필요한 신호가 없습니다."
+
+    return {
+        **base,
+        "profile": profile,
+        "status": status,
+        "signals": signals,
+        "reason": reason,
+    }

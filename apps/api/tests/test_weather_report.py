@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apps.api.engine.weather_report import aggregate_dayparts
+from apps.api.engine.weather_report import aggregate_dayparts, evaluate_itinerary_impact
 
 
 def test_aggregate_dayparts_uses_worst_probability_and_wind():
@@ -66,3 +66,89 @@ def test_aggregate_dayparts_exposes_missing_periods_without_guessing():
         "available": False,
     }
     assert afternoon["available"] is True
+
+
+def test_oreum_rain_and_wind_recommends_adjustment():
+    impact = evaluate_itinerary_impact(
+        item={
+            "id": "p1",
+            "moment": "oreum",
+            "region": "seongsan",
+            "date": "2026-07-20",
+            "daypart": "morning",
+            "fixed": False,
+        },
+        period={
+            "available": True,
+            "precipitation_probability_max": 80,
+            "wind_speed_max": 8.0,
+            "precipitation_type": "비",
+        },
+    )
+
+    assert impact["status"] == "adjust"
+    assert impact["signals"] == ["rain", "wind"]
+    assert impact["policy_version"] == "weather-travel-v1"
+    assert "기상청 예보" in impact["source_label"]
+
+
+def test_indoor_place_remains_suitable_in_rain():
+    impact = evaluate_itinerary_impact(
+        item={
+            "id": "p2",
+            "moment": "culture_stop",
+            "region": "seongsan",
+            "date": "2026-07-20",
+            "daypart": "morning",
+            "fixed": False,
+        },
+        period={
+            "available": True,
+            "precipitation_probability_max": 80,
+            "wind_speed_max": 8.0,
+            "precipitation_type": "비",
+        },
+    )
+
+    assert impact["status"] == "suitable"
+    assert impact["signals"] == []
+
+
+def test_missing_forecast_returns_unknown_without_inventing_risk():
+    impact = evaluate_itinerary_impact(
+        item={"id": "p3", "moment": "oreum", "region": "aewol"},
+        period={"available": False},
+    )
+
+    assert impact["status"] == "unknown"
+    assert impact["signals"] == []
+
+
+def test_udo_strong_wind_requires_official_transport_check():
+    impact = evaluate_itinerary_impact(
+        item={"id": "p4", "moment": "beach_walk", "region": "udo"},
+        period={
+            "available": True,
+            "precipitation_probability_max": 10,
+            "wind_speed_max": 10.0,
+            "precipitation_type": "강수 없음",
+        },
+    )
+
+    assert impact["status"] == "official_check"
+    assert impact["signals"] == ["wind"]
+
+
+def test_mild_outdoor_rain_only_recommends_preparation():
+    impact = evaluate_itinerary_impact(
+        item={"id": "p5", "moment": "local_market", "region": "jeju_city"},
+        period={
+            "available": True,
+            "precipitation_probability_max": 45,
+            "wind_speed_max": 2.0,
+            "precipitation_type": "강수 없음",
+        },
+    )
+
+    assert impact["status"] == "prepare"
+    assert impact["signals"] == ["rain"]
