@@ -212,6 +212,28 @@ def test_web_source_classifier_marks_personal_publishing_hosts_as_experience():
         "https://blog.naver.com/example/123",
         "제주 카페 후기",
     ) == "experience"
+    assert haruban._classify_web_source(
+        "https://www.siksinhot.com/P/458379",
+        "제주 음식점 정보",
+    ) == "platform"
+
+
+def test_web_source_role_guardrail_replaces_universal_official_claim():
+    reply = (
+        "모두 공식 또는 공개 플랫폼을 통해 직접 확인된 사항만 정리했습니다.\n\n"
+        "## 추천 장소\n**돈사돈**\n- 특징: 흑돼지 전문점입니다."
+    )
+    guarded = haruban._enforce_web_source_role_disclosure(
+        reply,
+        [
+            {"url": "https://www.visitjeju.net/place", "source_class": "official"},
+            {"url": "https://example.tistory.com/post", "source_class": "experience"},
+        ],
+    )
+
+    assert "모두 공식 또는 공개 플랫폼" not in guarded
+    assert "출처 구성: 공식 1건, 후기 1건" in guarded
+    assert "방문 전 재확인" in guarded
 
 
 def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch):
@@ -393,6 +415,51 @@ def test_preloaded_search_pool_disables_duplicate_model_tool_calls(monkeypatch):
     assert captured["tools"] == []
     assert captured["tool_choice"] == "none"
     assert captured["reasoning_effort"] == "low"
+
+
+def test_preloaded_web_answer_applies_source_role_guardrail(monkeypatch):
+    message = SimpleNamespace(
+        content=(
+            "모두 공식 또는 공개 플랫폼에서 확인했습니다.\n\n"
+            "## 추천 장소\n**돈사돈**\n- 특징: 흑돼지 전문점입니다."
+        ),
+        tool_calls=[],
+    )
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    class FakeCompletions:
+        @staticmethod
+        def create(**_kwargs):
+            return response
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=FakeCompletions()),
+    )
+    monkeypatch.setattr(openai, "OpenAI", lambda **_kwargs: fake_client)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    conv = [{
+        "role": "system",
+        "content": haruban._format_search_pool_context({
+            "tool": "web_search_jeju",
+            "result": {
+                "sources": [
+                    {"url": "https://www.visitjeju.net/place", "source_class": "official"},
+                    {"url": "https://example.tistory.com/post", "source_class": "experience"},
+                ],
+            },
+        }),
+    }]
+
+    turn = haruban._chat_turn_raw(
+        conv,
+        [{"tool": "preload:web_search_jeju", "args": {}, "result_size": 10}],
+        3,
+        {},
+        preloaded_tool="web_search_jeju",
+    )
+
+    assert "모두 공식 또는 공개 플랫폼" not in turn.reply_text
+    assert "출처 구성: 공식 1건, 후기 1건" in turn.reply_text
 
 
 def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):

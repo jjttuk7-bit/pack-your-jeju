@@ -58,3 +58,12 @@ python -m pytest apps\api\tests\test_haruban_agent.py apps\api\tests\test_llm.py
 4. Fast-forward remote `main`.
 5. Call the production API with the same restaurant question.
 6. Confirm no numeric price candidate and record source classes and elapsed time.
+
+### Task 5: Prevent source-role overstatement
+
+1. Add a failing test where mixed official and experience sources accompany a reply claiming all information is official.
+2. Add a failing integration test for the preloaded web-search final-answer path.
+3. Classify known restaurant discovery platforms separately from personal blogs.
+4. Remove universal official-source claims when mixed sources are present.
+5. Prepend deterministic source-class counts and a recheck warning without another model call.
+6. Run the full related test suite and repeat the production API check.

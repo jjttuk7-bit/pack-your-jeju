@@ -742,7 +742,13 @@ def _classify_web_source(url: str, title: str = "", snippet: str = "") -> str:
         or any(cue in text_in for cue in ("공식 홈페이지", "공식 사이트", "제주특별자치도", "관광공사"))
     ):
         return "official"
-    if any(cue in host for cue in ("map.naver", "place.map.kakao", "booking", "catchtable")):
+    if any(cue in host for cue in (
+        "map.naver",
+        "place.map.kakao",
+        "booking",
+        "catchtable",
+        "siksinhot.com",
+    )):
         return "platform"
     if (
         host.endswith("tistory.com")
@@ -812,6 +818,46 @@ def _dedupe_sources(sources: list[dict]) -> list[dict]:
             item["snippet"] = snippet
         result.append(item)
     return result[:8]
+
+
+def _enforce_web_source_role_disclosure(reply: str, sources: list[dict]) -> str:
+    """혼합 출처 답변이 모든 근거를 공식·플랫폼으로 과장하지 않게 한다."""
+    clean_reply = str(reply or "").strip()
+    normalized_sources = _dedupe_sources(list(sources or []))
+    counts = {"official": 0, "platform": 0, "experience": 0, "web": 0}
+    for source in normalized_sources:
+        source_class = source.get("source_class") or "web"
+        counts[source_class if source_class in counts else "web"] += 1
+
+    if counts["experience"] + counts["web"] == 0:
+        return clean_reply
+
+    parts = []
+    for source_class, label in (
+        ("official", "공식"),
+        ("platform", "플랫폼"),
+        ("experience", "후기"),
+        ("web", "기타 웹"),
+    ):
+        if counts[source_class]:
+            parts.append(f"{label} {counts[source_class]}건")
+    disclosure = (
+        f"출처 구성: {', '.join(parts)}입니다. "
+        "후기·기타 웹 출처가 포함된 후보의 운영 정보는 방문 전 재확인이 필요합니다."
+    )
+
+    guarded_reply = re.sub(
+        r"(?m)^[^\n]*(?:모두|전부)[^\n]*(?:공식|공개 플랫폼)[^\n]*(?:확인|검증)[^\n]*\n?",
+        "",
+        clean_reply,
+    )
+    guarded_reply = re.sub(
+        r"(?m)^[^\n]*공식 운영 정보 확인된 장소 위주[^\n]*\n?",
+        "",
+        guarded_reply,
+    )
+    guarded_reply = re.sub(r"\n{3,}", "\n\n", guarded_reply).strip()
+    return f"{disclosure}\n\n{guarded_reply}".strip()
 
 
 def _extract_response_sources(resp: Any) -> list[dict]:
@@ -1857,6 +1903,20 @@ def _search_pool_context_messages(conv: list[dict]) -> list[dict]:
     return messages
 
 
+def _web_sources_from_pool_context(conv: list[dict]) -> list[dict]:
+    for message in reversed(_search_pool_context_messages(conv)):
+        if message.get("name") != "web_search_jeju":
+            continue
+        try:
+            payload = json.loads(message.get("content") or "{}")
+        except json.JSONDecodeError:
+            continue
+        sources = payload.get("sources")
+        if isinstance(sources, list):
+            return [source for source in sources if isinstance(source, dict)]
+    return []
+
+
 def _candidate_names_from_pool_context(conv: list[dict]) -> list[str]:
     names: list[str] = []
     for message in _search_pool_context_messages(conv):
@@ -2640,6 +2700,11 @@ def _chat_turn_raw(
             # 최종 응답. 반환.
             if not text_reply or _should_replace_low_value_reply(text_reply, conv):
                 text_reply = _fallback_reply_from_tool_messages(conv)
+            if preloaded_tool == "web_search_jeju":
+                text_reply = _enforce_web_source_role_disclosure(
+                    text_reply,
+                    _web_sources_from_pool_context(conv),
+                )
             return HarubanTurn(
                 available=True,
                 reply_text=text_reply,
