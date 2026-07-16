@@ -164,6 +164,7 @@ export interface WeatherProposalOperation {
 export interface WeatherChangeProposal {
   proposal_id: string;
   fingerprint: string;
+  basePlanFingerprint?: string;
   severity: 'adjust';
   reason: string;
   signals: string[];
