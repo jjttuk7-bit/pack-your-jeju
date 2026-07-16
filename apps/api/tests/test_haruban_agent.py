@@ -226,7 +226,7 @@ def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch)
         "성산의 맛집들은?",
         "혼자 여행",
         "web",
-        haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
+        haruban.WEB_SEARCH_TIMEOUT_SECONDS,
     )]
     assert result.queries == ["성산의 맛집들은?"]
 
@@ -291,8 +291,10 @@ def test_single_web_search_forces_search_with_explicit_jeju_region_context(monke
 
     assert result.available is True
     assert captured["tool_choice"] == "required"
-    assert captured["max_tool_calls"] == 2
-    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["model"] == haruban.WEB_SEARCH_MODEL
+    assert haruban.WEB_SEARCH_MODEL == "gpt-4o"
+    assert captured["max_tool_calls"] == 1
+    assert "reasoning" not in captured
     assert captured["max_output_tokens"] == haruban.WEB_SEARCH_MAX_OUTPUT_TOKENS
     assert haruban.WEB_SEARCH_MAX_OUTPUT_TOKENS == 2200
     assert "제주특별자치도 서귀포시 성산읍" in captured["input"]
@@ -323,12 +325,13 @@ def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
     result = haruban._perform_single_web_search("구좌 오름 공식", source_class="official")
 
     assert result.available is False
-    assert haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS == 14.0
-    assert captured["timeout"] == haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS
+    assert haruban.WEB_SEARCH_TIMEOUT_SECONDS == 18.0
+    assert captured["timeout"] == haruban.WEB_SEARCH_TIMEOUT_SECONDS
     assert captured["max_retries"] == 0
     assert "provider timeout" in caplog.text
     assert "official" in caplog.text
-    assert "timeout_seconds=14.0" in caplog.text
+    assert "model=gpt-4o" in caplog.text
+    assert "timeout_seconds=18.0" in caplog.text
     assert "elapsed_ms" in caplog.text
 
 
@@ -417,6 +420,7 @@ def test_web_failure_fallback_does_not_substitute_public_data_candidates():
     ])
 
     assert "웹 출처" in reply
+    assert "여러 관점" not in reply
     assert "지역이나 순간을 하나 고르면" not in reply
     assert "공공데이터 후보" not in reply
 
@@ -1067,24 +1071,17 @@ def test_haruban_routes_first_place_to_visit_question_to_web_search(monkeypatch)
     assert captured["query"] == "제주시에서 제일 첫번째로 방문하면 좋은 곳을 알려줘"
 
 
-def test_haruban_retries_web_search_once_with_broader_query(monkeypatch):
+def test_haruban_does_not_retry_failed_web_search(monkeypatch):
     calls = []
     timeouts = []
 
     def fake_single(query, context="", source_class="web", timeout_seconds=None):
         calls.append((query, context, source_class))
         timeouts.append(timeout_seconds)
-        if len(calls) == 1:
-            return haruban.WebSearchResult(
-                available=False,
-                query=query,
-                reason="web search returned no usable source",
-            )
         return haruban.WebSearchResult(
-            available=True,
+            available=False,
             query=query,
-            answer="재검색으로 확인한 제주 추천입니다.",
-            sources=[{"title": "공식 출처", "url": "https://example.com/official"}],
+            reason="web search returned no usable source",
         )
 
     monkeypatch.setattr(haruban, "_perform_single_web_search", fake_single)
@@ -1094,16 +1091,10 @@ def test_haruban_retries_web_search_once_with_broader_query(monkeypatch):
         context='{"regions":["jeju_city"],"companion":"solo"}',
     )
 
-    assert result.available is True
-    assert len(calls) == 2
-    assert calls[1][0] != calls[0][0]
-    assert "제주특별자치도 제주시" in calls[1][0]
-    assert result.queries == [calls[0][0], calls[1][0]]
-    assert timeouts == [
-        haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
-        haruban.WEB_SEARCH_RETRY_TIMEOUT_SECONDS,
-    ]
-    assert sum(timeouts) <= haruban.WEB_SEARCH_TOTAL_BUDGET_SECONDS
+    assert result.available is False
+    assert len(calls) == 1
+    assert result.queries == [calls[0][0]]
+    assert timeouts == [haruban.WEB_SEARCH_TIMEOUT_SECONDS]
 
 
 def test_haruban_extracts_structured_candidates_from_web_answer():

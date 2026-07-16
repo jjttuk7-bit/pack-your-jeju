@@ -37,9 +37,8 @@ from apps.api.engine import weather as weather_mod
 
 
 logger = logging.getLogger(__name__)
-WEB_SEARCH_TOTAL_BUDGET_SECONDS = 20.0
-WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS = 14.0
-WEB_SEARCH_RETRY_TIMEOUT_SECONDS = 6.0
+WEB_SEARCH_MODEL = "gpt-4o"
+WEB_SEARCH_TIMEOUT_SECONDS = 18.0
 WEB_SEARCH_MAX_OUTPUT_TOKENS = 2200
 
 
@@ -952,7 +951,7 @@ def _perform_single_web_search(
     query: str,
     context: str = "",
     source_class: str = "web",
-    timeout_seconds: float = WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
+    timeout_seconds: float = WEB_SEARCH_TIMEOUT_SECONDS,
 ) -> WebSearchResult:
     """하나의 검색 관점을 실행한다. 상위 함수가 실패를 병합한다."""
     import os
@@ -1010,11 +1009,10 @@ def _perform_single_web_search(
         started = perf_counter()
         try:
             resp = client.responses.create(
-                model=llm.MODEL,
+                model=WEB_SEARCH_MODEL,
                 tools=[{"type": tool_type}],
                 tool_choice="required",
-                max_tool_calls=2,
-                reasoning={"effort": "low"},
+                max_tool_calls=1,
                 input=prompt,
                 max_output_tokens=WEB_SEARCH_MAX_OUTPUT_TOKENS,
             )
@@ -1028,7 +1026,8 @@ def _perform_single_web_search(
             ]
             elapsed_ms = (perf_counter() - started) * 1000
             logger.info(
-                "haruban web search completed source_class=%s tool_type=%s query=%r available=%s sources=%d timeout_seconds=%.1f elapsed_ms=%.1f",
+                "haruban web search completed model=%s source_class=%s tool_type=%s query=%r available=%s sources=%d timeout_seconds=%.1f elapsed_ms=%.1f",
+                WEB_SEARCH_MODEL,
                 source_class,
                 tool_type,
                 clean_query,
@@ -1050,7 +1049,8 @@ def _perform_single_web_search(
             elapsed_ms = (perf_counter() - started) * 1000
             last_error = f"{type(e).__name__}: {e}"
             logger.warning(
-                "haruban web search failed source_class=%s tool_type=%s query=%r timeout_seconds=%.1f elapsed_ms=%.1f error=%s",
+                "haruban web search failed model=%s source_class=%s tool_type=%s query=%r timeout_seconds=%.1f elapsed_ms=%.1f error=%s",
+                WEB_SEARCH_MODEL,
                 source_class,
                 tool_type,
                 clean_query,
@@ -1062,7 +1062,7 @@ def _perform_single_web_search(
 
 
 def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
-    """Responses API 웹검색을 실행하고 출처가 없으면 지역 맥락으로 한 번 재검색한다."""
+    """Responses API 웹검색을 제한시간 안에 한 번 실행한다."""
     clean_query = str(query or "").strip()
     if not clean_query:
         return WebSearchResult(available=False, query=clean_query, reason="query is required")
@@ -1071,43 +1071,8 @@ def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
         clean_query,
         context=context,
         source_class="web",
-        timeout_seconds=WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
+        timeout_seconds=WEB_SEARCH_TIMEOUT_SECONDS,
     )
-    if not result.available:
-        region_scope = "제주"
-        try:
-            payload = json.loads(context) if context else {}
-        except (TypeError, ValueError):
-            payload = {}
-        if isinstance(payload, dict):
-            raw_regions = payload.get("regions") or []
-            if isinstance(raw_regions, str):
-                raw_regions = [raw_regions]
-            region_labels = [
-                WEB_REGION_CONTEXT_KO.get(str(region), str(region))
-                for region in raw_regions
-                if region
-            ]
-            if region_labels:
-                region_scope = ", ".join(region_labels)
-        retry_query = (
-            f"{region_scope} {clean_query} 공식 관광 정보 지도 최근 방문 후기"
-        ).strip()
-        queries.append(retry_query)
-        retry_result = _perform_single_web_search(
-            retry_query,
-            context=context,
-            source_class="web",
-            timeout_seconds=WEB_SEARCH_RETRY_TIMEOUT_SECONDS,
-        )
-        if retry_result.available:
-            result = retry_result
-        elif retry_result.reason:
-            result = WebSearchResult(
-                available=False,
-                query=clean_query,
-                reason=f"first: {result.reason}; retry: {retry_result.reason}",
-            )
     return WebSearchResult(
         available=result.available,
         query=clean_query,
@@ -2051,7 +2016,7 @@ def _fallback_reply_from_tool_messages(conv: list[dict]) -> str:
         if name == "web_search_jeju":
             if not payload.get("available"):
                 return (
-                    "웹 출처를 여러 관점으로 확인했지만 이번 검색에서는 답변을 뒷받침할 원문을 확보하지 못했습니다. "
+                    "웹 출처를 확인했지만 이번 검색에서는 답변을 뒷받침할 원문을 확보하지 못했습니다. "
                     "확인되지 않은 장소나 순위를 대신 제시하지 않겠습니다. 검색 범위를 조정해 다시 조사할 수 있습니다."
                 )
             answer = (payload.get("answer") or "").strip()
