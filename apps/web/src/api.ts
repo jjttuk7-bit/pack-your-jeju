@@ -131,6 +131,62 @@ export async function downloadPackPdf(
   return { filename, blob: await res.blob() };
 }
 
+export interface TravelPlanPdfRequestItem {
+  id: string;
+  name: string;
+  day: number;
+  order: number;
+  source: 'public_data' | 'web_search' | 'user_added';
+  address: string | null;
+  memo: string | null;
+  badge: string | null;
+  source_title: string | null;
+  source_url: string | null;
+  checked_at: string | null;
+  check_required: string[];
+}
+
+export interface TravelPlanPdfRequest {
+  title: string;
+  travel: {
+    regions: string[];
+    start_date: string;
+    days: number;
+    companion: string;
+    purpose: string;
+    moments: string[];
+  };
+  items: TravelPlanPdfRequestItem[];
+  packing_items: string[];
+}
+
+export async function downloadTravelPlanPdf(
+  request: TravelPlanPdfRequest,
+): Promise<{ filename: string; blob: Blob }> {
+  const res = await fetch(`${API_BASE_URL}/plan/pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const payload = await res.json();
+      detail = typeof payload?.detail === 'string'
+        ? payload.detail
+        : payload?.detail?.message ?? '';
+    } catch {}
+    throw new Error(`/plan/pdf ${res.status} ${detail || res.statusText}`);
+  }
+
+  let filename = `pack-your-jeju-passport_${request.travel.start_date}.pdf`;
+  const contentDisposition = res.headers.get('Content-Disposition') || '';
+  const match = /filename="?([^";]+)"?/.exec(contentDisposition);
+  if (match) filename = match[1];
+
+  return { filename, blob: await res.blob() };
+}
+
 export function requestVerify(text: string): Promise<VerifyResponse> {
   return post<VerifyResponse>('/verify', { text });
 }

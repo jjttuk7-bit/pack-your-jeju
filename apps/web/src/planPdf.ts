@@ -1,4 +1,5 @@
-import type { TravelPlanItem } from './types';
+import type { TravelPlanPdfRequest } from './api';
+import type { MomentId, TravelInfo, TravelPlanItem } from './types';
 
 export interface PlanPdfDraftItem extends TravelPlanItem {
   day: number;
@@ -109,4 +110,41 @@ export function movePlanPdfItem(
     item.day === moving.day ? reordered[cursor++] : item
   ));
   return renumberByDay(next);
+}
+
+export function buildTravelPlanPdfRequest(
+  info: TravelInfo,
+  moments: MomentId[],
+  draft: PlanPdfDraft,
+  packingItems: string[],
+): TravelPlanPdfRequest {
+  return {
+    title: draft.title.trim() || '나의 제주 여행',
+    travel: {
+      regions: [...info.regions],
+      start_date: info.startDate,
+      days: normalizedDays(info.durationDays),
+      companion: info.companion,
+      purpose: info.purpose,
+      moments: [...moments],
+    },
+    items: draft.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      day: item.day,
+      order: item.order,
+      source: item.source,
+      address: item.address ?? null,
+      memo: item.pdfMemo.trim() || null,
+      badge: item.badge ?? null,
+      source_title: item.source_title ?? null,
+      source_url: item.source_url ?? null,
+      checked_at: item.checked_at ?? null,
+      check_required: [...(item.check_required ?? [])],
+    })),
+    packing_items: packingItems
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 30),
+  };
 }
