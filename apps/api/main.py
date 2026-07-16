@@ -43,6 +43,7 @@ from apps.api.routes.evidence_assets import router as evidence_assets_router
 from apps.api.routes.corrections import router as corrections_router
 from apps.api.routes.moderation_admin import router as moderation_admin_router
 from apps.api.routes.plan_pdf import router as plan_pdf_router
+from apps.api.routes.weather_report import router as weather_report_router
 
 _bootstrap_result: dict = {"applied": 0, "failed": 0, "errors": []}
 
@@ -62,6 +63,7 @@ app.include_router(evidence_assets_router)
 app.include_router(corrections_router)
 app.include_router(moderation_admin_router)
 app.include_router(plan_pdf_router)
+app.include_router(weather_report_router)
 
 # CORS — 프론트(Vercel)에서 크로스오리진 호출 허용.
 # CORS_ALLOW_ORIGINS 환경변수에 콤마 구분으로 세팅 (예: "https://pack-your-jeju.vercel.app,http://localhost:3000")
@@ -639,7 +641,10 @@ def _public_weather_snapshot(snapshot: dict | None) -> dict:
         "labels",
         "summary",
         "issued_at_label",
+        "source_issued_at",
+        "source_issued_at_label",
         "daily_forecasts",
+        "hourly_forecasts",
         "region",
         "source",
         "http_status",

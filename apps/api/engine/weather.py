@@ -186,6 +186,21 @@ def _vilage_base_datetime(now: datetime | None = None) -> tuple[str, str]:
     return base_day.strftime("%Y%m%d"), f"{hour:02d}00"
 
 
+def _source_issue_metadata(base_date: str, base_time: str) -> dict[str, str]:
+    """Expose the KMA source cycle separately from a forecast target hour."""
+    issued_at = datetime.strptime(
+        f"{base_date}{base_time}",
+        "%Y%m%d%H%M",
+    ).replace(tzinfo=KST)
+    return {
+        "source_issued_at": issued_at.isoformat(),
+        "source_issued_at_label": (
+            f"{issued_at.year}년 {issued_at.month}월 {issued_at.day}일 "
+            f"{issued_at.hour:02d}시 발표"
+        ),
+    }
+
+
 def _first_forecast_values(
     items: list[dict[str, Any]],
     *,
@@ -473,8 +488,15 @@ def parse_vilage_fcst_payload(
     }
 
 
-def _build_vilage_url(key: str, *, region: str) -> str:
-    base_date, base_time = _vilage_base_datetime()
+def _build_vilage_url(
+    key: str,
+    *,
+    region: str,
+    base_date: str | None = None,
+    base_time: str | None = None,
+) -> str:
+    if base_date is None or base_time is None:
+        base_date, base_time = _vilage_base_datetime()
     nx, ny = JEJU_GRID.get(region, JEJU_GRID["jeju_city"])
     params = {
         "pageNo": "1",
@@ -497,7 +519,13 @@ def _fetch_vilage_fcst(
     target_start: date | None = None,
     target_days: int = 1,
 ) -> dict[str, Any]:
-    url = _build_vilage_url(key, region=region)
+    base_date, base_time = _vilage_base_datetime()
+    url = _build_vilage_url(
+        key,
+        region=region,
+        base_date=base_date,
+        base_time=base_time,
+    )
     req = Request(url, headers={"User-Agent": "pack-your-jeju/0.1"})
     try:
         with urlopen(req, timeout=8) as resp:
@@ -546,6 +574,7 @@ def _fetch_vilage_fcst(
             "key_env": key_name,
             "http_status": status,
             "source": "data.go.kr getVilageFcst",
+            **_source_issue_metadata(base_date, base_time),
         }
     )
     return parsed
