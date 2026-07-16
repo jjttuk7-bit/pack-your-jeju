@@ -45,6 +45,7 @@ import { requestCandidatePage, requestPack, requestVisitSignal } from '../api';
 import { hasFinishedCandidateSection, mergeCandidateSection } from '../candidatePagination';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
+import PlanPdfEditor from './PlanPdfEditor';
 import PlaceDetail from './PlaceDetail';
 
 interface Props {
@@ -172,9 +173,7 @@ export default function PackingDashboard(props: Props) {
   >({});
   // 뷰 스위처: 순간별(기본) vs 요일별. 응답의 itinerary가 있어야 요일별 활성.
   const [viewMode, setViewMode] = useState<'moments' | 'itinerary'>('moments');
-  // PDF 저장 상태
-  const [pdfLoading, setPdfLoading] = useState<boolean>(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [planPdfEditorOpen, setPlanPdfEditorOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState<boolean>(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [planSidebarWidth, setPlanSidebarWidth] = useState(savedPlanSidebarWidth);
@@ -244,28 +243,6 @@ export default function PackingDashboard(props: Props) {
   };
 
   const resetSidebarWidth = () => setPlanSidebarWidth(PLAN_SIDEBAR_DEFAULT_WIDTH);
-
-  const handleDownloadPlan = async () => {
-    if (pdfLoading) return;
-    setPdfLoading(true);
-    setPdfError(null);
-    try {
-      const filename = `pack-your-jeju-plan_${info.startDate}.txt`;
-      const blob = new Blob([shareText], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      setPdfError(e?.message || String(e));
-    } finally {
-      setPdfLoading(false);
-    }
-  };
 
   const regionLabel = useMemo(
     () => info.regions
@@ -432,22 +409,13 @@ export default function PackingDashboard(props: Props) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={handleDownloadPlan}
-                disabled={pdfLoading}
+                onClick={() => setPlanPdfEditorOpen(true)}
+                disabled={selectedPlanItems.length === 0}
                 className="rounded-2xl px-3 py-3 bg-citrus text-white font-serif-kr font-bold text-[13px] hover:bg-citrus-2 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5 shadow-jeju-chip"
               >
-                {pdfLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    플랜 생성 중
-                  </>
-                ) : (
-                  <>
-                    <BookOpenCheck className="w-4 h-4" />
-                    내 플랜 저장
-                    <Download className="w-3.5 h-3.5 opacity-80" />
-                  </>
-                )}
+                <BookOpenCheck className="w-4 h-4" />
+                여행 플랜 PDF
+                <Download className="w-3.5 h-3.5 opacity-80" />
               </button>
               <button
                 type="button"
@@ -469,13 +437,8 @@ export default function PackingDashboard(props: Props) {
               </button>
             </div>
             <p className="mt-1.5 text-[10.5px] text-stone-500 text-center leading-snug">
-              플랜에 담은 장소와 직접 추가한 메모만 저장·공유합니다.
+              PDF를 만들기 전에 Day·순서·여행 메모를 직접 다듬을 수 있어요.
             </p>
-            {pdfError && (
-              <p className="mt-1.5 text-[10.5px] text-rose-700 text-center">
-                {pdfError}
-              </p>
-            )}
             {shareError && (
               <p className="mt-1.5 text-[10.5px] text-rose-700 text-center">
                 {shareError}
@@ -733,6 +696,14 @@ export default function PackingDashboard(props: Props) {
       </div>
         </main>
       </div>
+      <PlanPdfEditor
+        open={planPdfEditorOpen}
+        info={info}
+        selectedMomentIds={selectedMomentIds}
+        selectedPlanItems={selectedPlanItems}
+        packingItems={planPackingItems.map((suggestion) => suggestion.item)}
+        onClose={() => setPlanPdfEditorOpen(false)}
+      />
     </div>
   );
 }
