@@ -744,7 +744,12 @@ def _classify_web_source(url: str, title: str = "", snippet: str = "") -> str:
         return "official"
     if any(cue in host for cue in ("map.naver", "place.map.kakao", "booking", "catchtable")):
         return "platform"
-    if any(cue in host for cue in ("blog.", "youtube.com", "youtu.be", "instagram.com")):
+    if (
+        host.endswith("tistory.com")
+        or host.endswith("brunch.co.kr")
+        or host.endswith("medium.com")
+        or any(cue in host for cue in ("blog.", "youtube.com", "youtu.be", "instagram.com"))
+    ):
         return "experience"
     if any(cue in text_in for cue in ("블로그", "후기", "리뷰", "방문기")):
         return "experience"
@@ -837,6 +842,13 @@ def _extract_web_place_candidates(
     clean_answer = str(answer or "")
     if not clean_answer:
         return []
+    recommendation_section = re.search(
+        r"(?ms)^##\s*추천 장소\s*$\s*(.*?)(?=^##\s|\Z)",
+        clean_answer,
+    )
+    if not recommendation_section:
+        return []
+    recommendation_text = recommendation_section.group(1)
 
     try:
         payload = json.loads(context) if context else {}
@@ -864,7 +876,7 @@ def _extract_web_place_candidates(
         for source in sources
         if source.get("url")
     }
-    matches = list(re.finditer(r"\*\*([^*\n]{2,80})\*\*", clean_answer))
+    matches = list(re.finditer(r"\*\*([^*\n]{2,80})\*\*", recommendation_text))
     checked_at = datetime.now(timezone.utc).isoformat()
     candidates: list[dict] = []
     seen_names: set[str] = set()
@@ -873,10 +885,24 @@ def _extract_web_place_candidates(
     for index, match in enumerate(matches):
         name = re.sub(r"^\s*\d+[.)]\s*", "", match.group(1)).strip()
         name_key = _normalize_place_name(name)
-        if not name_key or name in ignored_names or name_key in seen_names:
+        if (
+            not name_key
+            or name in ignored_names
+            or name_key in seen_names
+            or re.search(r"\d[\d,.~\s]*(?:원|만원|천원|%|km|분|시간|명|인분|곳|개)", name, re.I)
+        ):
             continue
-        segment_end = matches[index + 1].start() if index + 1 < len(matches) else len(clean_answer)
-        segment = clean_answer[match.end():segment_end]
+        segment_end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(recommendation_text)
+        )
+        segment = recommendation_text[match.end():segment_end]
+        if not re.search(
+            r"(?m)^[\s>*-]*(?:특징|추천 이유|이유|위치|주소)\s*[:：]",
+            segment,
+        ):
+            continue
         urls = re.findall(r"\]\((https?://[^)\s]+)\)", segment)
         source_url = next((url for url in urls if url), "")
         if not source_url and len(sources) == 1:
@@ -991,6 +1017,10 @@ def _perform_single_web_search(
         "반드시 '## 한눈에 보기', '## 추천 장소', '## 방문 팁' 제목을 그대로 사용하세요. "
         "확인된 고유 장소는 최대 6곳만 장소별로 정리하세요. "
         "장소명은 굵게 표시하고 특징·추천 이유·위치·주의점을 짧은 목록으로 묶으세요. "
+        "굵게 표시하는 장소명에는 정확한 상호명 또는 고유명만 쓰고 가격·설명·추천 수식어를 섞지 마세요. "
+        "운영시간·휴무·가격·예약·1인 주문 가능 여부는 공식 출처 또는 지도·예약 플랫폼에서 직접 확인된 경우에만 단정하세요. "
+        "블로그·후기는 분위기와 방문 경험 판단에만 사용하고 운영 사실의 단독 근거로 사용하지 마세요. "
+        "공식·플랫폼 근거가 없으면 후기 기반 참고 후보라고 밝히고 운영 정보는 재확인 필요로 표시하세요. "
         "같은 변동 가능성 경고를 반복하거나 A/B/C/D 선택지를 만들지 마세요. "
         "각 핵심 정보 가까이에 [출처명](URL) 링크를 붙이세요. "
         f"{role_instruction}\n\n"

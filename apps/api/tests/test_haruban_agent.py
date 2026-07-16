@@ -203,6 +203,17 @@ def test_dedupe_sources_adds_class_and_checked_at():
     assert sources[0]["checked_at"]
 
 
+def test_web_source_classifier_marks_personal_publishing_hosts_as_experience():
+    assert haruban._classify_web_source(
+        "https://example.tistory.com/123",
+        "제주 음식점 목록",
+    ) == "experience"
+    assert haruban._classify_web_source(
+        "https://blog.naver.com/example/123",
+        "제주 카페 후기",
+    ) == "experience"
+
+
 def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch):
     calls = []
 
@@ -304,6 +315,9 @@ def test_single_web_search_forces_search_with_explicit_jeju_region_context(monke
     assert "1,800자" in captured["input"]
     assert "최대 6곳" in captured["input"]
     assert "A/B/C/D" in captured["input"]
+    assert "정확한 상호명 또는 고유명만" in captured["input"]
+    assert "운영시간·휴무·가격·예약·1인 주문 가능 여부" in captured["input"]
+    assert "블로그·후기는 분위기와 방문 경험" in captured["input"]
 
 
 def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
@@ -1123,6 +1137,47 @@ def test_haruban_extracts_structured_candidates_from_web_answer():
     assert candidates[0]["moment"] == "beach_walk"
     assert candidates[0]["source_url"] == "https://www.visitjeju.net/example-iho"
     assert "공항에서 가까운" in candidates[0]["note"]
+
+
+def test_haruban_candidate_extraction_ignores_bold_price_outside_recommendations():
+    answer = """
+## 추천 장소
+- **우진해장국**
+  - 특징: 고사리해장국 전문점입니다.
+  - 위치: 제주시 서사로.
+  - [지도 정보](https://map.example.com/woojin)
+
+## 방문 팁
+- 평균 가격은 **1인 25,000원~35,000원** 정도입니다.
+  - [가격 참고](https://example.tistory.com/price)
+"""
+    candidates = haruban._extract_web_place_candidates(
+        answer,
+        [
+            {"title": "지도 정보", "url": "https://map.example.com/woojin"},
+            {"title": "가격 참고", "url": "https://example.tistory.com/price"},
+        ],
+        "제주시 맛집",
+        '{"regions":["jeju_city"],"moments":["local_food"]}',
+    )
+
+    assert [candidate["name"] for candidate in candidates] == ["우진해장국"]
+
+
+def test_haruban_candidate_extraction_requires_structured_place_fields():
+    answer = """
+## 추천 장소
+- **후기 기반 참고 후보**
+  - [블로그](https://example.tistory.com/list)
+"""
+    candidates = haruban._extract_web_place_candidates(
+        answer,
+        [{"title": "블로그", "url": "https://example.tistory.com/list"}],
+        "제주시 맛집",
+        '{"regions":["jeju_city"],"moments":["local_food"]}',
+    )
+
+    assert candidates == []
 
 
 def test_haruban_turn_exposes_web_candidates_without_second_llm_call(monkeypatch):
