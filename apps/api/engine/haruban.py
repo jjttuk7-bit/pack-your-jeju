@@ -12,13 +12,15 @@
 """
 from __future__ import annotations
 
+import copy
 import json
 import hashlib
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from time import perf_counter
+from time import monotonic, perf_counter
 from typing import Any
 from urllib.parse import urlparse
 
@@ -40,6 +42,10 @@ logger = logging.getLogger(__name__)
 WEB_SEARCH_MODEL = "gpt-4o"
 WEB_SEARCH_TIMEOUT_SECONDS = 18.0
 WEB_SEARCH_MAX_OUTPUT_TOKENS = 2200
+WEB_SEARCH_CACHE_TTL_SECONDS = 300.0
+WEB_SEARCH_CACHE_MAX_ENTRIES = 128
+_WEB_SEARCH_CACHE: dict[str, tuple[float, dict]] = {}
+_WEB_SEARCH_CACHE_LOCK = threading.Lock()
 
 
 # ─── 한글 라벨 (하이라이트 문구 조립용) ───
@@ -729,6 +735,63 @@ class WebSearchResult:
     research_status: str = "unavailable"
 
 
+def _web_search_cache_key(query: str, context: str = "") -> str:
+    normalized_query = re.sub(r"\s+", " ", str(query or "")).strip().lower()
+    raw_context = str(context or "").strip()
+    try:
+        normalized_context = json.dumps(
+            json.loads(raw_context),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError, json.JSONDecodeError):
+        normalized_context = re.sub(r"\s+", " ", raw_context).strip()
+    return hashlib.sha256(
+        f"{normalized_query}\n{normalized_context}".encode("utf-8")
+    ).hexdigest()
+
+
+def _get_cached_web_search(cache_key: str) -> dict | None:
+    now = monotonic()
+    with _WEB_SEARCH_CACHE_LOCK:
+        entry = _WEB_SEARCH_CACHE.get(cache_key)
+        if entry is None:
+            return None
+        expires_at, payload = entry
+        if expires_at <= now:
+            _WEB_SEARCH_CACHE.pop(cache_key, None)
+            return None
+        return copy.deepcopy(payload)
+
+
+def _cache_web_search(cache_key: str, payload: dict) -> None:
+    if not payload.get("available"):
+        return
+    now = monotonic()
+    with _WEB_SEARCH_CACHE_LOCK:
+        expired_keys = [
+            key
+            for key, (expires_at, _) in _WEB_SEARCH_CACHE.items()
+            if expires_at <= now
+        ]
+        for key in expired_keys:
+            _WEB_SEARCH_CACHE.pop(key, None)
+        if (
+            cache_key not in _WEB_SEARCH_CACHE
+            and len(_WEB_SEARCH_CACHE) >= WEB_SEARCH_CACHE_MAX_ENTRIES
+        ):
+            oldest_key = min(
+                _WEB_SEARCH_CACHE,
+                key=lambda key: _WEB_SEARCH_CACHE[key][0],
+            )
+            _WEB_SEARCH_CACHE.pop(oldest_key, None)
+        _WEB_SEARCH_CACHE[cache_key] = (
+            now + WEB_SEARCH_CACHE_TTL_SECONDS,
+            copy.deepcopy(payload),
+        )
+
+
 def _source_key(source: dict) -> str:
     return str(source.get("url") or source.get("title") or "").strip().lower()
 
@@ -1175,6 +1238,12 @@ def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
 def _run_web_search_jeju(args: dict) -> dict:
     query = str(args.get("query") or "").strip()
     context = str(args.get("context") or "").strip()
+    cache_key = _web_search_cache_key(query, context)
+    cached = _get_cached_web_search(cache_key)
+    if cached is not None:
+        logger.info("haruban web search cache hit query=%r", query)
+        return cached
+
     result = _perform_web_search_jeju(query, context=context)
     place_candidates = _extract_web_place_candidates(
         result.answer,
@@ -1182,7 +1251,7 @@ def _run_web_search_jeju(args: dict) -> dict:
         result.query,
         context,
     ) if result.available else []
-    return {
+    payload = {
         "available": result.available,
         "query": result.query,
         "answer": result.answer,
@@ -1201,6 +1270,8 @@ def _run_web_search_jeju(args: dict) -> dict:
             "웹검색 결과는 최신 외부 출처 기준입니다. 내부 공공데이터 검증 완료와 구분해서 사용자에게 안내해야 합니다."
         ),
     }
+    _cache_web_search(cache_key, payload)
+    return payload
 
 
 def _run_suggest_form_augment(args: dict) -> dict:
@@ -1602,7 +1673,7 @@ def _should_use_web_research(conv: list[dict]) -> bool:
     if _is_web_search_question(last_user):
         return True
     recommendation = bool(re.search(
-        r"추천|맛집|식당|카페|오름|관광|여행지|명소|해변|바다|시장|"
+        r"추천|맛집|식당|카페|오름|관광|여행지|명소|해변|바닷가|해수욕장|해안|바다|시장|"
         r"어디|정보|가장|베스트|좋은\s*곳|방문.*좋|가면.*좋|첫\s*번째|"
         r"더\s*(?:알려|추천)|비교",
         last_user,
@@ -1680,6 +1751,8 @@ def _should_answer_without_search(messages_in: list[dict]) -> bool:
     ]
     last_user = _latest_user_text(conv)
     if not last_user:
+        return False
+    if _should_use_web_research(conv):
         return False
     if _infer_place_detail_query(conv):
         return False

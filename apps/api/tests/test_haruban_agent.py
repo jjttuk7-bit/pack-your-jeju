@@ -1152,6 +1152,52 @@ def test_haruban_routes_first_place_to_visit_question_to_web_search(monkeypatch)
     assert captured["query"] == "제주시에서 제일 첫번째로 방문하면 좋은 곳을 알려줘"
 
 
+def test_haruban_best_place_advice_cannot_bypass_web_research(monkeypatch):
+    captured = {}
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {
+            "available": True,
+            "query": args["query"],
+            "answer": "사용자 조건에 맞는 후보를 웹 출처로 비교했습니다.",
+            "sources": [{"title": "제주 관광 공식", "url": "https://example.com/jeju"}],
+            "source_type": "web",
+        }
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+    conv = [{"role": "user", "content": "가장 가보면 좋은 곳에 대한 정보를 알려줘"}]
+
+    assert haruban._should_use_web_research(conv) is True
+    assert haruban._should_answer_without_search(conv) is False
+    result = haruban._build_search_pool_context(conv, {"regions": ["jeju_city"]})
+
+    assert result["tool"] == "web_search_jeju"
+    assert captured["query"] == "가장 가보면 좋은 곳에 대한 정보를 알려줘"
+
+
+def test_haruban_routes_beach_existence_question_to_web_search(monkeypatch):
+    captured = {}
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {
+            "available": True,
+            "query": args["query"],
+            "answer": "성산의 해변 후보를 웹 출처로 확인했습니다.",
+            "sources": [{"title": "제주 관광 공식", "url": "https://example.com/seongsan"}],
+            "source_type": "web",
+        }
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+    conv = [{"role": "user", "content": "성산에 바닷가가 있나?"}]
+
+    result = haruban._build_search_pool_context(conv, {"regions": ["seongsan"]})
+
+    assert result["tool"] == "web_search_jeju"
+    assert captured["query"] == "성산에 바닷가가 있나?"
+
+
 def test_haruban_does_not_retry_failed_web_search(monkeypatch):
     calls = []
     timeouts = []
@@ -1176,6 +1222,34 @@ def test_haruban_does_not_retry_failed_web_search(monkeypatch):
     assert len(calls) == 1
     assert result.queries == [calls[0][0]]
     assert timeouts == [haruban.WEB_SEARCH_TIMEOUT_SECONDS]
+
+
+def test_haruban_reuses_recent_successful_web_research(monkeypatch):
+    calls = []
+
+    def fake_search(query, context=""):
+        calls.append((query, context))
+        return haruban.WebSearchResult(
+            available=True,
+            query=query,
+            answer="성산의 해변 후보를 웹 출처로 확인했습니다.",
+            sources=[{"title": "제주 관광 공식", "url": "https://example.com/seongsan"}],
+            queries=[query],
+            research_status="sufficient",
+        )
+
+    haruban._WEB_SEARCH_CACHE.clear()
+    monkeypatch.setattr(haruban, "_perform_web_search_jeju", fake_search)
+    args = {
+        "query": "성산에 바닷가가 있나?",
+        "context": '{"regions":["seongsan"],"companion":"solo"}',
+    }
+
+    first = haruban._run_web_search_jeju(args)
+    second = haruban._run_web_search_jeju(args)
+
+    assert len(calls) == 1
+    assert first == second
 
 
 def test_haruban_extracts_structured_candidates_from_web_answer():
