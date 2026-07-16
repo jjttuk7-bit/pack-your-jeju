@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
 from statistics import mean
 from typing import Any
 
@@ -196,3 +197,77 @@ def evaluate_itinerary_impact(
         "signals": signals,
         "reason": reason,
     }
+
+
+def _proposal_fingerprint(
+    impact: dict[str, Any],
+    risky_item: dict[str, Any],
+    alternative_item: dict[str, Any],
+) -> str:
+    parts = (
+        WEATHER_POLICY_VERSION,
+        str(impact.get("forecast_issued_at") or "unknown"),
+        str(risky_item.get("id")),
+        str(alternative_item.get("id")),
+        str(risky_item.get("daypart")),
+        str(alternative_item.get("daypart")),
+        "swap_daypart",
+    )
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def build_weather_proposals(
+    items: list[dict[str, Any]],
+    impacts: list[dict[str, Any]],
+    dismissed: set[str],
+) -> list[dict[str, Any]]:
+    """Build deterministic, user-approved swaps without moving fixed items."""
+    items_by_id = {str(item.get("id")): item for item in items if item.get("id")}
+    proposals: list[dict[str, Any]] = []
+
+    for impact in impacts:
+        if impact.get("status") != "adjust":
+            continue
+        risky_item = items_by_id.get(str(impact.get("item_id")))
+        if not risky_item or risky_item.get("fixed"):
+            continue
+
+        alternative_item = next(
+            (
+                item
+                for item in items
+                if item.get("id") != risky_item.get("id")
+                and item.get("date") == risky_item.get("date")
+                and item.get("region") == risky_item.get("region")
+                and item.get("daypart") != risky_item.get("daypart")
+                and not item.get("fixed")
+                and MOMENT_WEATHER_PROFILE.get(str(item.get("moment") or "")) == "indoor"
+            ),
+            None,
+        )
+        if alternative_item is None:
+            continue
+
+        fingerprint = _proposal_fingerprint(impact, risky_item, alternative_item)
+        if fingerprint in dismissed:
+            continue
+
+        proposals.append(
+            {
+                "proposal_id": f"weather-{fingerprint}",
+                "fingerprint": fingerprint,
+                "severity": "adjust",
+                "reason": impact.get("reason"),
+                "signals": list(impact.get("signals") or []),
+                "operations": [
+                    {
+                        "type": "swap_daypart",
+                        "item_ids": [risky_item["id"], alternative_item["id"]],
+                    }
+                ],
+                "affected_item_ids": [risky_item["id"], alternative_item["id"]],
+                "requires_recalculation": False,
+            }
+        )
+
+    return proposals

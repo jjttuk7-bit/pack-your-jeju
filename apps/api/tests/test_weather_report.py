@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from apps.api.engine.weather_report import aggregate_dayparts, evaluate_itinerary_impact
+from apps.api.engine.weather_report import (
+    aggregate_dayparts,
+    build_weather_proposals,
+    evaluate_itinerary_impact,
+)
 
 
 def test_aggregate_dayparts_uses_worst_probability_and_wind():
@@ -152,3 +156,95 @@ def test_mild_outdoor_rain_only_recommends_preparation():
 
     assert impact["status"] == "prepare"
     assert impact["signals"] == ["rain"]
+
+
+def _proposal_items() -> list[dict]:
+    return [
+        {
+            "id": "outdoor",
+            "name": "성산 오름",
+            "day": 1,
+            "date": "2026-07-20",
+            "daypart": "morning",
+            "moment": "oreum",
+            "region": "seongsan",
+            "fixed": False,
+        },
+        {
+            "id": "indoor",
+            "name": "제주 전시",
+            "day": 1,
+            "date": "2026-07-20",
+            "daypart": "afternoon",
+            "moment": "culture_stop",
+            "region": "seongsan",
+            "fixed": False,
+        },
+    ]
+
+
+def _adjust_impact() -> dict:
+    return {
+        "item_id": "outdoor",
+        "status": "adjust",
+        "signals": ["rain"],
+        "reason": "오전 비 예보로 시간 조정을 권합니다.",
+        "forecast_issued_at": "2026-07-19T05:00:00+09:00",
+    }
+
+
+def test_proposal_swaps_risky_outdoor_with_existing_indoor_item():
+    proposals = build_weather_proposals(
+        _proposal_items(),
+        [_adjust_impact()],
+        dismissed=set(),
+    )
+
+    assert len(proposals) == 1
+    assert proposals[0]["operations"] == [
+        {"type": "swap_daypart", "item_ids": ["outdoor", "indoor"]}
+    ]
+    assert proposals[0]["affected_item_ids"] == ["outdoor", "indoor"]
+    assert proposals[0]["fingerprint"]
+
+
+def test_fixed_item_is_never_moved_by_weather_proposal():
+    items = _proposal_items()
+    items[0]["fixed"] = True
+
+    proposals = build_weather_proposals(items, [_adjust_impact()], dismissed=set())
+
+    assert proposals == []
+
+
+def test_dismissed_proposal_fingerprint_is_not_returned():
+    first = build_weather_proposals(
+        _proposal_items(),
+        [_adjust_impact()],
+        dismissed=set(),
+    )
+
+    second = build_weather_proposals(
+        _proposal_items(),
+        [_adjust_impact()],
+        dismissed={first[0]["fingerprint"]},
+    )
+
+    assert second == []
+
+
+def test_weather_proposal_fingerprint_is_deterministic():
+    first = build_weather_proposals(_proposal_items(), [_adjust_impact()], dismissed=set())
+    second = build_weather_proposals(_proposal_items(), [_adjust_impact()], dismissed=set())
+
+    assert first[0]["fingerprint"] == second[0]["fingerprint"]
+    assert first[0]["proposal_id"] == second[0]["proposal_id"]
+
+
+def test_weather_proposal_does_not_move_into_occupied_fixed_slot():
+    items = _proposal_items()
+    items[1]["fixed"] = True
+
+    proposals = build_weather_proposals(items, [_adjust_impact()], dismissed=set())
+
+    assert proposals == []
