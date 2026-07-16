@@ -66,6 +66,8 @@ export interface MemoryTask {
   description: string;
 }
 
+export type Daypart = 'morning' | 'afternoon' | 'evening';
+
 export interface TravelPlanItem {
   id: string;
   name: string;
@@ -78,6 +80,11 @@ export interface TravelPlanItem {
   note?: string | null;
   day?: number | null;
   date?: string | null;
+  daypart?: Daypart;
+  startTime?: string | null;
+  durationMinutes?: number | null;
+  fixed?: boolean;
+  reservationNote?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   trust_score?: number;
@@ -87,6 +94,103 @@ export interface TravelPlanItem {
   source_url?: string | null;
   checked_at?: string | null;
   search_query?: string | null;
+}
+
+export interface WeatherReportPlanItem {
+  id: string;
+  name: string;
+  day: number;
+  date: string;
+  daypart: Daypart;
+  startTime?: string | null;
+  durationMinutes?: number | null;
+  region: string;
+  moment: MomentId | string;
+  fixed: boolean;
+  reservationNote?: string | null;
+}
+
+export interface WeatherReportRequest {
+  startDate: string;
+  days: number;
+  regions: string[];
+  items: WeatherReportPlanItem[];
+  dismissedProposalFingerprints: string[];
+}
+
+export type WeatherDecisionStatus =
+  | 'unknown'
+  | 'suitable'
+  | 'prepare'
+  | 'adjust'
+  | 'official_check';
+
+export interface WeatherDaypartPeriod {
+  region: string;
+  date: string;
+  daypart: Daypart;
+  available: boolean;
+  sky?: string;
+  precipitation_type?: string;
+  precipitation_probability_max?: number | null;
+  temperature_min?: number | null;
+  temperature_max?: number | null;
+  wind_speed_average?: number | null;
+  wind_speed_max?: number | null;
+  humidity_average?: number | null;
+  source_issued_at?: string | null;
+  source_issued_at_label?: string | null;
+}
+
+export interface WeatherItineraryImpact {
+  item_id: string;
+  region: string;
+  date: string;
+  daypart: Daypart;
+  status: WeatherDecisionStatus;
+  signals: string[];
+  reason: string;
+  policy_version: string;
+  source_label: string;
+  profile?: string;
+  forecast_issued_at?: string | null;
+}
+
+export interface WeatherProposalOperation {
+  type: 'swap_daypart';
+  item_ids: [string, string];
+}
+
+export interface WeatherChangeProposal {
+  proposal_id: string;
+  fingerprint: string;
+  severity: 'adjust';
+  reason: string;
+  signals: string[];
+  operations: WeatherProposalOperation[];
+  affected_item_ids: string[];
+  requires_recalculation: boolean;
+}
+
+export interface WeatherReportResponse {
+  status: WeatherDecisionStatus;
+  headline: string;
+  periods: WeatherDaypartPeriod[];
+  impacts: WeatherItineraryImpact[];
+  proposals: WeatherChangeProposal[];
+  forecast_meta: {
+    provider: string;
+    requested_regions: string[];
+    available_regions: string[];
+    unavailable_regions: string[];
+    partial: boolean;
+    issues: Array<{
+      region: string;
+      source_issued_at?: string | null;
+      source_issued_at_label?: string | null;
+    }>;
+    failures: Array<{region: string; reason: string}>;
+  };
 }
 
 export type VisitCheckStatus =

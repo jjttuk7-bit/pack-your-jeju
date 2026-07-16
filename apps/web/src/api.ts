@@ -15,6 +15,8 @@ import type {
   VisitSignalResponse,
   VisitCheckStatus,
   VerifyResponse,
+  WeatherReportRequest,
+  WeatherReportResponse,
 } from './types';
 
 // 로컬 dev 기본값은 127.0.0.1로 고정 (Windows에서 localhost는 IPv6로 해석되어
@@ -93,6 +95,30 @@ export function requestRegionCoveragePreview(
   return get<RegionCoveragePreview>(
     `/region/coverage-preview?region=${encodeURIComponent(region)}`,
   );
+}
+
+export function requestWeatherReport(
+  request: WeatherReportRequest,
+): Promise<WeatherReportResponse> {
+  return post<WeatherReportResponse>('/weather/report', {
+    start_date: request.startDate,
+    days: request.days,
+    regions: request.regions,
+    items: request.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      day: item.day,
+      date: item.date,
+      daypart: item.daypart,
+      start_time: item.startTime ?? null,
+      duration_minutes: item.durationMinutes ?? null,
+      region: item.region,
+      moment: item.moment,
+      fixed: item.fixed,
+      reservation_note: item.reservationNote ?? null,
+    })),
+    dismissed_proposal_fingerprints: request.dismissedProposalFingerprints,
+  });
 }
 
 // 여행플랜 PDF 다운로드 — 서버가 조립한 pdf를 그대로 받아 브라우저 다운로드.
