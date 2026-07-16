@@ -206,8 +206,8 @@ def test_dedupe_sources_adds_class_and_checked_at():
 def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch):
     calls = []
 
-    def fake_single(query, context="", source_class="web"):
-        calls.append((query, context, source_class))
+    def fake_single(query, context="", source_class="web", timeout_seconds=None):
+        calls.append((query, context, source_class, timeout_seconds))
         return haruban.WebSearchResult(
             available=True,
             query=query,
@@ -222,7 +222,12 @@ def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch)
 
     assert result.available is True
     assert result.research_status == "sufficient"
-    assert calls == [("성산의 맛집들은?", "혼자 여행", "web")]
+    assert calls == [(
+        "성산의 맛집들은?",
+        "혼자 여행",
+        "web",
+        haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
+    )]
     assert result.queries == ["성산의 맛집들은?"]
 
 
@@ -318,11 +323,12 @@ def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
     result = haruban._perform_single_web_search("구좌 오름 공식", source_class="official")
 
     assert result.available is False
-    assert haruban.WEB_SEARCH_TIMEOUT_SECONDS == 20.0
-    assert captured["timeout"] == haruban.WEB_SEARCH_TIMEOUT_SECONDS
+    assert haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS == 14.0
+    assert captured["timeout"] == haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS
     assert captured["max_retries"] == 0
     assert "provider timeout" in caplog.text
     assert "official" in caplog.text
+    assert "timeout_seconds=14.0" in caplog.text
     assert "elapsed_ms" in caplog.text
 
 
@@ -1062,9 +1068,11 @@ def test_haruban_routes_first_place_to_visit_question_to_web_search(monkeypatch)
 
 def test_haruban_retries_web_search_once_with_broader_query(monkeypatch):
     calls = []
+    timeouts = []
 
-    def fake_single(query, context="", source_class="web"):
+    def fake_single(query, context="", source_class="web", timeout_seconds=None):
         calls.append((query, context, source_class))
+        timeouts.append(timeout_seconds)
         if len(calls) == 1:
             return haruban.WebSearchResult(
                 available=False,
@@ -1090,6 +1098,11 @@ def test_haruban_retries_web_search_once_with_broader_query(monkeypatch):
     assert calls[1][0] != calls[0][0]
     assert "제주특별자치도 제주시" in calls[1][0]
     assert result.queries == [calls[0][0], calls[1][0]]
+    assert timeouts == [
+        haruban.WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
+        haruban.WEB_SEARCH_RETRY_TIMEOUT_SECONDS,
+    ]
+    assert sum(timeouts) <= haruban.WEB_SEARCH_TOTAL_BUDGET_SECONDS
 
 
 def test_haruban_extracts_structured_candidates_from_web_answer():

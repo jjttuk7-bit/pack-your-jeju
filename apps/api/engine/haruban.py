@@ -37,7 +37,9 @@ from apps.api.engine import weather as weather_mod
 
 
 logger = logging.getLogger(__name__)
-WEB_SEARCH_TIMEOUT_SECONDS = 20.0
+WEB_SEARCH_TOTAL_BUDGET_SECONDS = 20.0
+WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS = 14.0
+WEB_SEARCH_RETRY_TIMEOUT_SECONDS = 6.0
 WEB_SEARCH_MAX_OUTPUT_TOKENS = 2200
 
 
@@ -950,6 +952,7 @@ def _perform_single_web_search(
     query: str,
     context: str = "",
     source_class: str = "web",
+    timeout_seconds: float = WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
 ) -> WebSearchResult:
     """하나의 검색 관점을 실행한다. 상위 함수가 실패를 병합한다."""
     import os
@@ -999,7 +1002,7 @@ def _perform_single_web_search(
 
     client = OpenAI(
         api_key=key,
-        timeout=WEB_SEARCH_TIMEOUT_SECONDS,
+        timeout=timeout_seconds,
         max_retries=0,
     )
     last_error = ""
@@ -1025,12 +1028,13 @@ def _perform_single_web_search(
             ]
             elapsed_ms = (perf_counter() - started) * 1000
             logger.info(
-                "haruban web search completed source_class=%s tool_type=%s query=%r available=%s sources=%d elapsed_ms=%.1f",
+                "haruban web search completed source_class=%s tool_type=%s query=%r available=%s sources=%d timeout_seconds=%.1f elapsed_ms=%.1f",
                 source_class,
                 tool_type,
                 clean_query,
                 bool(sources),
                 len(sources),
+                timeout_seconds,
                 elapsed_ms,
             )
             return WebSearchResult(
@@ -1046,10 +1050,11 @@ def _perform_single_web_search(
             elapsed_ms = (perf_counter() - started) * 1000
             last_error = f"{type(e).__name__}: {e}"
             logger.warning(
-                "haruban web search failed source_class=%s tool_type=%s query=%r elapsed_ms=%.1f error=%s",
+                "haruban web search failed source_class=%s tool_type=%s query=%r timeout_seconds=%.1f elapsed_ms=%.1f error=%s",
                 source_class,
                 tool_type,
                 clean_query,
+                timeout_seconds,
                 elapsed_ms,
                 last_error,
             )
@@ -1062,7 +1067,12 @@ def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
     if not clean_query:
         return WebSearchResult(available=False, query=clean_query, reason="query is required")
     queries = [clean_query]
-    result = _perform_single_web_search(clean_query, context=context, source_class="web")
+    result = _perform_single_web_search(
+        clean_query,
+        context=context,
+        source_class="web",
+        timeout_seconds=WEB_SEARCH_PRIMARY_TIMEOUT_SECONDS,
+    )
     if not result.available:
         region_scope = "제주"
         try:
@@ -1088,6 +1098,7 @@ def _perform_web_search_jeju(query: str, context: str = "") -> WebSearchResult:
             retry_query,
             context=context,
             source_class="web",
+            timeout_seconds=WEB_SEARCH_RETRY_TIMEOUT_SECONDS,
         )
         if retry_result.available:
             result = retry_result
