@@ -1247,6 +1247,63 @@ def test_haruban_candidate_extraction_requires_structured_place_fields():
     assert candidates == []
 
 
+def test_haruban_candidate_extraction_accepts_bold_section_and_bullet_dot():
+    answer = """
+**추천 장소**
+**자매국수**
+• 특징: 고기국수 전문점입니다. ([**TripPick**](https://trippick.co/food))
+• 위치: 제주시 항골남길 46
+
+**우진해장국**
+• 특징: 고사리육개장 전문입니다. ([**Visit Jeju**](https://visitjeju.net/place))
+• 위치: 제주시 서사로 11
+
+**방문 팁**
+운영 정보는 방문 전 다시 확인합니다.
+"""
+    candidates = haruban._extract_web_place_candidates(
+        answer,
+        [
+            {"title": "TripPick", "url": "https://trippick.co/food", "source_class": "web"},
+            {
+                "title": "Visit Jeju",
+                "url": "https://visitjeju.net/place",
+                "source_class": "official",
+            },
+        ],
+        "최근 제주시 맛집들 알려줘",
+        '{"regions":["jeju_city"],"moments":["local_food"]}',
+    )
+
+    assert [candidate["name"] for candidate in candidates] == ["자매국수", "우진해장국"]
+    assert candidates[0]["source_url"] == "https://trippick.co/food"
+    assert candidates[1]["source_url"] == "https://visitjeju.net/place"
+    assert all(candidate["name"] not in {"TripPick", "Visit Jeju"} for candidate in candidates)
+
+
+def test_haruban_candidate_extraction_accepts_field_labels_without_colons():
+    answer = """
+## 추천 장소
+- **올래국수 본점**
+  - 특징 및 추천 이유
+    - 고기국수 중심의 식당입니다. ([**식신**](https://siksinhot.com/olle))
+  - 위치
+    - 제주시 귀아랑길 24
+
+## 방문 팁
+- 운영 정보는 방문 전 다시 확인합니다.
+"""
+    candidates = haruban._extract_web_place_candidates(
+        answer,
+        [{"title": "식신", "url": "https://siksinhot.com/olle", "source_class": "platform"}],
+        "최근 제주시 맛집들 알려줘",
+        '{"regions":["jeju_city"],"moments":["local_food"]}',
+    )
+
+    assert [candidate["name"] for candidate in candidates] == ["올래국수 본점"]
+    assert candidates[0]["source_url"] == "https://siksinhot.com/olle"
+
+
 def test_haruban_turn_exposes_web_candidates_without_second_llm_call(monkeypatch):
     monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
     monkeypatch.setattr(

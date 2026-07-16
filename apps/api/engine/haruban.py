@@ -888,13 +888,22 @@ def _extract_web_place_candidates(
     clean_answer = str(answer or "")
     if not clean_answer:
         return []
-    recommendation_section = re.search(
-        r"(?ms)^##\s*추천 장소\s*$\s*(.*?)(?=^##\s|\Z)",
+    recommendation_start = re.search(
+        r"(?m)^[ \t]*(?:##[ \t]+추천 장소|\*\*추천 장소\*\*)[ \t]*\r?$",
         clean_answer,
     )
-    if not recommendation_section:
+    if not recommendation_start:
         return []
-    recommendation_text = recommendation_section.group(1)
+    recommendation_tail = clean_answer[recommendation_start.end():]
+    recommendation_end = re.search(
+        r"(?m)^[ \t]*(?:##[ \t]+.+|\*\*(?:한눈에 보기|방문 팁|공공데이터 교차확인|웹 출처 기준|확인 필요)\*\*)[ \t]*\r?$",
+        recommendation_tail,
+    )
+    recommendation_text = (
+        recommendation_tail[:recommendation_end.start()]
+        if recommendation_end
+        else recommendation_tail
+    )
 
     try:
         payload = json.loads(context) if context else {}
@@ -922,7 +931,10 @@ def _extract_web_place_candidates(
         for source in sources
         if source.get("url")
     }
-    matches = list(re.finditer(r"\*\*([^*\n]{2,80})\*\*", recommendation_text))
+    matches = list(re.finditer(
+        r"(?m)^[ \t]*(?:[-*•][ \t]+|\d+[.)][ \t]+)?\*\*([^*\n]{2,80})\*\*[ \t]*\r?$",
+        recommendation_text,
+    ))
     checked_at = datetime.now(timezone.utc).isoformat()
     candidates: list[dict] = []
     seen_names: set[str] = set()
@@ -945,7 +957,7 @@ def _extract_web_place_candidates(
         )
         segment = recommendation_text[match.end():segment_end]
         if not re.search(
-            r"(?m)^[\s>*-]*(?:특징|추천 이유|이유|위치|주소)\s*[:：]",
+            r"(?m)^[\s>*•-]*(?:특징(?:[ \t]*및[ \t]*추천 이유)?|추천 이유|이유|위치|주소)[ \t]*(?:[:：]|$)",
             segment,
         ):
             continue
@@ -961,7 +973,7 @@ def _extract_web_place_candidates(
         address = ""
         for raw_line in segment.splitlines():
             line = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", raw_line)
-            line = re.sub(r"^[\s>*-]+", "", line).strip()
+            line = re.sub(r"^[\s>*•-]+", "", line).strip()
             if not line:
                 continue
             if re.match(r"(?:위치|주소)\s*[:：]", line):
