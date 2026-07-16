@@ -25,6 +25,6 @@ test('Haruban writes into the same selectedPlanItems state used by My Travel Pla
   assert.match(appSource, /onAddPlanItem=\{handleAddCustomPlanItem\}/);
   assert.match(
     appSource,
-    /const handleAddCustomPlanItem = \(item: TravelPlanItem\) => \{[\s\S]*selectedPlanItems: \[\.\.\.current, item\]/,
+    /const handleAddCustomPlanItem = \(item: TravelPlanItem\) => \{[\s\S]*selectedPlanItems: schedulePlanItemsForWeather\(prev\.info, \[\.\.\.current, item\]\)/,
   );
 });

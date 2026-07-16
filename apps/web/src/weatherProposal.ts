@@ -1,4 +1,11 @@
-import type {TravelPlanItem, WeatherChangeProposal} from './types';
+import {REGIONS} from './data';
+import type {
+  Daypart,
+  TravelInfo,
+  TravelPlanItem,
+  WeatherChangeProposal,
+  WeatherReportPlanItem,
+} from './types';
 
 
 export interface WeatherUndoSnapshot {
@@ -16,6 +23,14 @@ export interface ApplyProposalResult {
 
 export type ProposalPreview = ApplyProposalResult;
 
+const DAYPART_SEQUENCE: Daypart[] = ['morning', 'afternoon', 'evening'];
+const DAYPART_START_TIME: Record<Daypart, string> = {
+  morning: '09:00',
+  afternoon: '14:00',
+  evening: '18:00',
+};
+const WEATHER_REGIONS = new Set<string>(REGIONS.map((region) => region.value));
+
 
 function cloneItems(items: TravelPlanItem[]): TravelPlanItem[] {
   return items.map((item) => ({
@@ -25,6 +40,63 @@ function cloneItems(items: TravelPlanItem[]): TravelPlanItem[] {
       : item.score_breakdown,
     check_required: item.check_required ? [...item.check_required] : item.check_required,
   }));
+}
+
+
+function dateForDay(startDate: string, day: number): string {
+  const [year, month, dateValue] = startDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, dateValue));
+  date.setUTCDate(date.getUTCDate() + day - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+
+export function schedulePlanItemsForWeather(
+  info: TravelInfo,
+  items: TravelPlanItem[],
+): TravelPlanItem[] {
+  const days = Math.max(1, Math.min(14, info.durationDays));
+  const positionsByDay = new Map<number, number>();
+  return items.map((item, index) => {
+    const requestedDay = Number(item.day);
+    const day = Number.isInteger(requestedDay) && requestedDay >= 1 && requestedDay <= days
+      ? requestedDay
+      : Math.min(Math.floor(index / DAYPART_SEQUENCE.length) + 1, days);
+    const position = positionsByDay.get(day) ?? 0;
+    positionsByDay.set(day, position + 1);
+    const daypart = item.daypart ?? DAYPART_SEQUENCE[position % DAYPART_SEQUENCE.length];
+    return {
+      ...item,
+      day,
+      date: dateForDay(info.startDate, day),
+      daypart,
+      startTime: item.startTime || DAYPART_START_TIME[daypart],
+      fixed: item.fixed ?? false,
+    };
+  });
+}
+
+
+export function toWeatherReportItems(
+  info: TravelInfo,
+  items: TravelPlanItem[],
+): WeatherReportPlanItem[] {
+  return schedulePlanItemsForWeather(info, items).flatMap((item) => {
+    if (!item.region || !WEATHER_REGIONS.has(item.region)) return [];
+    return [{
+      id: item.id,
+      name: item.name,
+      day: item.day!,
+      date: item.date!,
+      daypart: item.daypart!,
+      startTime: item.startTime ?? null,
+      durationMinutes: item.durationMinutes ?? null,
+      region: item.region,
+      moment: item.moment,
+      fixed: item.fixed ?? false,
+      reservationNote: item.reservationNote ?? null,
+    }];
+  });
 }
 
 

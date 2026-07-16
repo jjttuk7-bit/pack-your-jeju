@@ -96,6 +96,12 @@ export interface TravelPlanItem {
   search_query?: string | null;
 }
 
+export interface WeatherUndoState {
+  proposalId: string;
+  beforeItems: TravelPlanItem[];
+  appliedPlanFingerprint: string;
+}
+
 export interface WeatherReportPlanItem {
   id: string;
   name: string;
@@ -228,6 +234,9 @@ export interface SavedTravel {
   customMemories?: string[];
   selectedPlanItems?: TravelPlanItem[];
   visitChecks?: Record<string, VisitCheck>;
+  weatherDismissedFingerprints?: string[];
+  weatherUndo?: WeatherUndoState | null;
+  weatherActionMessage?: string | null;
 }
 
 // ─────────────────────────────────────────────────────

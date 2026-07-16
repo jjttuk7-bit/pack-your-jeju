@@ -26,6 +26,8 @@ import {
   ClipboardCheck,
   CloudSun,
   GripVertical,
+  Clock3,
+  LockKeyhole,
 } from 'lucide-react';
 import type {
   TravelInfo,
@@ -39,14 +41,23 @@ import type {
   VisitCheck,
   VisitCheckStatus,
   WeatherSnapshotDto,
+  WeatherChangeProposal,
+  WeatherReportResponse,
+  Daypart,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
-import { requestCandidatePage, requestPack, requestVisitSignal } from '../api';
+import { requestCandidatePage, requestPack, requestVisitSignal, requestWeatherReport } from '../api';
+import {
+  planFingerprint,
+  schedulePlanItemsForWeather,
+  toWeatherReportItems,
+} from '../weatherProposal';
 import { hasFinishedCandidateSection, mergeCandidateSection } from '../candidatePagination';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
 import PlanPdfEditor from './PlanPdfEditor';
 import PlaceDetail from './PlaceDetail';
+import WeatherDecisionReport from './WeatherDecisionReport';
 
 interface Props {
   info: TravelInfo;
@@ -58,6 +69,9 @@ interface Props {
   customMemories: string[];
   selectedPlanItems: TravelPlanItem[];
   visitChecks: Record<string, VisitCheck>;
+  weatherDismissedFingerprints: string[];
+  weatherUndoAvailable: boolean;
+  weatherActionMessage: string | null;
   onToggleItem: (itemId: string) => void;
   onToggleMemory: (memoryId: string) => void;
   onAddCustomBasic: (itemName: string) => void;
@@ -69,6 +83,13 @@ interface Props {
   onTogglePlanItem: (item: TravelPlanItem) => void;
   onAddCustomPlanItem: (item: TravelPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
+  onUpdatePlanSchedule: (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => void;
+  onApplyWeatherProposal: (proposal: WeatherChangeProposal) => void;
+  onDismissWeatherProposal: (proposal: WeatherChangeProposal) => void;
+  onUndoWeatherProposal: () => void;
   onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
   onOpenFeedback: () => void;
   onReset: () => void;
@@ -142,6 +163,11 @@ const PLAN_SIDEBAR_DEFAULT_WIDTH = 460;
 const PLAN_SIDEBAR_MIN_WIDTH = 360;
 const PLAN_SIDEBAR_MAX_WIDTH = 680;
 const PLAN_CONTENT_MIN_WIDTH = 520;
+const DAYPART_OPTIONS: Array<{value: Daypart; label: string; startTime: string}> = [
+  {value: 'morning', label: '오전', startTime: '09:00'},
+  {value: 'afternoon', label: '오후', startTime: '14:00'},
+  {value: 'evening', label: '저녁', startTime: '18:00'},
+];
 
 function savedPlanSidebarWidth(): number {
   const saved = Number(window.localStorage.getItem(PLAN_SIDEBAR_STORAGE_KEY));
@@ -156,10 +182,17 @@ export default function PackingDashboard(props: Props) {
     checkedItemIds,
     selectedPlanItems,
     visitChecks,
+    weatherDismissedFingerprints,
+    weatherUndoAvailable,
+    weatherActionMessage,
     onToggleItem,
     onTogglePlanItem,
     onAddCustomPlanItem,
     onRemovePlanItem,
+    onUpdatePlanSchedule,
+    onApplyWeatherProposal,
+    onDismissWeatherProposal,
+    onUndoWeatherProposal,
     onSetVisitCheck,
     onOpenFeedback,
     onReset,
@@ -177,6 +210,9 @@ export default function PackingDashboard(props: Props) {
   const [shareCopied, setShareCopied] = useState<boolean>(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [planSidebarWidth, setPlanSidebarWidth] = useState(savedPlanSidebarWidth);
+  const [weatherReport, setWeatherReport] = useState<WeatherReportResponse | null>(null);
+  const [weatherReportLoading, setWeatherReportLoading] = useState(false);
+  const [weatherReportError, setWeatherReportError] = useState<string | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const resizingSidebarRef = useRef(false);
 
@@ -275,6 +311,28 @@ export default function PackingDashboard(props: Props) {
     () => buildPlanPackingItems(selectedPlanItems),
     [selectedPlanItems],
   );
+  const scheduledPlanItems = useMemo(
+    () => schedulePlanItemsForWeather(info, selectedPlanItems),
+    [info, selectedPlanItems],
+  );
+  const weatherPlanItems = useMemo(
+    () => toWeatherReportItems(info, scheduledPlanItems),
+    [info, scheduledPlanItems],
+  );
+  const scheduledPlanFingerprint = useMemo(
+    () => planFingerprint(scheduledPlanItems),
+    [scheduledPlanItems],
+  );
+  const visibleWeatherReport = useMemo(() => {
+    if (!weatherReport) return null;
+    const dismissed = new Set(weatherDismissedFingerprints);
+    return {
+      ...weatherReport,
+      proposals: weatherReport.proposals.filter(
+        (proposal) => !dismissed.has(proposal.fingerprint),
+      ),
+    };
+  }, [weatherReport, weatherDismissedFingerprints]);
   const shareText = useMemo(
     () => packResp ? buildShareText(info, selectedMomentIds, packResp, selectedPlanItems, visitChecks) : '',
     [info, selectedMomentIds, packResp, selectedPlanItems, visitChecks]
@@ -366,6 +424,61 @@ export default function PackingDashboard(props: Props) {
     info.purpose,
     hasPackInput,
     JSON.stringify(selectedMomentIds),
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (weatherPlanItems.length === 0) {
+      setWeatherReport(null);
+      setWeatherReportError(null);
+      setWeatherReportLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setWeatherReportLoading(true);
+    setWeatherReportError(null);
+    requestWeatherReport({
+      startDate: info.startDate,
+      days: info.durationDays,
+      regions: Array.from(new Set(weatherPlanItems.map((item) => item.region))),
+      items: weatherPlanItems,
+      dismissedProposalFingerprints: weatherDismissedFingerprints,
+    })
+      .then((report) => {
+        if (cancelled) return;
+        const basePlanFingerprint = scheduledPlanFingerprint;
+        setWeatherReport({
+          ...report,
+          proposals: report.proposals.map((proposal) => ({
+            ...proposal,
+            basePlanFingerprint,
+          })),
+        });
+      })
+      .catch((weatherError: unknown) => {
+        if (cancelled) return;
+        setWeatherReport(null);
+        setWeatherReportError(
+          weatherError instanceof Error
+            ? weatherError.message
+            : '날씨 리포트를 불러오지 못했습니다.',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setWeatherReportLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    info.startDate,
+    info.durationDays,
+    JSON.stringify(weatherPlanItems),
+    JSON.stringify(weatherDismissedFingerprints),
+    scheduledPlanFingerprint,
   ]);
 
   return (
@@ -464,7 +577,21 @@ export default function PackingDashboard(props: Props) {
         </motion.div>
       )}
 
-      {packResp?.weather && (
+      {weatherPlanItems.length > 0 && (
+        <WeatherDecisionReport
+          report={visibleWeatherReport}
+          planItems={selectedPlanItems}
+          loading={weatherReportLoading}
+          error={weatherReportError}
+          onApply={onApplyWeatherProposal}
+          onDismiss={onDismissWeatherProposal}
+          canUndo={weatherUndoAvailable}
+          onUndo={onUndoWeatherProposal}
+          actionMessage={weatherActionMessage}
+        />
+      )}
+
+      {packResp?.weather && (!visibleWeatherReport || weatherReportError) && (
         <WeatherSignalCard weather={packResp.weather} />
       )}
 
@@ -479,9 +606,11 @@ export default function PackingDashboard(props: Props) {
       {packResp && !loading && !error && (
         <PlanBuilderCard
           planItems={selectedPlanItems}
+          durationDays={info.durationDays}
           visitChecks={visitChecks}
           onAddCustomPlanItem={onAddCustomPlanItem}
           onRemovePlanItem={onRemovePlanItem}
+          onUpdatePlanSchedule={onUpdatePlanSchedule}
           onSetVisitCheck={onSetVisitCheck}
         />
       )}
@@ -886,15 +1015,22 @@ function toPlanItem(item: PackItemDto | ItineraryItemDto, day?: ItineraryDayDto)
 
 function PlanBuilderCard({
   planItems,
+  durationDays,
   visitChecks,
   onAddCustomPlanItem,
   onRemovePlanItem,
+  onUpdatePlanSchedule,
   onSetVisitCheck,
 }: {
   planItems: TravelPlanItem[];
+  durationDays: number;
   visitChecks: Record<string, VisitCheck>;
   onAddCustomPlanItem: (item: TravelPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
+  onUpdatePlanSchedule: (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => void;
   onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
 }) {
   const [customName, setCustomName] = useState('');
@@ -948,8 +1084,10 @@ function PlanBuilderCard({
               key={item.id}
               item={item}
               index={index}
+              durationDays={durationDays}
               visitCheck={visitChecks[item.id]}
               onRemovePlanItem={onRemovePlanItem}
+              onUpdatePlanSchedule={onUpdatePlanSchedule}
               onSetVisitCheck={onSetVisitCheck}
             />
           ))}
@@ -992,14 +1130,21 @@ function PlanBuilderCard({
 function PlanItemRow({
   item,
   index,
+  durationDays,
   visitCheck,
   onRemovePlanItem,
+  onUpdatePlanSchedule,
   onSetVisitCheck,
 }: {
   item: TravelPlanItem;
   index: number;
+  durationDays: number;
   visitCheck?: VisitCheck;
   onRemovePlanItem: (itemId: string) => void;
+  onUpdatePlanSchedule: (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => void;
   onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
 }) {
   const moment = MOMENTS.find((m) => m.id === item.moment);
@@ -1119,6 +1264,64 @@ function PlanItemRow({
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
+      </div>
+
+      <div className="rounded-xl border border-[#E3D7C5] bg-white/75 p-2.5" aria-label={`${item.name} 일정 시간`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-earth bg-white px-2.5 text-[10.5px] font-bold text-basalt-2">
+            <Clock3 className="h-3.5 w-3.5 text-mint" />
+            <span>날짜</span>
+            <select
+              aria-label={`${item.name} 여행 날짜`}
+              value={item.day ?? 1}
+              onChange={(event) => onUpdatePlanSchedule(item.id, {day: Number(event.target.value)})}
+              className="bg-transparent text-[11px] font-bold text-basalt outline-none"
+            >
+              {Array.from({length: Math.max(1, durationDays)}, (_, dayIndex) => (
+                <option key={dayIndex + 1} value={dayIndex + 1}>Day {dayIndex + 1}</option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-1 gap-1" aria-label={`${item.name} 시간대`}>
+            {DAYPART_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-label={`${item.name} ${option.label}으로 설정`}
+                aria-pressed={item.daypart === option.value}
+                onClick={() => onUpdatePlanSchedule(item.id, {
+                  daypart: option.value,
+                  startTime: option.startTime,
+                })}
+                className={`min-h-11 flex-1 rounded-xl border px-2 py-2 text-[10.5px] font-bold transition ${
+                  item.daypart === option.value
+                    ? 'border-[#2D6F65] bg-[#E6F2EE] text-[#245B52]'
+                    : 'border-earth bg-white text-basalt-2 hover:border-[#8CB7AD]'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-pressed={Boolean(item.fixed)}
+            aria-label={`${item.name} 시간 고정`}
+            onClick={() => onUpdatePlanSchedule(item.id, {fixed: !item.fixed})}
+            className={`inline-flex min-h-11 items-center gap-1 rounded-xl border px-3 py-2 text-[10.5px] font-bold transition ${
+              item.fixed
+                ? 'border-[#B75C36] bg-[#FFF0E8] text-[#994523]'
+                : 'border-earth bg-white text-basalt-2 hover:border-[#D19A78]'
+            }`}
+          >
+            <LockKeyhole className="h-3.5 w-3.5" /> 시간 고정
+          </button>
+        </div>
+        <p className="mt-1.5 text-[9.5px] leading-relaxed text-basalt-2/70">
+          {item.fixed
+            ? '예약·약속이 있는 일정으로 표시되어 날씨 추천이 이동하지 않습니다.'
+            : '날씨 변경안은 미리보기 후 직접 승인할 때만 반영됩니다.'}
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquareText, ShieldCheck, Home } from 'lucide-react';
-import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus } from './types';
+import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus, WeatherChangeProposal } from './types';
 import PackingDashboard from './components/PackingDashboard';
 import VerifyPage from './components/VerifyPage';
 import TravelFeedback from './components/TravelFeedback';
@@ -12,6 +12,12 @@ import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import { MOMENTS, REGIONS } from './data';
 import { normalizeTripStartDate, todayInJeju } from './date';
+import {
+  applyWeatherProposal,
+  planFingerprint,
+  schedulePlanItemsForWeather,
+  undoWeatherProposal,
+} from './weatherProposal';
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
@@ -35,6 +41,9 @@ const defaultState: SavedTravel = {
   customMemories: [],
   selectedPlanItems: [],
   visitChecks: {},
+  weatherDismissedFingerprints: [],
+  weatherUndo: null,
+  weatherActionMessage: null,
 };
 
 function createFreshState(): SavedTravel {
@@ -54,6 +63,9 @@ function createFreshState(): SavedTravel {
     customMemories: [],
     selectedPlanItems: [],
     visitChecks: {},
+    weatherDismissedFingerprints: [],
+    weatherUndo: null,
+    weatherActionMessage: null,
   };
 }
 
@@ -81,19 +93,24 @@ function migrateSavedTravel(saved: any): SavedTravel {
   if (!Array.isArray(info.regions)) {
     delete info.region;
   }
+  const migratedInfo: TravelInfo = {
+    ...defaultState.info,
+    ...info,
+    regions,
+    startDate: normalizeTripStartDate(info.startDate),
+    durationDays:
+      typeof info.durationDays === 'number' && Number.isFinite(info.durationDays) && info.durationDays > 0
+        ? info.durationDays
+        : defaultState.info.durationDays,
+  };
+  const selectedPlanItems = schedulePlanItemsForWeather(
+    migratedInfo,
+    Array.isArray(saved.selectedPlanItems) ? saved.selectedPlanItems : [],
+  );
   return {
     ...defaultState,
     ...saved,
-    info: {
-      ...defaultState.info,
-      ...info,
-      regions,
-      startDate: normalizeTripStartDate(info.startDate),
-      durationDays:
-        typeof info.durationDays === 'number' && Number.isFinite(info.durationDays) && info.durationDays > 0
-          ? info.durationDays
-          : defaultState.info.durationDays,
-    },
+    info: migratedInfo,
     selectedMomentIds,
     checkedItemIds: Array.isArray(saved.checkedItemIds) ? saved.checkedItemIds : [],
     checkedMemoryIds: Array.isArray(saved.checkedMemoryIds) ? saved.checkedMemoryIds : [],
@@ -103,11 +120,22 @@ function migrateSavedTravel(saved: any): SavedTravel {
         ? saved.customMomentItems
         : defaultState.customMomentItems,
     customMemories: Array.isArray(saved.customMemories) ? saved.customMemories : [],
-    selectedPlanItems: Array.isArray(saved.selectedPlanItems) ? saved.selectedPlanItems : [],
+    selectedPlanItems,
     visitChecks:
       saved.visitChecks && typeof saved.visitChecks === 'object'
         ? saved.visitChecks
         : {},
+    weatherDismissedFingerprints: Array.isArray(saved.weatherDismissedFingerprints)
+      ? saved.weatherDismissedFingerprints.filter((value: unknown) => typeof value === 'string')
+      : [],
+    weatherUndo:
+      saved.weatherUndo && typeof saved.weatherUndo === 'object'
+        ? saved.weatherUndo
+        : null,
+    weatherActionMessage:
+      typeof saved.weatherActionMessage === 'string'
+        ? saved.weatherActionMessage
+        : null,
     step,
   };
 }
@@ -192,6 +220,9 @@ export default function App() {
       ...prev,
       info,
       selectedMomentIds: selectedMoments,
+      selectedPlanItems: schedulePlanItemsForWeather(info, prev.selectedPlanItems || []),
+      weatherUndo: null,
+      weatherActionMessage: null,
       step: 'dashboard'
     }));
   };
@@ -205,11 +236,17 @@ export default function App() {
     infoPatch: Partial<TravelInfo>,
     selectedMoments: MomentId[] | null,
   ) => {
-    setState(prev => ({
-      ...prev,
-      info: { ...prev.info, ...infoPatch },
-      selectedMomentIds: selectedMoments ?? prev.selectedMomentIds,
-    }));
+    setState(prev => {
+      const info = { ...prev.info, ...infoPatch };
+      return {
+        ...prev,
+        info,
+        selectedPlanItems: schedulePlanItemsForWeather(info, prev.selectedPlanItems || []),
+        selectedMomentIds: selectedMoments ?? prev.selectedMomentIds,
+        weatherUndo: null,
+        weatherActionMessage: null,
+      };
+    });
   };
 
   const handleToggleItem = (itemId: string) => {
@@ -293,11 +330,14 @@ export default function App() {
     setState(prev => {
       const current = prev.selectedPlanItems || [];
       const exists = current.some(planItem => planItem.id === item.id);
+      const selectedPlanItems = exists
+        ? current.filter(planItem => planItem.id !== item.id)
+        : schedulePlanItemsForWeather(prev.info, [...current, item]);
       return {
         ...prev,
-        selectedPlanItems: exists
-          ? current.filter(planItem => planItem.id !== item.id)
-          : [...current, item],
+        selectedPlanItems,
+        weatherUndo: null,
+        weatherActionMessage: null,
       };
     });
   };
@@ -308,7 +348,9 @@ export default function App() {
       if (current.some(planItem => planItem.id === item.id)) return prev;
       return {
         ...prev,
-        selectedPlanItems: [...current, item],
+        selectedPlanItems: schedulePlanItemsForWeather(prev.info, [...current, item]),
+        weatherUndo: null,
+        weatherActionMessage: null,
       };
     });
   };
@@ -317,10 +359,86 @@ export default function App() {
     setState(prev => ({
       ...prev,
       selectedPlanItems: (prev.selectedPlanItems || []).filter(item => item.id !== itemId),
+      weatherUndo: null,
+      weatherActionMessage: null,
       visitChecks: Object.fromEntries(
         Object.entries(prev.visitChecks || {}).filter(([id]) => id !== itemId),
       ),
     }));
+  };
+
+  const handleUpdatePlanSchedule = (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => {
+    setState(prev => {
+      const updated = (prev.selectedPlanItems || []).map((item) => {
+        if (item.id !== itemId) return item;
+        return {
+          ...item,
+          ...patch,
+          date: patch.day !== undefined && patch.day !== item.day ? null : item.date,
+        };
+      });
+      return {
+        ...prev,
+        selectedPlanItems: schedulePlanItemsForWeather(prev.info, updated),
+        weatherUndo: null,
+        weatherActionMessage: '일정 시간을 직접 수정했습니다.',
+      };
+    });
+  };
+
+  const handleApplyWeatherProposal = (proposal: WeatherChangeProposal) => {
+    setState(prev => {
+      const items = schedulePlanItemsForWeather(prev.info, prev.selectedPlanItems || []);
+      const result = applyWeatherProposal(items, proposal);
+      if (!result.ok) {
+        return {
+          ...prev,
+          weatherUndo: null,
+          weatherActionMessage: result.reason || '변경안을 적용하지 못했습니다.',
+        };
+      }
+      return {
+        ...prev,
+        selectedPlanItems: result.items,
+        weatherUndo: result.undo ?? null,
+        weatherActionMessage: '날씨 변경안을 플랜에 반영했습니다.',
+      };
+    });
+  };
+
+  const handleDismissWeatherProposal = (proposal: WeatherChangeProposal) => {
+    setState(prev => ({
+      ...prev,
+      weatherDismissedFingerprints: Array.from(new Set([
+        ...(prev.weatherDismissedFingerprints || []),
+        proposal.fingerprint,
+      ])),
+      weatherActionMessage: '현재 일정을 유지했습니다. 같은 예보에서는 이 제안을 다시 띄우지 않습니다.',
+    }));
+  };
+
+  const handleUndoWeatherProposal = () => {
+    setState(prev => {
+      const undo = prev.weatherUndo;
+      const items = prev.selectedPlanItems || [];
+      if (!undo) return prev;
+      if (planFingerprint(items) !== undo.appliedPlanFingerprint) {
+        return {
+          ...prev,
+          weatherUndo: null,
+          weatherActionMessage: '이후 직접 수정한 일정이 있어 되돌리기를 적용하지 않았습니다.',
+        };
+      }
+      return {
+        ...prev,
+        selectedPlanItems: undoWeatherProposal(items, undo),
+        weatherUndo: null,
+        weatherActionMessage: '날씨 변경 전 일정으로 되돌렸습니다.',
+      };
+    });
   };
 
   const handleSetVisitCheck = (
@@ -520,6 +638,9 @@ export default function App() {
                   customMemories={state.customMemories || []}
                   selectedPlanItems={state.selectedPlanItems || []}
                   visitChecks={state.visitChecks || {}}
+                  weatherDismissedFingerprints={state.weatherDismissedFingerprints || []}
+                  weatherUndoAvailable={Boolean(state.weatherUndo)}
+                  weatherActionMessage={state.weatherActionMessage || null}
                   onToggleItem={handleToggleItem}
                   onToggleMemory={handleToggleMemory}
                   onAddCustomBasic={handleAddCustomBasic}
@@ -531,6 +652,10 @@ export default function App() {
                   onTogglePlanItem={handleTogglePlanItem}
                   onAddCustomPlanItem={handleAddCustomPlanItem}
                   onRemovePlanItem={handleRemovePlanItem}
+                  onUpdatePlanSchedule={handleUpdatePlanSchedule}
+                  onApplyWeatherProposal={handleApplyWeatherProposal}
+                  onDismissWeatherProposal={handleDismissWeatherProposal}
+                  onUndoWeatherProposal={handleUndoWeatherProposal}
                   onSetVisitCheck={handleSetVisitCheck}
                   onOpenFeedback={goToFeedback}
                   onReset={handleReset}
