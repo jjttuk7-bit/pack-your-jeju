@@ -178,9 +178,9 @@ export default function PlanPdfEditor({
               </p>
               <h2
                 id="plan-pdf-editor-title"
-                className="font-serif-kr text-[23px] font-bold tracking-tight md:text-[28px]"
+                className="font-serif-kr text-[21px] font-bold leading-tight tracking-tight md:text-[28px]"
               >
-                여행을 떠나기 전, 내 플랜 다듬기
+                내 여행 플랜 다듬기
               </h2>
               <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-white/72 md:text-[13px]">
                 날짜와 순서를 정하고 나만의 메모를 더하면, 고른 장소가 여행 여권처럼
