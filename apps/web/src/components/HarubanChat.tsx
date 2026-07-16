@@ -702,26 +702,15 @@ function WebPlaceCandidatePicker({
   selectedPlanItems: TravelPlanItem[];
   onAddPlanItem: (item: TravelPlanItem) => void;
 }) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [addedIds, setAddedIds] = useState<string[]>([]);
   const planIds = useMemo(
     () => new Set(selectedPlanItems.map((item) => item.id)),
     [selectedPlanItems],
   );
 
-  const toggleCandidate = (candidate: HarubanWebPlaceCandidate) => {
+  const addCandidate = (candidate: HarubanWebPlaceCandidate) => {
     const planId = `web-${candidate.id}`;
-    if (planIds.has(planId) || addedIds.includes(candidate.id)) return;
-    setSelectedIds((current) => current.includes(candidate.id)
-      ? current.filter((id) => id !== candidate.id)
-      : [...current, candidate.id]);
-  };
-
-  const addSelected = () => {
-    const selected = candidates.filter((candidate) => selectedIds.includes(candidate.id));
-    selected.forEach((candidate) => onAddPlanItem(planItemFromWebCandidate(candidate)));
-    setAddedIds((current) => [...new Set([...current, ...selected.map((candidate) => candidate.id)])]);
-    setSelectedIds([]);
+    if (planIds.has(planId)) return;
+    onAddPlanItem(planItemFromWebCandidate(candidate));
   };
 
   return (
@@ -738,8 +727,7 @@ function WebPlaceCandidatePicker({
 
       <div className="divide-y divide-[#2D6F65]/15">
         {candidates.map((candidate) => {
-          const alreadyAdded = planIds.has(`web-${candidate.id}`) || addedIds.includes(candidate.id);
-          const checked = alreadyAdded || selectedIds.includes(candidate.id);
+          const alreadyAdded = planIds.has(`web-${candidate.id}`);
           return (
             <label
               key={candidate.id}
@@ -747,9 +735,9 @@ function WebPlaceCandidatePicker({
             >
               <input
                 type="checkbox"
-                checked={checked}
+                checked={alreadyAdded}
                 disabled={alreadyAdded}
-                onChange={() => toggleCandidate(candidate)}
+                onChange={() => addCandidate(candidate)}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-[#2D6F65]"
               />
               <span className="min-w-0 flex-1">
@@ -780,16 +768,9 @@ function WebPlaceCandidatePicker({
         })}
       </div>
 
-      <div className="border-t border-[#2D6F65]/20 bg-white/70 p-2.5">
-        <button
-          type="button"
-          onClick={addSelected}
-          disabled={selectedIds.length === 0}
-          className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#2D6F65] px-3 text-[11.5px] font-bold text-white transition hover:bg-[#245B53] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <PackageCheck className="h-3.5 w-3.5" />
-          선택한 {selectedIds.length}곳을 플랜에 담기
-        </button>
+      <div className="flex items-center gap-1.5 border-t border-[#2D6F65]/20 bg-white/70 px-3 py-2.5 text-[10px] font-semibold text-[#2D6F65]">
+        <Check className="h-3.5 w-3.5 shrink-0" />
+        체크하면 즉시 내 플랜에 반영됩니다. 삭제는 내 플랜에서 할 수 있어요.
       </div>
     </section>
   );
