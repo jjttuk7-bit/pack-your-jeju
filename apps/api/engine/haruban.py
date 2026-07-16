@@ -18,6 +18,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from time import perf_counter
 from typing import Any
 from urllib.parse import urlparse
 
@@ -36,7 +37,8 @@ from apps.api.engine import weather as weather_mod
 
 
 logger = logging.getLogger(__name__)
-WEB_SEARCH_TIMEOUT_SECONDS = 60.0
+WEB_SEARCH_TIMEOUT_SECONDS = 20.0
+WEB_SEARCH_MAX_OUTPUT_TOKENS = 2200
 
 
 # ─── 한글 라벨 (하이라이트 문구 조립용) ───
@@ -1002,6 +1004,7 @@ def _perform_single_web_search(
     )
     last_error = ""
     for tool_type in ("web_search",):
+        started = perf_counter()
         try:
             resp = client.responses.create(
                 model=llm.MODEL,
@@ -1010,7 +1013,7 @@ def _perform_single_web_search(
                 max_tool_calls=2,
                 reasoning={"effort": "low"},
                 input=prompt,
-                max_output_tokens=4000,
+                max_output_tokens=WEB_SEARCH_MAX_OUTPUT_TOKENS,
             )
             answer = (getattr(resp, "output_text", "") or "").strip()
             sources = [
@@ -1020,6 +1023,16 @@ def _perform_single_web_search(
                 }
                 for source in _extract_response_sources(resp)
             ]
+            elapsed_ms = (perf_counter() - started) * 1000
+            logger.info(
+                "haruban web search completed source_class=%s tool_type=%s query=%r available=%s sources=%d elapsed_ms=%.1f",
+                source_class,
+                tool_type,
+                clean_query,
+                bool(sources),
+                len(sources),
+                elapsed_ms,
+            )
             return WebSearchResult(
                 available=bool(sources),
                 query=clean_query,
@@ -1030,12 +1043,14 @@ def _perform_single_web_search(
                 research_status="sufficient" if sources else "unavailable",
             )
         except Exception as e:
+            elapsed_ms = (perf_counter() - started) * 1000
             last_error = f"{type(e).__name__}: {e}"
             logger.warning(
-                "haruban web search failed source_class=%s tool_type=%s query=%r error=%s",
+                "haruban web search failed source_class=%s tool_type=%s query=%r elapsed_ms=%.1f error=%s",
                 source_class,
                 tool_type,
                 clean_query,
+                elapsed_ms,
                 last_error,
             )
     return WebSearchResult(available=False, query=clean_query, reason=last_error)
@@ -2406,6 +2421,24 @@ class HarubanTurn:
     place_candidates: list[dict] = field(default_factory=list)
 
 
+def _finish_chat_turn(
+    started: float,
+    turn: HarubanTurn,
+    *,
+    search_pool_tool: str | None = None,
+) -> HarubanTurn:
+    elapsed_ms = (perf_counter() - started) * 1000
+    logger.info(
+        "haruban chat_turn completed available=%s reason=%r search_pool=%s tool_calls=%d elapsed_ms=%.1f",
+        turn.available,
+        turn.reason,
+        search_pool_tool or "none",
+        len(turn.tool_trace),
+        elapsed_ms,
+    )
+    return turn
+
+
 def chat_turn(
     messages_in: list[dict],
     form_state: dict,
@@ -2421,13 +2454,17 @@ def chat_turn(
     llm.complete_with_tools는 단일 system/user만 받아서, 여기서는 openai 클라이언트를
     직접 사용해 conv 배열 통째로 전달하고 도구 실행 루프를 돌린다. 모델·키 규칙은 유지.
     """
+    started = perf_counter()
     general_reply = _try_general_question_answer(messages_in)
     if general_reply:
-        return HarubanTurn(
-            available=True,
-            reply_text=general_reply,
-            reason="general question template",
-            answer_contract=_general_question_contract(),
+        return _finish_chat_turn(
+            started,
+            HarubanTurn(
+                available=True,
+                reply_text=general_reply,
+                reason="general question template",
+                answer_contract=_general_question_contract(),
+            ),
         )
 
     if _should_answer_without_search(messages_in):
@@ -2450,15 +2487,24 @@ def chat_turn(
                 temperature=0.7,
             )
             if resp.available and resp.text:
-                return HarubanTurn(available=True, reply_text=resp.text)
-        return HarubanTurn(
-            available=True,
-            reply_text=_template_free_advice(last_user),
-            reason="free advice template fallback",
+                return _finish_chat_turn(started, HarubanTurn(available=True, reply_text=resp.text))
+        return _finish_chat_turn(
+            started,
+            HarubanTurn(
+                available=True,
+                reply_text=_template_free_advice(last_user),
+                reason="free advice template fallback",
+            ),
         )
 
     system_prompt = _BASE_SYSTEM_PROMPT + _form_context_block(form_state)
+    search_pool_started = perf_counter()
     search_pool = _build_search_pool_context(messages_in, form_state)
+    logger.info(
+        "haruban search_pool built tool=%s elapsed_ms=%.1f",
+        (search_pool or {}).get("tool") or "none",
+        (perf_counter() - search_pool_started) * 1000,
+    )
 
     conv: list[dict] = [{"role": "system", "content": system_prompt}]
     if search_pool:
@@ -2490,24 +2536,35 @@ def chat_turn(
 
     if not llm.is_available():
         if search_pool:
-            return HarubanTurn(
-                available=True,
-                reply_text=_fallback_reply_from_tool_messages(conv),
-                tool_trace=trace,
-                reason="OPENAI_API_KEY not set; used search pool fallback",
-                answer_contract=search_pool.get("contract") or {},
-                place_candidates=(search_pool.get("result") or {}).get("place_candidates") or [],
+            return _finish_chat_turn(
+                started,
+                HarubanTurn(
+                    available=True,
+                    reply_text=_fallback_reply_from_tool_messages(conv),
+                    tool_trace=trace,
+                    reason="OPENAI_API_KEY not set; used search pool fallback",
+                    answer_contract=search_pool.get("contract") or {},
+                    place_candidates=(search_pool.get("result") or {}).get("place_candidates") or [],
+                ),
+                search_pool_tool=search_pool.get("tool"),
             )
-        return HarubanTurn(available=False, reason="OPENAI_API_KEY not set", tool_trace=trace)
+        return _finish_chat_turn(
+            started,
+            HarubanTurn(available=False, reason="OPENAI_API_KEY not set", tool_trace=trace),
+        )
 
-    return _chat_turn_raw(
-        conv,
-        trace,
-        max_iterations,
-        form_state,
-        answer_contract=(search_pool.get("contract") if search_pool else None),
-        preloaded_tool=(search_pool.get("tool") if search_pool else None),
-        place_candidates=(search_pool.get("result") or {}).get("place_candidates") or [] if search_pool else [],
+    return _finish_chat_turn(
+        started,
+        _chat_turn_raw(
+            conv,
+            trace,
+            max_iterations,
+            form_state,
+            answer_contract=(search_pool.get("contract") if search_pool else None),
+            preloaded_tool=(search_pool.get("tool") if search_pool else None),
+            place_candidates=(search_pool.get("result") or {}).get("place_candidates") or [] if search_pool else [],
+        ),
+        search_pool_tool=(search_pool.get("tool") if search_pool else None),
     )
 
 
@@ -2538,6 +2595,7 @@ def _chat_turn_raw(
     tool_choice = "none" if preloaded_tool else "auto"
 
     for it in range(max_iterations):
+        completion_started = perf_counter()
         try:
             resp = client.chat.completions.create(
                 model=llm.MODEL,
@@ -2547,7 +2605,20 @@ def _chat_turn_raw(
                 max_completion_tokens=600,
             )
         except Exception as e:
+            logger.warning(
+                "haruban chat completion failed iteration=%d preloaded_tool=%s elapsed_ms=%.1f error=%s",
+                it + 1,
+                preloaded_tool or "none",
+                (perf_counter() - completion_started) * 1000,
+                f"{type(e).__name__}: {e}",
+            )
             return HarubanTurn(available=False, reason=f"openai call failed: {e}", tool_trace=trace)
+        logger.info(
+            "haruban chat completion completed iteration=%d preloaded_tool=%s elapsed_ms=%.1f",
+            it + 1,
+            preloaded_tool or "none",
+            (perf_counter() - completion_started) * 1000,
+        )
 
         choice = resp.choices[0] if resp.choices else None
         if not choice:

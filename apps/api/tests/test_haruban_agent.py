@@ -288,7 +288,8 @@ def test_single_web_search_forces_search_with_explicit_jeju_region_context(monke
     assert captured["tool_choice"] == "required"
     assert captured["max_tool_calls"] == 2
     assert captured["reasoning"] == {"effort": "low"}
-    assert captured["max_output_tokens"] >= 4000
+    assert captured["max_output_tokens"] == haruban.WEB_SEARCH_MAX_OUTPUT_TOKENS
+    assert haruban.WEB_SEARCH_MAX_OUTPUT_TOKENS == 2200
     assert "제주특별자치도 서귀포시 성산읍" in captured["input"]
     assert "되묻지" in captured["input"]
     assert "Markdown" in captured["input"]
@@ -317,11 +318,27 @@ def test_single_web_search_limits_timeout_and_logs_failure(monkeypatch, caplog):
     result = haruban._perform_single_web_search("구좌 오름 공식", source_class="official")
 
     assert result.available is False
-    assert haruban.WEB_SEARCH_TIMEOUT_SECONDS >= 45
+    assert haruban.WEB_SEARCH_TIMEOUT_SECONDS == 20.0
     assert captured["timeout"] == haruban.WEB_SEARCH_TIMEOUT_SECONDS
     assert captured["max_retries"] == 0
     assert "provider timeout" in caplog.text
     assert "official" in caplog.text
+    assert "elapsed_ms" in caplog.text
+
+
+def test_chat_turn_logs_total_latency(monkeypatch, caplog):
+    monkeypatch.setattr(haruban, "_try_general_question_answer", lambda _messages: "바로 답변합니다.")
+    caplog.set_level(logging.INFO, logger=haruban.__name__)
+
+    turn = haruban.chat_turn(
+        [{"role": "user", "content": "제주 여행 준비는 어떻게 시작해?"}],
+        {},
+    )
+
+    assert turn.available is True
+    assert "바로 답변" in turn.reply_text
+    assert "haruban chat_turn completed" in caplog.text
+    assert "elapsed_ms" in caplog.text
 
 
 def test_preloaded_search_pool_disables_duplicate_model_tool_calls(monkeypatch):
