@@ -1,0 +1,182 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PackResponse, TravelInfo } from '../types';
+import {
+  requestCandidatePage,
+  requestPack,
+  requestRoutePlan,
+  requestVisitSignal,
+  requestWeatherReport,
+} from '../api';
+import PackingDashboard from './PackingDashboard';
+
+vi.mock('../api', () => ({
+  requestCandidatePage: vi.fn(),
+  requestPack: vi.fn(),
+  requestRoutePlan: vi.fn(),
+  requestVisitSignal: vi.fn(),
+  requestWeatherReport: vi.fn(),
+}));
+
+const info: TravelInfo = {
+  regions: ['andeok'],
+  startDate: '2026-07-18',
+  durationDays: 2,
+  companion: 'solo',
+  purpose: 'healing',
+};
+
+const candidate = {
+  name: '산방산 둘레길',
+  badge: 'verified' as const,
+  external_id: 'candidate-1',
+  sources: [{ name: '공식', url: 'https://example.com/place' }],
+  freshness: { info_type: '운영 정보', valid_until: null },
+  transit: { parking: true, parking_count: 1, bus_walkable: true },
+  note: '산책 후보',
+  address: '제주 서귀포시 안덕면',
+  region: 'andeok',
+};
+
+const packResponse: PackResponse = {
+  pack_id: 'pack-1',
+  intro: { text: '안덕의 산책 후보를 준비했어요.', llm_used: false },
+  sections: [
+    {
+      moment: 'beach_walk',
+      items: [candidate],
+      fallback: null,
+      total_count: 1,
+      shown_count: 1,
+      has_more: false,
+      next_cursor: null,
+    },
+  ],
+  itinerary: [
+    {
+      day: 1,
+      date: '2026-07-18',
+      items: [{ ...candidate, moment: 'beach_walk' }],
+      regions: ['andeok'],
+    },
+  ],
+  packing_additions: [],
+  log_id: 'log-1',
+};
+
+const noop = vi.fn();
+
+function renderDashboard() {
+  return render(
+    <PackingDashboard
+      info={info}
+      selectedMomentIds={['beach_walk']}
+      checkedItemIds={[]}
+      checkedMemoryIds={[]}
+      customBasicItems={[]}
+      customMomentItems={{
+        oreum: [],
+        beach_walk: [],
+        sunset: [],
+        local_market: [],
+        local_food: [],
+        quiet_cafe: [],
+        gotjawal: [],
+        citrus: [],
+        stay: [],
+        festival_event: [],
+        souvenir_shopping: [],
+        culture_stop: [],
+      }}
+      customMemories={[]}
+      selectedPlanItems={[]}
+      visitChecks={{}}
+      weatherDismissedFingerprints={[]}
+      weatherUndoAvailable={false}
+      weatherActionMessage={null}
+      routeDismissedFingerprints={[]}
+      routeUndoAvailable={false}
+      routeActionMessage={null}
+      onToggleItem={noop}
+      onToggleMemory={noop}
+      onAddCustomBasic={noop}
+      onRemoveCustomBasic={noop}
+      onAddCustomMomentItem={noop}
+      onRemoveCustomMomentItem={noop}
+      onAddCustomMemory={noop}
+      onRemoveCustomMemory={noop}
+      onTogglePlanItem={noop}
+      onAddCustomPlanItem={noop}
+      onRemovePlanItem={noop}
+      onUpdatePlanSchedule={noop}
+      onApplyWeatherProposal={noop}
+      onDismissWeatherProposal={noop}
+      onUndoWeatherProposal={noop}
+      onApplyRouteProposal={noop}
+      onDismissRouteProposal={noop}
+      onUndoRouteProposal={noop}
+      onSetVisitCheck={noop}
+      onOpenFeedback={noop}
+      onReset={noop}
+    />,
+  );
+}
+
+describe('PackingDashboard pack journey guide', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requestPack).mockResolvedValue(packResponse);
+    vi.mocked(requestCandidatePage).mockRejectedValue(new Error('unused'));
+    vi.mocked(requestRoutePlan).mockRejectedValue(new Error('unused'));
+    vi.mocked(requestVisitSignal).mockRejectedValue(new Error('unused'));
+    vi.mocked(requestWeatherReport).mockRejectedValue(new Error('unused'));
+  });
+
+  it('adds the guide without removing existing dashboard controls', async () => {
+    renderDashboard();
+
+    expect(await screen.findByRole('navigation', { name: '여행팩 만드는 순서' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('이번 제주 여행')).toBeInTheDocument();
+    expect(screen.getByText('후보를 고르고, 근거를 확인하고, 플랜에 담습니다.'))
+      .toBeInTheDocument();
+    expect(screen.getByText('내 여행플랜에 담은 것')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /여행 플랜 PDF/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /플랜 공유/ })).toBeInTheDocument();
+
+    expect(document.getElementById('candidate-workbench-header')).toBeInTheDocument();
+    expect(document.getElementById('my-plan-builder')).toBeInTheDocument();
+    expect(document.getElementById('view-mode-tabs')).toBeInTheDocument();
+    expect(document.getElementById('plan-export-actions')).toBeInTheDocument();
+  });
+
+  it('scrolls and focuses existing sections while respecting reduced motion', async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue({ matches: false }),
+    });
+    renderDashboard();
+    await screen.findByRole('navigation', { name: '여행팩 만드는 순서' });
+
+    fireEvent.click(screen.getByRole('button', { name: /일정 정하기 다음/ }));
+    const scheduleTarget = document.getElementById('view-mode-tabs');
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      behavior: 'smooth',
+      block: 'start',
+    });
+    await waitFor(() => expect(scheduleTarget).toHaveFocus());
+
+    vi.mocked(window.matchMedia).mockReturnValue({ matches: true } as MediaQueryList);
+    fireEvent.click(screen.getByRole('button', { name: /저장·공유하기 다음/ }));
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      behavior: 'auto',
+      block: 'start',
+    });
+    await waitFor(() => expect(document.getElementById('plan-export-actions')).toHaveFocus());
+  });
+});

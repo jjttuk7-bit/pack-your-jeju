@@ -99,8 +99,8 @@ Expected: FAIL because the component does not exist.
 
 Create a compact `card-jeju` guide:
 
-- desktop: four equal-width step buttons;
-- mobile: a 2×2 grid;
+- current plan sidebar: a readable 2×2 grid at both desktop and mobile widths;
+- reserve a four-column row for a future full-width placement;
 - current step: citrus border and `aria-current`;
 - complete step: mint check icon;
 - next step: neutral number;

@@ -63,6 +63,8 @@ import PlaceDetail from './PlaceDetail';
 import WeatherDecisionReport from './WeatherDecisionReport';
 import TravelRouteCard from './TravelRouteCard';
 import TravelRouteMap from './TravelRouteMap';
+import PackJourneyGuide from './PackJourneyGuide';
+import { derivePackJourneyState } from '../packJourneyGuide';
 
 const PlanPdfEditor = lazy(() => import('./PlanPdfEditor'));
 
@@ -320,6 +322,10 @@ export default function PackingDashboard(props: Props) {
     [info.purpose]
   );
   const packItems = useMemo(() => collectPackItems(packResp), [packResp]);
+  const packJourneyState = useMemo(
+    () => derivePackJourneyState(packItems.length, selectedPlanItems),
+    [packItems.length, selectedPlanItems],
+  );
   const currentPlanItemsForMap = useMemo(
     () => filterPlanItemsForCurrentPack(selectedPlanItems, packItems),
     [selectedPlanItems, packItems],
@@ -401,6 +407,18 @@ export default function PackingDashboard(props: Props) {
     [info, selectedMomentIds, packResp, selectedPlanItems, visitChecks]
   );
   const hasPackInput = info.regions.length > 0 && selectedMomentIds.length > 0;
+
+  const navigateToPackSection = (targetId: string) => {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      ?? false;
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+    target.focus({ preventScroll: true });
+  };
 
   const handleCopyShare = async () => {
     if (!shareText) return;
@@ -651,7 +669,11 @@ export default function PackingDashboard(props: Props) {
         {/* 이 여행을 저장 — 근거 기반 여행플랜 PDF 다운로드. 사실은 서버가 조립하고
             프론트는 파일만 받아 저장한다. LLM 없이도 항상 동작. */}
         {packResp && !loading && !error && (
-          <div className="pt-1">
+          <div
+            className="scroll-mt-6 pt-1 focus:outline-none"
+            id="plan-export-actions"
+            tabIndex={-1}
+          >
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -693,6 +715,13 @@ export default function PackingDashboard(props: Props) {
           </div>
         )}
       </div>
+
+      {packResp && !loading && !error && (
+        <PackJourneyGuide
+          state={packJourneyState}
+          onNavigate={navigateToPackSection}
+        />
+      )}
 
       {/* Intro 문구 (LLM 조립 or 템플릿 폴백) */}
       {packResp?.intro && (
@@ -858,8 +887,9 @@ export default function PackingDashboard(props: Props) {
       {/* 뷰 스위처: 순간별 vs 요일별 */}
       {packResp && !loading && !error && (packResp.itinerary?.length ?? 0) > 0 && (
         <div
-          className="flex items-center gap-1 p-1 rounded-2xl bg-[#FDF6EA] border border-earth"
+          className="scroll-mt-6 flex items-center gap-1 p-1 rounded-2xl bg-[#FDF6EA] border border-earth focus:outline-none"
           id="view-mode-tabs"
+          tabIndex={-1}
         >
           <button
             type="button"
@@ -1100,8 +1130,9 @@ function CandidateWorkbenchHeader({
   const sourceLabel = viewMode === 'itinerary' ? 'Day별 일정 후보' : '순간별 추천 후보';
   return (
     <section
-      className="rounded-[28px] border border-orange-100/70 bg-white/88 p-5 shadow-pyj-card backdrop-blur-sm"
+      className="scroll-mt-6 rounded-[28px] border border-orange-100/70 bg-white/88 p-5 shadow-pyj-card backdrop-blur-sm focus:outline-none"
       id="candidate-workbench-header"
+      tabIndex={-1}
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
@@ -1235,7 +1266,11 @@ function PlanBuilderCard({
   };
 
   return (
-    <div className="card-jeju p-5 space-y-4" id="my-plan-builder">
+    <div
+      className="card-jeju scroll-mt-6 p-5 space-y-4 focus:outline-none"
+      id="my-plan-builder"
+      tabIndex={-1}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-citrus-2 uppercase tracking-wider mb-1.5">
