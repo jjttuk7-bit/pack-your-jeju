@@ -38,6 +38,10 @@ import {
 } from '../api';
 import { MOMENTS } from '../data';
 import { buildHarubanChatHistory } from '../harubanChatHistory';
+import {
+  createInitialHarubanConversationState,
+  updateHarubanConversationState,
+} from '../harubanConversationState';
 
 interface HarubanChatProps {
   info: TravelInfo;
@@ -177,6 +181,9 @@ export default function HarubanChat({
   const [panelRect, setPanelRect] = useState<PanelRect | null>(null);
   const [pendingSuggestion, setPendingSuggestion] =
     useState<HarubanFormSuggestion | null>(null);
+  const [conversationState, setConversationState] = useState(
+    createInitialHarubanConversationState,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const introRequestSeqRef = useRef(0);
   const interactionRef = useRef<PanelInteraction | null>(null);
@@ -317,6 +324,7 @@ export default function HarubanChat({
       hasTriggeredRef.current = false;
       lastIntroSnapshotRef.current = null;
       setEntries([]);
+      setConversationState(createInitialHarubanConversationState());
       setPendingSuggestion(null);
       setError(null);
       return;
@@ -326,6 +334,7 @@ export default function HarubanChat({
       if (!lastSnapshot || !isDifferentSnapshot(currentSnapshot, lastSnapshot)) return;
 
       setEntries([]);
+      setConversationState(createInitialHarubanConversationState());
       setPendingSuggestion(null);
       setError(null);
       void fetchIntro(currentSnapshot, { autoOpen: false });
@@ -384,7 +393,7 @@ export default function HarubanChat({
       const formState = formStateForApi(currentSnapshot);
       // /agent/chat은 role=user|assistant|tool의 평면 메시지 배열만 받는다 (intro 엔트리 제외).
       const chatHistory = buildHarubanChatHistory(nextEntries);
-      const resp = await requestHarubanChat(chatHistory, formState);
+      const resp = await requestHarubanChat(chatHistory, formState, conversationState);
       if (!resp.available) {
         setError(
           resp.reason?.includes('OPENAI_API_KEY')
@@ -402,6 +411,12 @@ export default function HarubanChat({
           placeCandidates: resp.place_candidates ?? [],
         },
       ]);
+      setConversationState((previous) =>
+        updateHarubanConversationState(previous, {
+          question: t,
+          formState,
+          response: resp,
+        }));
       if (resp.form_suggestion) {
         setPendingSuggestion(resp.form_suggestion);
       }

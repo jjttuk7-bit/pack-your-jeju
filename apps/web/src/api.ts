@@ -283,6 +283,15 @@ export interface HarubanChatMessage {
   tool_call_id?: string;
   name?: string;
 }
+export interface HarubanConversationState {
+  last_user_question: string;
+  last_research_query: string;
+  active_regions: string[];
+  active_place_names: string[];
+  shown_place_names: string[];
+  excluded_constraints: string[];
+  web_research_active: boolean;
+}
 export interface HarubanFormSuggestion {
   regions?: string[];
   companion?: string;
@@ -324,10 +333,12 @@ export interface HarubanAnswerContract {
 export function requestHarubanChat(
   messages: HarubanChatMessage[],
   formState: Record<string, unknown>,
+  conversationState: HarubanConversationState,
 ): Promise<HarubanChatResponse> {
   return post<HarubanChatResponse>('/agent/chat', {
     messages,
     form_state: formState,
+    conversation_state: conversationState,
   });
 }
 
