@@ -267,6 +267,7 @@ export default function TrustMapDashboard({
   const [reviewedCombinations, setReviewedCombinations] = useState<Set<string>>(
     () => new Set(),
   );
+  const [showUnreviewedOnly, setShowUnreviewedOnly] = useState(false);
   const [startDate, setStartDate] = useState(
     normalizeTripStartDate(initialInfo?.startDate),
   );
@@ -522,6 +523,11 @@ export default function TrustMapDashboard({
                 activeMoment={activeMoment}
                 reviewedCount={reviewedCount}
                 combinationCount={combinations.length}
+                activeCombinationPosition={
+                  activeCombinationIndex >= 0 ? activeCombinationIndex + 1 : 0
+                }
+                reviewedCombinations={reviewedCombinations}
+                showUnreviewedOnly={showUnreviewedOnly}
                 selected={selectedRegions.includes(activeRegion)}
                 selectedLabels={selectedLabels}
                 coverageSummary={coverageSummary}
@@ -533,6 +539,9 @@ export default function TrustMapDashboard({
                 hasNextCombination={
                   activeCombinationIndex >= 0 &&
                   activeCombinationIndex < combinations.length - 1
+                }
+                onToggleUnreviewedOnly={() =>
+                  setShowUnreviewedOnly((current) => !current)
                 }
                 onToggle={() => toggleRegion(activeRegion)}
                 onSubmit={submitPlan}
@@ -1100,6 +1109,9 @@ function RegionPanel({
   activeMoment,
   reviewedCount,
   combinationCount,
+  activeCombinationPosition,
+  reviewedCombinations,
+  showUnreviewedOnly,
   selected,
   selectedLabels,
   coverageSummary,
@@ -1109,6 +1121,7 @@ function RegionPanel({
   onNextCombination,
   hasPreviousCombination,
   hasNextCombination,
+  onToggleUnreviewedOnly,
   onToggle,
   onSubmit,
 }: {
@@ -1121,6 +1134,9 @@ function RegionPanel({
   activeMoment: MomentId | null;
   reviewedCount: number;
   combinationCount: number;
+  activeCombinationPosition: number;
+  reviewedCombinations: ReadonlySet<string>;
+  showUnreviewedOnly: boolean;
   selected: boolean;
   selectedLabels: string;
   coverageSummary: { totalPlaces: number; strongMoments: string[]; weakMoments: string[] };
@@ -1130,6 +1146,7 @@ function RegionPanel({
   onNextCombination: () => void;
   hasPreviousCombination: boolean;
   hasNextCombination: boolean;
+  onToggleUnreviewedOnly: () => void;
   onToggle: () => void;
   onSubmit: () => void;
 }) {
@@ -1153,6 +1170,11 @@ function RegionPanel({
         meta: buildRegionMomentMeta(activeMomentStat),
       }
     : null;
+  const visibleMoments = selectedMoments.filter(
+    (moment) =>
+      !showUnreviewedOnly ||
+      !reviewedCombinations.has(combinationKey(region.value, moment)),
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -1242,6 +1264,19 @@ function RegionPanel({
           <p className="mt-1 text-[11px] font-bold text-mint">
             확인 {reviewedCount} / {combinationCount}
           </p>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="text-[10px] text-basalt-2">
+              현재 {activeCombinationPosition} / {combinationCount}
+            </p>
+            <button
+              type="button"
+              aria-pressed={showUnreviewedOnly}
+              onClick={onToggleUnreviewedOnly}
+              className="rounded-full border border-earth bg-white px-2 py-1 text-[10px] font-bold text-basalt-2"
+            >
+              {showUnreviewedOnly ? '전체 보기' : '미확인만 보기'}
+            </button>
+          </div>
 
           <nav aria-label="선택 지역 조합" className="mt-3 flex flex-wrap gap-1.5">
             {selectedRegions.map((regionId) => {
@@ -1265,7 +1300,7 @@ function RegionPanel({
           </nav>
 
           <div aria-label={`${region.label} 선택 순간`} className="mt-3 flex flex-wrap gap-1.5">
-            {selectedMoments.map((momentId) => {
+            {visibleMoments.map((momentId) => {
               const moment = MOMENTS.find((item) => item.id === momentId);
               if (!moment) return null;
               return (

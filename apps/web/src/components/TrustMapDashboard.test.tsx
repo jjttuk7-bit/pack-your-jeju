@@ -164,4 +164,34 @@ describe('TrustMapDashboard terrain map', () => {
     expect(within(inspector).getByText('확인 2 / 4')).toBeVisible();
     expect(within(inspector).getByText('한림에서 바다 산책하기')).toBeVisible();
   });
+
+  it('shows only unreviewed moment controls while preserving the active detail', async () => {
+    const user = userEvent.setup();
+    render(
+      <TrustMapDashboard
+        onSubmit={vi.fn()}
+        initialInfo={{...twoRegionTravelInfo, regions: ['hallim']}}
+        initialMoments={['oreum', 'beach_walk', 'quiet_cafe']}
+      />,
+    );
+
+    const inspector = await screen.findByTestId('region-moment-inspector');
+    await user.click(
+      within(inspector).getByRole('button', {name: '미확인만 보기'}),
+    );
+
+    expect(
+      within(inspector).queryByRole('button', {
+        name: /한림에서 오름에 올라 바람 맞기 조합 확인/,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(inspector).getByRole('button', {
+        name: /한림에서 바다 산책하기 조합 확인/,
+      }),
+    ).toBeVisible();
+    expect(
+      within(inspector).getByText('한림에서 오름에 올라 바람 맞기'),
+    ).toBeVisible();
+  });
 });
