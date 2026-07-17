@@ -1,4 +1,5 @@
 import {render, screen} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {requestRegionCoveragePreview} from '../api';
@@ -61,5 +62,20 @@ describe('TrustMapDashboard terrain map', () => {
     expect(screen.getByTestId('jeju-coast-layer')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByTestId('hallasan-terrain-layer')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getAllByRole('button', {name: /근거 보기/})).toHaveLength(12);
+  });
+
+  it('shows compact evidence status and a selected visual state without changing the button contract', async () => {
+    const user = userEvent.setup();
+    render(<TrustMapDashboard onSubmit={vi.fn()} />);
+
+    const jeju = await screen.findByRole('button', {name: '제주시 근거 보기'});
+    expect(jeju).toHaveAttribute('data-selected', 'false');
+    expect(screen.getByLabelText('제주시 지도 상태')).toHaveTextContent('후보 128');
+
+    await user.dblClick(jeju);
+
+    expect(jeju).toHaveAttribute('aria-pressed', 'true');
+    expect(jeju).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('jeju_city-selection-glow')).toBeInTheDocument();
   });
 });

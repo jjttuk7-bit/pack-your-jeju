@@ -510,6 +510,15 @@ function JejuMapDefs() {
           floodOpacity="0.1"
         />
       </filter>
+      <filter id="jejuSelectedGlow" x="-24%" y="-24%" width="148%" height="158%">
+        <feDropShadow
+          dx="0"
+          dy="5"
+          stdDeviation="4"
+          floodColor="#E65F2F"
+          floodOpacity="0.62"
+        />
+      </filter>
       <linearGradient
         id="jejuRoad"
         x1="42"
@@ -657,27 +666,46 @@ function JejuSilhouetteMap({
             const selected = selectedRegions.includes(shape.id);
             const tone = getRegionTone(previews[shape.id], selectedMoments, loading);
             return (
-              <path
-                key={shape.id}
-                d={shape.path}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selected}
-                aria-label={`${region?.label ?? shape.id} 근거 보기`}
-                onClick={() => onInspect(shape.id)}
-                onDoubleClick={() => onToggle(shape.id)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onInspect(shape.id);
-                  }
-                }}
-                className={`cursor-pointer stroke-white stroke-[2.5] transition duration-200 outline-none hover:brightness-105 focus:stroke-citrus focus:stroke-[4] ${regionFillClass(
-                  tone,
-                  active,
-                  selected,
-                )}`}
-              />
+              <g key={shape.id}>
+                {selected && (
+                  <path
+                    data-testid={`${shape.id}-selection-glow`}
+                    aria-hidden="true"
+                    pointerEvents="none"
+                    d={shape.path}
+                    fill="none"
+                    stroke="#F06A3B"
+                    strokeOpacity="0.84"
+                    strokeWidth="6"
+                    filter="url(#jejuSelectedGlow)"
+                  />
+                )}
+                <path
+                  d={shape.path}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selected}
+                  aria-label={`${region?.label ?? shape.id} 근거 보기`}
+                  data-region-id={shape.id}
+                  data-tone={tone}
+                  data-active={String(active)}
+                  data-selected={String(selected)}
+                  filter={selected ? 'url(#jejuSelectedGlow)' : undefined}
+                  onClick={() => onInspect(shape.id)}
+                  onDoubleClick={() => onToggle(shape.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onInspect(shape.id);
+                    }
+                  }}
+                  className={`cursor-pointer stroke-white stroke-[2.5] transition duration-200 outline-none hover:brightness-105 focus:stroke-citrus focus:stroke-[4] ${regionFillClass(
+                    tone,
+                    active,
+                    selected,
+                  )}`}
+                />
+              </g>
             );
           })}
         </g>
@@ -706,8 +734,15 @@ function JejuSilhouetteMap({
           const region = REGIONS.find((r) => r.value === shape.id);
           const active = activeRegion === shape.id;
           const selected = selectedRegions.includes(shape.id);
+          const tone = getRegionTone(previews[shape.id], selectedMoments, loading);
+          const status = regionMapStatus(previews[shape.id], tone, loading);
           return (
-            <g key={`${shape.id}-label`} className="pointer-events-none">
+            <g
+              key={`${shape.id}-label`}
+              role="status"
+              aria-label={`${region?.label ?? shape.id} 지도 상태`}
+              className="pointer-events-none"
+            >
               {selected && (
                 <circle
                   cx={shape.labelX - 23}
@@ -725,15 +760,32 @@ function JejuSilhouetteMap({
               )}
               <text
                 x={shape.labelX}
-                y={shape.labelY}
+                y={shape.id === 'udo' ? shape.labelY : shape.labelY - 3}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                className={`select-none text-[13px] font-bold ${
+                className={`select-none text-[13px] font-bold [paint-order:stroke] [stroke-width:2.5px] ${
                   selected ? 'fill-white' : active ? 'fill-citrus-2' : 'fill-basalt'
-                }`}
+                } ${selected ? 'stroke-citrus-2/30' : 'stroke-white/55'}`}
               >
                 {region?.label}
               </text>
+              {shape.id !== 'udo' && (
+                <text
+                  x={shape.labelX}
+                  y={shape.labelY + 10}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className={`select-none text-[7.5px] font-semibold tracking-[-0.02em] [paint-order:stroke] [stroke-width:2px] ${
+                    selected
+                      ? 'fill-white stroke-citrus-2/35'
+                      : active
+                        ? 'fill-[#9D431F] stroke-white/60'
+                        : 'fill-[#4A675F] stroke-white/60'
+                  }`}
+                >
+                  {status}
+                </text>
+              )}
             </g>
           );
         })}
@@ -1200,6 +1252,18 @@ function getRegionTone(
   if (gaps === selectedStats.length) return 'gap';
   if (gaps > 0) return 'caution';
   return 'verified';
+}
+
+function regionMapStatus(
+  preview: RegionCoveragePreview | undefined,
+  tone: RegionTone,
+  loading: boolean,
+): string {
+  if (loading && !preview) return '조회 중';
+  if (tone === 'gap') return '데이터 부족';
+  if (tone === 'caution') return '확인 필요';
+  const total = preview?.total_places ?? 0;
+  return total > 0 ? `후보 ${total}` : '근거 보기';
 }
 
 function regionFillClass(tone: RegionTone, active: boolean, selected: boolean): string {
