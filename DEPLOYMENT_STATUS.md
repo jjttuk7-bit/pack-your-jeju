@@ -63,7 +63,7 @@
 - Railway `/health` 200, `/openapi.json`의 `/route/plan` 노출, Vercel→Railway CORS 200을 확인했다. 프로덕션 동선 요청은 네이버 Directions 서버 인증이 없어 `route-travel-v1` 기반 `estimated_route`로 정직하게 fallback한다.
 - Vercel 진입 chunk는 390,887 bytes이며, `PackingDashboard` 지연 chunk에서 `내 여행 동선`과 `동선 추천받기` 문구를 확인했다. PWA manifest와 서비스 워커도 각각 200이다.
 
-### 제주 입체 지형 지도 (배포 전 기능 브랜치)
+### 제주 입체 지형 지도 (프로덕션 배포 완료)
 
 - 기존 12개 행정구역 SVG 경로와 지역 근거 API 계약은 유지하면서 바다 수심, 해안광, 섬 그림자, 한라산 음영·등고선을 SVG 레이어로 추가했다.
 - 지역별 `확인 후보 있음 / 확인 필요 / 데이터 부족` 상태와 후보 수를 지도 안에 표시하고, 선택 지역은 경계를 움직이지 않는 주황 외곽광으로 구분한다.
@@ -71,7 +71,9 @@
 - 외부 지도 SDK·이미지·신규 런타임 의존성은 추가하지 않았다. 장식 레이어는 포인터 이벤트를 받지 않고, Enter·Space·포커스 표시·감소된 모션 설정을 보존한다.
 - 로컬 전체 검증: 프론트 Vitest **34 passed**, Node 회귀 **25 passed**, TypeScript 검사와 PWA 프로덕션 빌드 성공.
 - 2026-07-17 로컬 빌드 기준 초기 주 JavaScript chunk는 **390.89KB**(gzip 125.28KB), `TrustMapDashboard` 지연 chunk는 **37.60KB**(gzip 12.22KB)다. Vite 500KB 경고는 없다.
-- 이 항목은 `codex/terrain-map-visual` 기능 브랜치 검증 결과다. 원격 푸시·Vercel 프로덕션 배포·브라우저 스모크는 아직 수행하지 않았다.
+- 2026-07-17 로컬 `main` 병합 커밋 `b5af019`를 원격 `main`에 푸시했다. Vercel 최신 Production 배포는 `Ready`이며 `pack-your-jeju.vercel.app` 별칭이 연결됐다.
+- 프로덕션 엔트리에서 `TrustMapDashboard-BvP7bBsh.js` 지연 chunk를 확인했고, 해당 chunk가 `jeju-sea-layer`, 지형 범례, 지역 상태 속성을 포함한다. PWA manifest와 service worker는 각각 200이다.
+- Railway `/health`는 200과 `db:true`, bootstrap `applied:40 / failed:0`을 반환한다. `/openapi.json`에서 `/weather/report`, `/route/plan`, `/health` 노출을 확인했다.
 
 ## 2-a. 이전 세션에서 처리한 것 (2026-07-06)
 
