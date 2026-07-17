@@ -923,6 +923,40 @@ def _enforce_web_source_role_disclosure(reply: str, sources: list[dict]) -> str:
     return f"{guarded_reply}\n\n{disclosure}".strip()
 
 
+def _guard_unsupported_free_claims(reply: str) -> str:
+    clean_reply = str(reply or "").strip()
+    strong_free_claim = re.compile(
+        r"무료|입장료\s*없이|요금\s*없이|자유롭게\s*방문\s*가능",
+    )
+    missing_fee_evidence = re.compile(
+        r"(?:입장료|요금|가격).{0,30}(?:언급|안내|정보).{0,15}"
+        r"(?:없|찾지\s*못|확인되지|기재되지)",
+    )
+    explicit_free_evidence = re.compile(
+        r"(?:공식\s*(?:홈페이지|사이트|출처|운영\s*주체)|운영\s*기관).{0,40}"
+        r"(?:무료|입장료\s*0원).{0,25}(?:직접\s*)?(?:명시|안내|확인)"
+        r"|(?:무료|입장료\s*0원).{0,25}(?:공식\s*(?:홈페이지|사이트|출처)|운영\s*기관).{0,25}"
+        r"(?:명시|안내|확인)",
+    )
+    if (
+        not strong_free_claim.search(clean_reply)
+        or not missing_fee_evidence.search(clean_reply)
+        or explicit_free_evidence.search(clean_reply)
+    ):
+        return clean_reply
+
+    retained_lines = [
+        line for line in clean_reply.splitlines()
+        if not strong_free_claim.search(line)
+    ]
+    retained = "\n".join(retained_lines).strip()
+    cautious = (
+        "별도의 입장료 안내는 확인되지 않았습니다. "
+        "주차·체험·대여 시설을 이용하면 별도 비용이 생길 수 있어 방문 전 다시 확인해 주세요."
+    )
+    return f"{cautious}\n\n{retained}".strip() if retained else cautious
+
+
 def _extract_response_sources(resp: Any) -> list[dict]:
     sources: list[dict] = []
     for output in getattr(resp, "output", []) or []:
@@ -1140,6 +1174,8 @@ def _perform_single_web_search(
         "장소명은 굵게 표시하고 특징·추천 이유·위치·주의점을 짧은 목록으로 묶으세요. "
         "굵게 표시하는 장소명에는 정확한 상호명 또는 고유명만 쓰고 가격·설명·추천 수식어를 섞지 마세요. "
         "운영시간·휴무·가격·예약·1인 주문 가능 여부는 공식 출처 또는 지도·예약 플랫폼에서 직접 확인된 경우에만 단정하세요. "
+        "요금·입장료 안내를 찾지 못한 것은 무료의 근거가 아닙니다. "
+        "공식 운영 주체나 신뢰 가능한 운영 출처가 무료라고 직접 명시한 경우에만 무료라고 단정하세요. "
         "블로그·후기는 분위기와 방문 경험 판단에만 사용하고 운영 사실의 단독 근거로 사용하지 마세요. "
         "공식·플랫폼 근거가 없으면 후기 기반 참고 후보라고 밝히고 운영 정보는 재확인 필요로 표시하세요. "
         "같은 변동 가능성 경고를 반복하거나 A/B/C/D 선택지를 만들지 마세요. "
@@ -1167,7 +1203,9 @@ def _perform_single_web_search(
                 input=prompt,
                 max_output_tokens=WEB_SEARCH_MAX_OUTPUT_TOKENS,
             )
-            answer = (getattr(resp, "output_text", "") or "").strip()
+            answer = _guard_unsupported_free_claims(
+                (getattr(resp, "output_text", "") or "").strip()
+            )
             sources = [
                 {
                     **source,
@@ -2661,7 +2699,9 @@ _BASE_SYSTEM_PROMPT = (
     "8) items가 1개 이상 있으면 '조건을 더 알려달라'로 답변을 끝내지 마라. "
     "현재 후보 안에서 먼저 판단하고, 마지막에 선택적으로 더 좁힐 기준을 제안하라.\n"
     "9) exclude_names가 있으면 그 후보를 절대 다시 추천하지 말고, 답변에 '제외한 후보는 빼고 봤다'는 취지를 짧게 포함하라.\n"
-    "10) 사용자가 불만이나 답답함을 표현하면 사과보다 먼저 문제를 인정하고, 이전 후보 반복·조건 누락을 바로잡아 다시 제안하라."
+    "10) 사용자가 불만이나 답답함을 표현하면 사과보다 먼저 문제를 인정하고, 이전 후보 반복·조건 누락을 바로잡아 다시 제안하라.\n"
+    "11) 요금 안내를 찾지 못한 것은 무료의 근거가 아니다. 공식 운영 주체나 신뢰 가능한 운영 출처가 "
+    "무료라고 직접 명시한 경우에만 무료라고 단정하라. 정보가 없으면 '별도의 입장료 안내는 확인되지 않았다'고 표현하라."
 )
 
 
@@ -2917,6 +2957,7 @@ def _preloaded_tool_fallback_turn(
             reply_text,
             _web_sources_from_pool_context(conv),
         )
+        reply_text = _guard_unsupported_free_claims(reply_text)
     return HarubanTurn(
         available=True,
         reply_text=reply_text,
@@ -3016,6 +3057,7 @@ def _chat_turn_raw(
                     text_reply,
                     _web_sources_from_pool_context(conv),
                 )
+                text_reply = _guard_unsupported_free_claims(text_reply)
             return HarubanTurn(
                 available=True,
                 reply_text=text_reply,

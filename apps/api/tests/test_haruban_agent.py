@@ -18,6 +18,8 @@ def test_haruban_prompt_frames_web_research_agent():
     assert "웹 리서치" in prompt
     assert "공공데이터 교차확인" in prompt
     assert "저희 DB/RAG 검색 기준" not in prompt
+    assert "요금 안내를 찾지 못한 것은 무료의 근거가 아니다" in prompt
+    assert "무료라고 직접 명시" in prompt
 
 
 def test_haruban_prompt_uses_web_research_answer_contract():
@@ -343,6 +345,8 @@ def test_single_web_search_forces_search_with_explicit_jeju_region_context(monke
     assert "A/B/C/D" in captured["input"]
     assert "정확한 상호명 또는 고유명만" in captured["input"]
     assert "운영시간·휴무·가격·예약·1인 주문 가능 여부" in captured["input"]
+    assert "요금·입장료 안내를 찾지 못한 것은 무료의 근거가 아닙니다" in captured["input"]
+    assert "무료라고 직접 명시한 경우에만" in captured["input"]
     assert "블로그·후기는 분위기와 방문 경험" in captured["input"]
 
 
@@ -555,6 +559,36 @@ def test_preloaded_web_answer_applies_source_role_guardrail(monkeypatch):
 
     assert "모두 공식 또는 공개 플랫폼" not in turn.reply_text
     assert "출처 구성: 공식 1건, 후기 1건" in turn.reply_text
+
+
+def test_free_claim_guard_softens_claim_inferred_from_missing_fee_guidance():
+    reply = (
+        "소금막해변은 입장료 없이 자유롭게 방문 가능한 곳입니다.\n\n"
+        "- 입장료: 무료로 안내됩니다.\n"
+        "- 근거: 공식 자료나 관광 안내문에 입장료에 대한 언급이 없습니다."
+    )
+
+    guarded = haruban._guard_unsupported_free_claims(reply)
+
+    assert "입장료 없이 자유롭게 방문 가능한" not in guarded
+    assert "입장료: 무료" not in guarded
+    assert "별도의 입장료 안내는 확인되지 않았습니다" in guarded
+    assert "주차·체험·대여" in guarded
+
+
+def test_free_claim_guard_keeps_explicit_official_free_statement():
+    reply = (
+        "공식 홈페이지에서 입장료 무료라고 직접 명시했습니다. "
+        "따라서 현재 무료로 입장할 수 있습니다."
+    )
+
+    assert haruban._guard_unsupported_free_claims(reply) == reply
+
+
+def test_free_claim_guard_leaves_unrelated_answer_unchanged():
+    reply = "소금막해변은 안전요원이 배치된 정식 해수욕장이 아니므로 물놀이 전 확인이 필요합니다."
+
+    assert haruban._guard_unsupported_free_claims(reply) == reply
 
 
 def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
