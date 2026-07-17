@@ -200,6 +200,12 @@ export interface WeatherReportResponse {
   };
 }
 
+export interface RouteUndoState {
+  proposalId: string;
+  beforeItems: TravelPlanItem[];
+  appliedPlanFingerprint: string;
+}
+
 export type RouteMode = 'driving' | 'transit' | 'walking';
 
 export type RouteStatus =
@@ -270,6 +276,7 @@ export interface RouteChangeProposal {
   proposal_id: string;
   fingerprint: string;
   base_plan_fingerprint: string;
+  basePlanFingerprint?: string;
   operations: RouteProposalOperation[];
   saved_duration_s: number;
   saved_distance_m: number;
