@@ -335,6 +335,9 @@ export interface SavedTravel {
   weatherDismissedFingerprints?: string[];
   weatherUndo?: WeatherUndoState | null;
   weatherActionMessage?: string | null;
+  routeDismissedFingerprints?: string[];
+  routeUndo?: RouteUndoState | null;
+  routeActionMessage?: string | null;
 }
 
 // ─────────────────────────────────────────────────────

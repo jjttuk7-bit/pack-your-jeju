@@ -44,9 +44,13 @@ import type {
   WeatherChangeProposal,
   WeatherReportResponse,
   Daypart,
+  RouteChangeProposal,
+  RouteLocation,
+  RouteMode,
+  RoutePlanResponse,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
-import { requestCandidatePage, requestPack, requestVisitSignal, requestWeatherReport } from '../api';
+import { requestCandidatePage, requestPack, requestRoutePlan, requestVisitSignal, requestWeatherReport } from '../api';
 import {
   planFingerprint,
   schedulePlanItemsForWeather,
@@ -58,6 +62,8 @@ import MomentIcon from './marks/MomentIcon';
 import PlanPdfEditor from './PlanPdfEditor';
 import PlaceDetail from './PlaceDetail';
 import WeatherDecisionReport from './WeatherDecisionReport';
+import TravelRouteCard from './TravelRouteCard';
+import TravelRouteMap from './TravelRouteMap';
 
 interface Props {
   info: TravelInfo;
@@ -72,6 +78,9 @@ interface Props {
   weatherDismissedFingerprints: string[];
   weatherUndoAvailable: boolean;
   weatherActionMessage: string | null;
+  routeDismissedFingerprints: string[];
+  routeUndoAvailable: boolean;
+  routeActionMessage: string | null;
   onToggleItem: (itemId: string) => void;
   onToggleMemory: (memoryId: string) => void;
   onAddCustomBasic: (itemName: string) => void;
@@ -90,6 +99,9 @@ interface Props {
   onApplyWeatherProposal: (proposal: WeatherChangeProposal) => void;
   onDismissWeatherProposal: (proposal: WeatherChangeProposal) => void;
   onUndoWeatherProposal: () => void;
+  onApplyRouteProposal: (proposal: RouteChangeProposal) => void;
+  onDismissRouteProposal: (proposal: RouteChangeProposal) => void;
+  onUndoRouteProposal: () => void;
   onSetVisitCheck: (itemId: string, status: VisitCheckStatus, patch?: Partial<VisitCheck>) => void;
   onOpenFeedback: () => void;
   onReset: () => void;
@@ -185,6 +197,9 @@ export default function PackingDashboard(props: Props) {
     weatherDismissedFingerprints,
     weatherUndoAvailable,
     weatherActionMessage,
+    routeDismissedFingerprints,
+    routeUndoAvailable,
+    routeActionMessage,
     onToggleItem,
     onTogglePlanItem,
     onAddCustomPlanItem,
@@ -193,6 +208,9 @@ export default function PackingDashboard(props: Props) {
     onApplyWeatherProposal,
     onDismissWeatherProposal,
     onUndoWeatherProposal,
+    onApplyRouteProposal,
+    onDismissRouteProposal,
+    onUndoRouteProposal,
     onSetVisitCheck,
     onOpenFeedback,
     onReset,
@@ -213,6 +231,12 @@ export default function PackingDashboard(props: Props) {
   const [weatherReport, setWeatherReport] = useState<WeatherReportResponse | null>(null);
   const [weatherReportLoading, setWeatherReportLoading] = useState(false);
   const [weatherReportError, setWeatherReportError] = useState<string | null>(null);
+  const [routeMode, setRouteMode] = useState<RouteMode>('driving');
+  const [routeActiveDay, setRouteActiveDay] = useState(1);
+  const [routeResponse, setRouteResponse] = useState<RoutePlanResponse | null>(null);
+  const [routeBasisFingerprint, setRouteBasisFingerprint] = useState<string | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const resizingSidebarRef = useRef(false);
 
@@ -333,6 +357,44 @@ export default function PackingDashboard(props: Props) {
       ),
     };
   }, [weatherReport, weatherDismissedFingerprints]);
+  const routePlanItems = useMemo(
+    () => enrichPlanItemsWithCoordinates(scheduledPlanItems, packItems).filter(
+      (item) => Boolean(resolveItemCoordinate(item)),
+    ),
+    [scheduledPlanItems, packItems],
+  );
+  const routeDays = useMemo(
+    () => Array.from(new Set(
+      routePlanItems
+        .map((item) => item.day)
+        .filter((day): day is number => typeof day === 'number' && day > 0),
+    )).sort((a, b) => a - b),
+    [routePlanItems],
+  );
+  const routeEndpoint = useMemo<RouteLocation | null>(() => {
+    const endpointItem = routePlanItems.find((item) => item.moment === 'stay')
+      ?? routePlanItems[0];
+    const coordinate = endpointItem ? resolveItemCoordinate(endpointItem) : null;
+    if (!endpointItem || !coordinate) return null;
+    return {
+      label: endpointItem.moment === 'stay'
+        ? endpointItem.name
+        : `${endpointItem.name} 기준`,
+      lat: coordinate.lat,
+      lng: coordinate.lng,
+    };
+  }, [routePlanItems]);
+  const visibleRouteResponse = useMemo(() => {
+    if (!routeResponse?.proposal) return routeResponse;
+    if (!routeDismissedFingerprints.includes(routeResponse.proposal.fingerprint)) {
+      return routeResponse;
+    }
+    return {...routeResponse, proposal: null};
+  }, [routeResponse, routeDismissedFingerprints]);
+  const activeRouteDay = useMemo(
+    () => visibleRouteResponse?.days.find((day) => day.day === routeActiveDay) ?? null,
+    [visibleRouteResponse, routeActiveDay],
+  );
   const shareText = useMemo(
     () => packResp ? buildShareText(info, selectedMomentIds, packResp, selectedPlanItems, visitChecks) : '',
     [info, selectedMomentIds, packResp, selectedPlanItems, visitChecks]
@@ -349,6 +411,59 @@ export default function PackingDashboard(props: Props) {
       window.setTimeout(() => setShareCopied(false), 1800);
     } catch (_e) {
       setShareError('브라우저에서 복사를 허용하지 않았어요.');
+    }
+  };
+
+  const handleRequestRoute = async () => {
+    const endpoint = routeEndpoint;
+    const currentDayCount = routePlanItems.filter((item) => item.day === routeActiveDay).length;
+    if (!endpoint || currentDayCount < 2) {
+      setRouteError('같은 Day에 좌표가 확인된 장소를 2곳 이상 담아 주세요.');
+      return;
+    }
+
+    const weatherStatusByItem = new Map(
+      (visibleWeatherReport?.impacts ?? []).map((impact) => [impact.item_id, impact.status]),
+    );
+    setRouteLoading(true);
+    setRouteError(null);
+    try {
+      const response = await requestRoutePlan({
+        mode: routeMode,
+        origin: endpoint,
+        destination: endpoint,
+        items: routePlanItems.flatMap((item) => {
+          const coordinate = resolveItemCoordinate(item);
+          if (!coordinate || !item.day || !item.daypart) return [];
+          return [{
+            id: item.id,
+            label: item.name,
+            lat: coordinate.lat,
+            lng: coordinate.lng,
+            day: item.day,
+            daypart: item.daypart,
+            fixed: item.fixed ?? false,
+            weatherStatus: weatherStatusByItem.get(item.id) ?? null,
+            operatingCheckRequired: Boolean(item.check_required?.length),
+          }];
+        }),
+        dismissedProposalFingerprints: routeDismissedFingerprints,
+      });
+      const proposal = response.proposal
+        ? {...response.proposal, basePlanFingerprint: scheduledPlanFingerprint}
+        : null;
+      setRouteResponse({...response, proposal});
+      setRouteBasisFingerprint(scheduledPlanFingerprint);
+    } catch (routeRequestError: unknown) {
+      setRouteResponse(null);
+      setRouteBasisFingerprint(null);
+      setRouteError(
+        routeRequestError instanceof Error
+          ? routeRequestError.message
+          : '동선을 계산하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setRouteLoading(false);
     }
   };
 
@@ -481,6 +596,23 @@ export default function PackingDashboard(props: Props) {
     scheduledPlanFingerprint,
   ]);
 
+  useEffect(() => {
+    if (routeDays.length === 0) {
+      setRouteActiveDay(1);
+      return;
+    }
+    if (!routeDays.includes(routeActiveDay)) {
+      setRouteActiveDay(routeDays[0]);
+    }
+  }, [routeDays, routeActiveDay]);
+
+  useEffect(() => {
+    if (!routeBasisFingerprint || routeBasisFingerprint === scheduledPlanFingerprint) return;
+    setRouteResponse(null);
+    setRouteBasisFingerprint(null);
+    setRouteError(null);
+  }, [routeBasisFingerprint, scheduledPlanFingerprint]);
+
   return (
     <div
       ref={dashboardRef}
@@ -600,6 +732,42 @@ export default function PackingDashboard(props: Props) {
           items={mapPlanItems.length > 0 ? mapPlanItems : packItems}
           regions={info.regions}
           isPlanMap={mapPlanItems.length > 0}
+        />
+      )}
+
+      {packResp && !loading && !error && routePlanItems.length > 0 && routeEndpoint && (
+        <TravelRouteCard
+          planItems={routePlanItems}
+          activeDay={routeActiveDay}
+          mode={routeMode}
+          originLabel={routeEndpoint.label}
+          destinationLabel={routeEndpoint.label}
+          response={visibleRouteResponse}
+          loading={routeLoading}
+          error={routeError}
+          canUndo={routeUndoAvailable}
+          actionMessage={routeActionMessage}
+          mapContent={activeRouteDay ? (
+            <TravelRouteMap
+              activeDay={routeActiveDay}
+              dayRoute={activeRouteDay}
+              planItems={routePlanItems}
+              origin={routeEndpoint}
+              destination={routeEndpoint}
+              showRecommended
+            />
+          ) : undefined}
+          onActiveDayChange={setRouteActiveDay}
+          onModeChange={(mode) => {
+            setRouteMode(mode);
+            setRouteResponse(null);
+            setRouteBasisFingerprint(null);
+            setRouteError(null);
+          }}
+          onRequest={handleRequestRoute}
+          onApply={onApplyRouteProposal}
+          onDismiss={onDismissRouteProposal}
+          onUndo={onUndoRouteProposal}
         />
       )}
 
