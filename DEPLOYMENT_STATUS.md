@@ -51,7 +51,7 @@
 - 기존 `/pack.weather`는 compact fallback으로 유지하고 기상청 키·특정 지역 조회 장애가 플랜·후보·PDF 기능을 막지 않게 했다.
 - 이 항목은 기능 브랜치의 로컬 자동 검증 기준이다. 원격 푸시 후 Railway·Vercel 자동 배포와 프로덕션 스모크는 별도로 확인해야 한다.
 
-### 사용자 승인형 여행 동선 추천 (배포 전 기능 브랜치)
+### 사용자 승인형 여행 동선 추천 (프로덕션 배포 완료)
 
 - `POST /route/plan`: Day별 현재·추천 순서와 구간별 시간·거리·geometry를 반환하며 시간 고정 일정을 이동하지 않는다.
 - 네이버 Directions로 확인한 구간은 `verified_route`, 직선거리 fallback은 `estimated_route`, 혼합 결과는 `mixed_route`로 분리한다. 서버 키 미설정·timeout·공급자 오류가 기존 플랜과 지도 기능을 막지 않는다.
@@ -59,7 +59,9 @@
 - 플랜에 숙소 좌표가 있으면 숙소 왕복, 없으면 첫 장소를 기준점이라고 표시한다. 입력되지 않은 숙소 좌표는 만들지 않는다.
 - 로컬 전체 검증: 백엔드 `275 passed, 15 skipped`, 프론트 Vitest `28 passed`, Node 회귀 `22 passed`, TypeScript 검사와 PWA 프로덕션 빌드 성공.
 - 화면 단위 지연 로딩 후 초기 주 chunk는 `769.36KB → 390.89KB`로 약 49% 감소했고 Vite 500KB 경고가 사라졌다. 하루방(198.50KB), 대시보드(102.82KB), PDF 편집기(14.56KB)는 사용 시점에 로드되는 독립 chunk다.
-- 기능 브랜치 푸시 뒤 Railway/Vercel 프로덕션 반영 여부와 실제 경로 공급자 스모크는 별도로 확인한다.
+- 2026-07-17 커밋 `479d5d2`를 원격 `main`에 fast-forward하고 Railway·Vercel 자동 배포를 확인했다.
+- Railway `/health` 200, `/openapi.json`의 `/route/plan` 노출, Vercel→Railway CORS 200을 확인했다. 프로덕션 동선 요청은 네이버 Directions 서버 인증이 없어 `route-travel-v1` 기반 `estimated_route`로 정직하게 fallback한다.
+- Vercel 진입 chunk는 390,887 bytes이며, `PackingDashboard` 지연 chunk에서 `내 여행 동선`과 `동선 추천받기` 문구를 확인했다. PWA manifest와 서비스 워커도 각각 200이다.
 
 ## 2-a. 이전 세션에서 처리한 것 (2026-07-06)
 
