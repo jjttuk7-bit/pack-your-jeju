@@ -233,4 +233,21 @@ describe('TrustMapDashboard terrain map', () => {
       'overflow-y-auto',
     );
   });
+
+  it('does not make the dashboard shell a scroll container around the sticky inspector', async () => {
+    const {container} = render(
+      <TrustMapDashboard
+        onSubmit={vi.fn()}
+        initialInfo={{...twoRegionTravelInfo, regions: ['hallim']}}
+        initialMoments={['oreum']}
+      />,
+    );
+
+    await screen.findByTestId('region-moment-inspector');
+
+    const dashboardShell = container.querySelector('#trust-map-dashboard > section');
+    expect(dashboardShell).toHaveClass('overflow-visible');
+    expect(dashboardShell).not.toHaveClass('overflow-clip');
+    expect(dashboardShell).not.toHaveClass('overflow-hidden');
+  });
 });

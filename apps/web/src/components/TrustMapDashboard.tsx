@@ -406,9 +406,9 @@ export default function TrustMapDashboard({
 
   return (
     <div className="w-full max-w-6xl mx-auto" id="trust-map-dashboard">
-      <section className="overflow-hidden rounded-[30px] border border-earth bg-[#FFF9F0] shadow-pyj-card">
+      <section className="overflow-visible rounded-[30px] border border-earth bg-[#FFF9F0] shadow-pyj-card">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <main className="relative bg-gradient-to-br from-[#FFF9F0] via-[#FDF1DE] to-[#F6DFC1] p-4 sm:p-6 lg:p-7">
+          <main className="relative rounded-t-[29px] bg-gradient-to-br from-[#FFF9F0] via-[#FDF1DE] to-[#F6DFC1] p-4 sm:p-6 lg:rounded-l-[29px] lg:rounded-tr-none lg:p-7">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-citrus-2">
@@ -512,7 +512,7 @@ export default function TrustMapDashboard({
             </div>
           </main>
 
-          <aside className="border-t border-earth bg-white/82 p-4 sm:p-5 lg:border-l lg:border-t-0">
+          <aside className="rounded-b-[29px] border-t border-earth bg-white/82 p-4 sm:p-5 lg:rounded-bl-none lg:rounded-r-[29px] lg:border-l lg:border-t-0">
             <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-2rem)]">
               {activeEntry && activeRegion ? (
                 <RegionPanel

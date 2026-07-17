@@ -566,7 +566,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen overflow-x-clip text-basalt font-sans relative flex flex-col items-center px-4 pt-8 pb-4 antialiased ${state.step === 'setup' ? 'pyj-dashboard' : ''}`} id="app-root">
+    <div className={`min-h-screen text-basalt font-sans relative flex flex-col items-center px-4 pt-8 pb-4 antialiased ${state.step === 'setup' ? 'pyj-dashboard' : ''}`} id="app-root">
 
       {/* 하단 제주 바당 이미지 — 크림색 오버레이로 콘텐츠 가독성 유지 */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-40 overflow-hidden opacity-90" aria-hidden="true">
