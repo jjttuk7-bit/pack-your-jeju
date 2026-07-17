@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   ChevronRight,
@@ -20,6 +20,11 @@ import type {
 import { COMPANIONS, MOMENTS, PURPOSES, REGIONS } from '../data';
 import { requestRegionCoveragePreview } from '../api';
 import { normalizeTripStartDate } from '../date';
+import {
+  buildRegionMomentCombinations,
+  combinationKey,
+  countReviewedCombinations,
+} from '../regionMomentInspector';
 import MomentIcon from './marks/MomentIcon';
 
 interface TrustMapDashboardProps {
@@ -256,6 +261,12 @@ export default function TrustMapDashboard({
   const [selectedMoments, setSelectedMoments] = useState<MomentId[]>(
     initialMoments?.length ? initialMoments : [],
   );
+  const [activeMoment, setActiveMoment] = useState<MomentId | null>(
+    initialMoments?.[0] ?? null,
+  );
+  const [reviewedCombinations, setReviewedCombinations] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [startDate, setStartDate] = useState(
     normalizeTripStartDate(initialInfo?.startDate),
   );
@@ -306,6 +317,55 @@ export default function TrustMapDashboard({
     () => summarizeDashboardPreviews(previews),
     [previews],
   );
+  const combinations = useMemo(
+    () => buildRegionMomentCombinations(selectedRegions, selectedMoments),
+    [selectedRegions, selectedMoments],
+  );
+  const reviewedCount = countReviewedCombinations(
+    combinations,
+    reviewedCombinations,
+  );
+  const activeCombinationIndex = combinations.findIndex(
+    ({ region, moment }) => region === activeRegion && moment === activeMoment,
+  );
+
+  const inspectCombination = useCallback((region: RegionId, moment: MomentId) => {
+    setActiveRegion(region);
+    setActiveMoment(moment);
+    setReviewedCombinations((current) => {
+      const key = combinationKey(region, moment);
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const region = activeRegion && selectedRegions.includes(activeRegion)
+      ? activeRegion
+      : selectedRegions[0];
+    const moment = activeMoment && selectedMoments.includes(activeMoment)
+      ? activeMoment
+      : selectedMoments[0];
+
+    if (region && moment) {
+      inspectCombination(region, moment);
+    }
+  }, [
+    activeMoment,
+    activeRegion,
+    inspectCombination,
+    selectedMoments,
+    selectedRegions,
+  ]);
+
+  const inspectCombinationAt = (index: number) => {
+    const combination = combinations[index];
+    if (combination) {
+      inspectCombination(combination.region, combination.moment);
+    }
+  };
 
   function buildTravelInfo(regions: RegionId[] = selectedRegions): TravelInfo {
     return {
@@ -458,10 +518,22 @@ export default function TrustMapDashboard({
                 tone={activeTone}
                 previewLoading={previewLoading}
                 selectedMoments={selectedMoments}
+                selectedRegions={selectedRegions}
+                activeMoment={activeMoment}
+                reviewedCount={reviewedCount}
+                combinationCount={combinations.length}
                 selected={selectedRegions.includes(activeRegion)}
                 selectedLabels={selectedLabels}
                 coverageSummary={coverageSummary}
                 canSubmit={selectedMoments.length > 0}
+                onInspectCombination={inspectCombination}
+                onPreviousCombination={() => inspectCombinationAt(activeCombinationIndex - 1)}
+                onNextCombination={() => inspectCombinationAt(activeCombinationIndex + 1)}
+                hasPreviousCombination={activeCombinationIndex > 0}
+                hasNextCombination={
+                  activeCombinationIndex >= 0 &&
+                  activeCombinationIndex < combinations.length - 1
+                }
                 onToggle={() => toggleRegion(activeRegion)}
                 onSubmit={submitPlan}
               />
@@ -1024,10 +1096,19 @@ function RegionPanel({
   tone,
   previewLoading,
   selectedMoments,
+  selectedRegions,
+  activeMoment,
+  reviewedCount,
+  combinationCount,
   selected,
   selectedLabels,
   coverageSummary,
   canSubmit,
+  onInspectCombination,
+  onPreviousCombination,
+  onNextCombination,
+  hasPreviousCombination,
+  hasNextCombination,
   onToggle,
   onSubmit,
 }: {
@@ -1036,10 +1117,19 @@ function RegionPanel({
   tone: RegionTone;
   previewLoading: boolean;
   selectedMoments: MomentId[];
+  selectedRegions: RegionId[];
+  activeMoment: MomentId | null;
+  reviewedCount: number;
+  combinationCount: number;
   selected: boolean;
   selectedLabels: string;
   coverageSummary: { totalPlaces: number; strongMoments: string[]; weakMoments: string[] };
   canSubmit: boolean;
+  onInspectCombination: (region: RegionId, moment: MomentId) => void;
+  onPreviousCombination: () => void;
+  onNextCombination: () => void;
+  hasPreviousCombination: boolean;
+  hasNextCombination: boolean;
   onToggle: () => void;
   onSubmit: () => void;
 }) {
@@ -1049,20 +1139,20 @@ function RegionPanel({
     .slice(0, 4) ?? [];
   const regionObjectLabel = withObjectParticle(region.label);
   const intro = REGION_INTROS[region.value];
-  const momentStories = selectedMoments
-    .map((id) => {
-      const moment = MOMENTS.find((item) => item.id === id);
-      if (!moment) return null;
-      const momentStat = preview?.moments.find((item) => item.moment === id);
-      return {
-        id,
-        title: moment.title,
-        body: buildRegionMomentStory(region, id, momentStat),
-        meta: buildRegionMomentMeta(momentStat),
-      };
-    })
-    .filter(Boolean)
-    .slice(0, 4) as { id: MomentId; title: string; body: string; meta: string }[];
+  const activeMomentEntry = activeMoment
+    ? MOMENTS.find((item) => item.id === activeMoment)
+    : undefined;
+  const activeMomentStat = activeMoment
+    ? preview?.moments.find((item) => item.moment === activeMoment)
+    : undefined;
+  const activeStory = activeMoment && activeMomentEntry
+    ? {
+        id: activeMoment,
+        title: activeMomentEntry.title,
+        body: buildRegionMomentStory(region, activeMoment, activeMomentStat),
+        meta: buildRegionMomentMeta(activeMomentStat),
+      }
+    : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -1141,28 +1231,99 @@ function RegionPanel({
             </p>
           </div>
         </div>
-        <div className="space-y-2">
-          {momentStories.length ? momentStories.map((story) => (
-            <div key={story.id} className="rounded-2xl border border-earth bg-[#FFF9F0] p-3">
+        <section
+          data-testid="region-moment-inspector"
+          aria-label="지역별 순간 조합 확인"
+          className="mb-3 rounded-2xl border border-earth bg-white/70 p-3"
+        >
+          <p className="text-[10px] font-bold text-basalt-2">
+            {selectedRegions.length}개 지역 · {selectedMoments.length}개 순간 · 총 {combinationCount}개 조합
+          </p>
+          <p className="mt-1 text-[11px] font-bold text-mint">
+            확인 {reviewedCount} / {combinationCount}
+          </p>
+
+          <nav aria-label="선택 지역 조합" className="mt-3 flex flex-wrap gap-1.5">
+            {selectedRegions.map((regionId) => {
+              const label = REGIONS.find((item) => item.value === regionId)?.label ?? regionId;
+              return (
+                <button
+                  key={regionId}
+                  type="button"
+                  aria-current={regionId === region.value ? 'page' : undefined}
+                  aria-label={`${label} 지역 조합 보기`}
+                  onClick={() => {
+                    const moment = activeMoment ?? selectedMoments[0];
+                    if (moment) onInspectCombination(regionId, moment);
+                  }}
+                  className="rounded-full border border-earth bg-white px-2 py-1 text-[10px] font-bold text-basalt-2"
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div aria-label={`${region.label} 선택 순간`} className="mt-3 flex flex-wrap gap-1.5">
+            {selectedMoments.map((momentId) => {
+              const moment = MOMENTS.find((item) => item.id === momentId);
+              if (!moment) return null;
+              return (
+                <button
+                  key={momentId}
+                  type="button"
+                  aria-pressed={momentId === activeMoment}
+                  aria-label={`${region.label}에서 ${moment.title} 조합 확인`}
+                  onClick={() => onInspectCombination(region.value, momentId)}
+                  className="rounded-xl border border-earth bg-[#FFF9F0] px-2 py-1.5 text-[10px] font-bold text-basalt-2"
+                >
+                  {moment.title}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={!hasPreviousCombination}
+              onClick={onPreviousCombination}
+              className="flex-1 rounded-xl border border-earth bg-white px-2 py-1.5 text-[10px] font-bold text-basalt-2 disabled:opacity-40"
+            >
+              이전 조합
+            </button>
+            <button
+              type="button"
+              disabled={!hasNextCombination}
+              onClick={onNextCombination}
+              className="flex-1 rounded-xl border border-earth bg-white px-2 py-1.5 text-[10px] font-bold text-basalt-2 disabled:opacity-40"
+            >
+              다음 조합
+            </button>
+          </div>
+        <div className="mt-3 space-y-2">
+          {activeStory ? (
+            <div key={activeStory.id} className="rounded-2xl border border-earth bg-[#FFF9F0] p-3">
               <div className="flex gap-2.5">
-                <MomentIcon id={story.id} className="h-8 w-8 shrink-0" />
+                <MomentIcon id={activeStory.id} className="h-8 w-8 shrink-0" />
                 <div>
                   <p className="font-serif-kr text-[13px] font-bold text-basalt">
-                    {region.label}에서 {story.title}
+                    {region.label}에서 {activeStory.title}
                   </p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">{story.body}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-basalt-2">{activeStory.body}</p>
                   <p className="mt-2 text-[10px] font-bold leading-relaxed text-mint">
-                    {story.meta}
+                    {activeStory.meta}
                   </p>
                 </div>
               </div>
             </div>
-          )) : (
+          ) : (
             <div className="rounded-2xl border border-dashed border-earth bg-[#FFF9F0] p-4 text-center text-[11px] leading-relaxed text-basalt-2">
               아래에서 담고 싶은 순간을 고르면, 이 지역에서 어떤 여행감으로 볼 수 있는지 먼저 정리해드립니다.
             </div>
           )}
         </div>
+        </section>
       </div>
 
       {selectedLabels && (
