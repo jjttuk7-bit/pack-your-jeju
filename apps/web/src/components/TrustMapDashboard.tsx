@@ -699,7 +699,7 @@ function JejuSilhouetteMap({
                       onInspect(shape.id);
                     }
                   }}
-                  className={`cursor-pointer stroke-white stroke-[2.5] transition duration-200 outline-none hover:brightness-105 focus:stroke-citrus focus:stroke-[4] ${regionFillClass(
+                  className={`cursor-pointer stroke-white stroke-[2.5] transition duration-200 ease-out outline-none hover:brightness-105 focus-visible:stroke-citrus focus-visible:stroke-[4] motion-reduce:transition-none ${regionFillClass(
                     tone,
                     active,
                     selected,
@@ -824,6 +824,13 @@ function MapLegend() {
       <LegendDot className="bg-mint" label="확인 후보 있음" />
       <LegendDot className="bg-amber-400" label="확인 필요" />
       <LegendDot className="bg-stone-300" label="데이터 부족" />
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#B8D8D1] bg-white/70 px-2 py-1">
+        <span
+          aria-hidden="true"
+          className="h-2.5 w-6 rounded-full bg-gradient-to-r from-[#D9EDE8] via-[#8DB9AD] to-[#4F7F73]"
+        />
+        중앙 음영은 지형 표현
+      </span>
     </div>
   );
 }

@@ -78,4 +78,25 @@ describe('TrustMapDashboard terrain map', () => {
     expect(jeju).toHaveAttribute('data-selected', 'true');
     expect(screen.getByTestId('jeju_city-selection-glow')).toBeInTheDocument();
   });
+
+  it.each([
+    ['Enter', '{Enter}'],
+    ['Space', ' '],
+  ])('opens the region evidence panel with %s', async (_label, key) => {
+    const user = userEvent.setup();
+    render(<TrustMapDashboard onSubmit={vi.fn()} />);
+
+    const jeju = await screen.findByRole('button', {name: '제주시 근거 보기'});
+    jeju.focus();
+    await user.keyboard(key);
+
+    expect(jeju).toHaveAttribute('data-active', 'true');
+  });
+
+  it('separates terrain shading from public-data status in the legend', async () => {
+    render(<TrustMapDashboard onSubmit={vi.fn()} />);
+
+    await screen.findByRole('button', {name: '제주시 근거 보기'});
+    expect(screen.getByText('중앙 음영은 지형 표현')).toBeVisible();
+  });
 });
