@@ -32,12 +32,12 @@ import {
   requestHarubanChat,
   requestHarubanIntro,
   type HarubanAnswerContract,
-  type HarubanChatMessage,
   type HarubanFormSuggestion,
   type HarubanIntroResponse,
   type HarubanWebPlaceCandidate,
 } from '../api';
 import { MOMENTS } from '../data';
+import { buildHarubanChatHistory } from '../harubanChatHistory';
 
 interface HarubanChatProps {
   info: TravelInfo;
@@ -383,13 +383,7 @@ export default function HarubanChat({
     try {
       const formState = formStateForApi(currentSnapshot);
       // /agent/chat은 role=user|assistant|tool의 평면 메시지 배열만 받는다 (intro 엔트리 제외).
-      const chatHistory: HarubanChatMessage[] = nextEntries
-        .filter((e): e is Extract<ChatEntry, { kind: 'user' | 'assistant' }> =>
-          e.kind === 'user' || e.kind === 'assistant')
-        .map((e) => ({
-          role: e.kind === 'user' ? 'user' : 'assistant',
-          content: e.content,
-        }));
+      const chatHistory = buildHarubanChatHistory(nextEntries);
       const resp = await requestHarubanChat(chatHistory, formState);
       if (!resp.available) {
         setError(
