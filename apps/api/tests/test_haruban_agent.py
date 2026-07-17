@@ -1427,15 +1427,47 @@ def test_haruban_routes_broad_advice_to_free_gpt_path():
     assert haruban._should_answer_without_search([
         {"role": "user", "content": "제주는 처음인데 어떻게 여행계획을 세우면 좋을지 알려줘"},
     ])
-    assert haruban._should_answer_without_search([
+    region_recommendation = [
         {"role": "user", "content": "제주시는 어떤곳을 가보면 좋은지 알려줘"},
-    ])
+    ]
+    assert haruban._should_use_web_research(region_recommendation)
+    assert not haruban._should_answer_without_search(region_recommendation)
     assert not haruban._should_answer_without_search([
         {"role": "user", "content": "제주시에 있는 오름 정보를 알려줘"},
     ])
     assert not haruban._should_answer_without_search([
         {"role": "user", "content": "소심한이층에 관해 자세히 알려줘"},
     ])
+
+
+def test_haruban_routes_recognized_region_overview_to_web_research(monkeypatch):
+    captured = {}
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {
+            "available": True,
+            "query": args["query"],
+            "answer": "안덕의 특징을 웹 출처로 확인했습니다.",
+            "sources": [{"title": "제주 관광 공식", "url": "https://example.com/andeok"}],
+            "source_type": "web",
+        }
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+    conv = [{"role": "user", "content": "안덕은 어떤 곳이야?"}]
+    form_state = {
+        "regions": ["jocheon", "andeok"],
+        "moments": ["oreum", "local_food"],
+    }
+
+    assert haruban._should_use_web_research(conv)
+    assert not haruban._should_answer_without_search(conv)
+
+    result = haruban._build_search_pool_context(conv, form_state)
+
+    assert result["tool"] == "web_search_jeju"
+    assert captured["query"] == "안덕은 어떤 곳이야?"
+    assert json.loads(captured["context"]) == form_state
 
 
 def test_haruban_extracts_previous_candidates_for_more_requests():

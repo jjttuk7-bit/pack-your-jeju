@@ -1650,6 +1650,16 @@ def _is_explicit_public_data_question(text_in: str) -> bool:
     ))
 
 
+def _is_region_overview_question(text_in: str) -> bool:
+    has_explicit_region = bool(_infer_regions_from_text(text_in, {}))
+    asks_overview = bool(re.search(
+        r"어떤\s*곳|어떤\s*동네|어떤\s*지역|지역\s*(?:특징|성격|분위기)|"
+        r"지역.*어때|어떤\s*매력",
+        text_in,
+    ))
+    return has_explicit_region and asks_overview
+
+
 def _conversation_has_web_intent(conv: list[dict]) -> bool:
     recent = conv[-6:]
     prior_messages = recent[:-1] if recent and recent[-1].get("role") == "user" else recent
@@ -1670,6 +1680,8 @@ def _should_use_web_research(conv: list[dict]) -> bool:
     last_user = _latest_user_text(conv)
     if _is_explicit_public_data_question(last_user):
         return False
+    if _is_region_overview_question(last_user):
+        return True
     if _is_web_search_question(last_user):
         return True
     recommendation = bool(re.search(
