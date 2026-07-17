@@ -645,6 +645,53 @@ def test_clearly_non_jeju_question_returns_scope_answer_without_search(monkeypat
     assert turn.reason == "out of jeju scope"
 
 
+def test_short_followup_uses_session_subject_for_web_research(monkeypatch):
+    captured = {}
+    state = {
+        "last_user_question": "안덕은 어떤 곳이야?",
+        "last_research_query": "안덕은 어떤 곳이야?",
+        "active_regions": ["andeok"],
+        "active_place_names": ["산방산"],
+        "web_research_active": True,
+    }
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {
+            "available": True,
+            "query": args["query"],
+            "answer": "웹에서 확인했습니다.",
+            "sources": [],
+        }
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+
+    pool = haruban._build_search_pool_context(
+        [{"role": "user", "content": "거기는 왜 유명해?"}],
+        {},
+        state,
+    )
+
+    assert pool["tool"] == "web_search_jeju"
+    assert "거기는 왜 유명해?" in captured["query"]
+    assert "안덕은 어떤 곳이야?" in captured["query"]
+    assert "산방산" in captured["query"]
+
+
+def test_short_followup_without_subject_asks_for_target(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+
+    turn = haruban.chat_turn(
+        [{"role": "user", "content": "거기는 왜 유명해?"}],
+        {},
+        conversation_state={},
+    )
+
+    assert turn.available is True
+    assert "어느 지역이나 장소" in turn.reply_text
+    assert turn.reason == "context target required"
+
+
 def test_web_failure_fallback_does_not_substitute_public_data_candidates():
     reply = haruban._fallback_reply_from_tool_messages([
         {"role": "user", "content": "구좌에서 가장 맛집은?"},

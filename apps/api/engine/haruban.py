@@ -1676,6 +1676,62 @@ def _conversation_has_web_intent(conv: list[dict]) -> bool:
     )
 
 
+def _is_short_contextual_followup(text_in: str) -> bool:
+    normalized = text_in.strip()
+    return len(normalized) <= 40 and bool(re.search(
+        r"^(거기|거기는|거긴|그곳|그곳은|그거|그건|그중|그\s*중|왜|그러면|그럼)",
+        normalized,
+    ))
+
+
+def _resolve_web_research_query(
+    last_user: str,
+    conversation_state: dict | None = None,
+) -> str:
+    if not _is_short_contextual_followup(last_user):
+        return last_user
+    state = conversation_state or {}
+    context_parts: list[str] = []
+    prior_query = str(state.get("last_research_query") or state.get("last_user_question") or "").strip()
+    if prior_query:
+        context_parts.append(f"이전 질문: {prior_query[:200]}")
+    regions = list(state.get("active_regions") or [])[:8]
+    if regions:
+        context_parts.append("활성 지역: " + ", ".join(str(region) for region in regions))
+    place_names = list(state.get("active_place_names") or [])[:5]
+    if place_names:
+        context_parts.append("활성 후보: " + ", ".join(str(name) for name in place_names))
+    if not context_parts:
+        return last_user
+    return last_user + " (" + "; ".join(context_parts) + ")"
+
+
+def _try_context_clarification_answer(
+    messages_in: list[dict],
+    conversation_state: dict | None = None,
+) -> tuple[str, str] | None:
+    last_user = _latest_user_text(messages_in).strip()
+    if not _is_short_contextual_followup(last_user):
+        return None
+    state = conversation_state or {}
+    has_state_subject = bool(
+        state.get("last_research_query")
+        or state.get("last_user_question")
+        or state.get("active_regions")
+        or state.get("active_place_names")
+    )
+    prior_messages = [
+        message for message in messages_in[:-1]
+        if message.get("role") in {"user", "assistant"} and (message.get("content") or "").strip()
+    ]
+    if has_state_subject or prior_messages:
+        return None
+    return (
+        "말씀하신 대상이 아직 대화에 없어요. 어느 지역이나 장소를 가리키는지 알려주시면 웹 근거를 확인해 이어서 답할게요.",
+        "context target required",
+    )
+
+
 def _has_jeju_context(
     text_in: str,
     form_state: dict | None = None,
@@ -2130,7 +2186,11 @@ def _prepare_tool_args(name: str, args: dict, conv: list[dict], form_state: dict
     return prepared
 
 
-def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dict | None:
+def _build_search_pool_context(
+    messages_in: list[dict],
+    form_state: dict,
+    conversation_state: dict | None = None,
+) -> dict | None:
     conv = [
         {"role": m.get("role"), "content": m.get("content") or ""}
         for m in messages_in
@@ -2178,8 +2238,8 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
         return _pool_context("verify_review", args, result)
 
-    if _should_use_web_research(conv, form_state):
-        args = {"query": last_user}
+    if _should_use_web_research(conv, form_state, conversation_state):
+        args = {"query": _resolve_web_research_query(last_user, conversation_state)}
         filled = {k: v for k, v in (form_state or {}).items() if v not in (None, "", [], 0)}
         if filled:
             args["context"] = json.dumps(filled, ensure_ascii=False)
@@ -2655,6 +2715,7 @@ def chat_turn(
     form_state: dict,
     *,
     max_iterations: int = 3,
+    conversation_state: dict | None = None,
 ) -> HarubanTurn:
     """대화 한 턴. LLM이 도구 호출을 원하면 자동 실행 후 다음 회차로 넘어간다.
 
@@ -2669,6 +2730,14 @@ def chat_turn(
     routing_guardrail = _try_routing_guardrail_answer(messages_in)
     if routing_guardrail:
         reply_text, reason = routing_guardrail
+        return _finish_chat_turn(
+            started,
+            HarubanTurn(available=True, reply_text=reply_text, reason=reason),
+        )
+
+    context_clarification = _try_context_clarification_answer(messages_in, conversation_state)
+    if context_clarification:
+        reply_text, reason = context_clarification
         return _finish_chat_turn(
             started,
             HarubanTurn(available=True, reply_text=reply_text, reason=reason),
@@ -2718,7 +2787,7 @@ def chat_turn(
 
     system_prompt = _BASE_SYSTEM_PROMPT + _form_context_block(form_state)
     search_pool_started = perf_counter()
-    search_pool = _build_search_pool_context(messages_in, form_state)
+    search_pool = _build_search_pool_context(messages_in, form_state, conversation_state)
     logger.info(
         "haruban search_pool built tool=%s elapsed_ms=%.1f",
         (search_pool or {}).get("tool") or "none",
