@@ -1676,7 +1676,24 @@ def _conversation_has_web_intent(conv: list[dict]) -> bool:
     )
 
 
-def _should_use_web_research(conv: list[dict]) -> bool:
+def _has_jeju_context(
+    text_in: str,
+    form_state: dict | None = None,
+    conversation_state: dict | None = None,
+) -> bool:
+    if "제주" in text_in or _infer_regions_from_text(text_in, {}):
+        return True
+    if _infer_regions_from_text("", form_state):
+        return True
+    active_regions = (conversation_state or {}).get("active_regions") or []
+    return bool(active_regions)
+
+
+def _should_use_web_research(
+    conv: list[dict],
+    form_state: dict | None = None,
+    conversation_state: dict | None = None,
+) -> bool:
     last_user = _latest_user_text(conv)
     if _is_explicit_public_data_question(last_user):
         return False
@@ -1694,7 +1711,11 @@ def _should_use_web_research(conv: list[dict]) -> bool:
         r"그중|그\s*중|하나만|한\s*곳|다른\s*곳|또|그러면|그럼",
         last_user,
     ))
-    return recommendation or (contextual_followup and _conversation_has_web_intent(conv))
+    if recommendation or (contextual_followup and _conversation_has_web_intent(conv)):
+        return True
+    if _is_general_advice_text(last_user):
+        return False
+    return _has_jeju_context(last_user, form_state, conversation_state)
 
 
 def _infer_place_detail_query(conv: list[dict]) -> str:
@@ -1714,6 +1735,8 @@ def _infer_place_detail_query(conv: list[dict]) -> str:
         if key and key in normalized_user:
             return candidate
 
+    if _infer_regions_from_text(last_user, {}):
+        return ""
     if _is_general_advice_text(last_user) or _is_region_category_query(last_user):
         return ""
 
@@ -1799,6 +1822,31 @@ def _template_free_advice(last_user: str) -> str:
         "마지막 날은 공항 이동을 고려한 짧은 코스로 잡아보세요. "
         "지도에서 지역과 담고 싶은 순간을 고르면 확인된 후보만 근거와 함께 좁혀드릴게요."
     )
+
+
+def _try_routing_guardrail_answer(messages_in: list[dict]) -> tuple[str, str] | None:
+    last_user = _latest_user_text(messages_in).strip()
+    normalized = re.sub(r"[\s!?？！~.]+", "", last_user)
+    if re.fullmatch(r"(안녕|안녕하세요|하이|반가워|반갑습니다)", normalized):
+        return (
+            "안녕하세요. 제주 여행을 함께 조사하고 선택을 정리하는 하루방이에요. "
+            "궁금한 지역이나 장소, 일정 조건을 편하게 말씀해 주세요.",
+            "social greeting",
+        )
+
+    mentions_jeju = "제주" in last_user or bool(_infer_regions_from_text(last_user, {}))
+    outside_jeju = bool(re.search(
+        r"서울|부산|인천|대구|대전|광주|울산|경기|강원|전주|여수|해외|일본|중국|미국|유럽",
+        last_user,
+    ))
+    outside_travel_scope = bool(re.search(r"환율|주식|코인|코딩|프로그래밍|정치|연예", last_user))
+    if not mentions_jeju and (outside_jeju or outside_travel_scope):
+        return (
+            "하루방은 제주 여행 조사와 선택을 돕는 에이전트예요. "
+            "제주 지역, 장소, 일정, 맛집이나 이동에 관한 질문이라면 웹 근거를 확인해 도와드릴게요.",
+            "out of jeju scope",
+        )
+    return None
 
 
 def _is_specific_fact_or_search_question(text_in: str) -> bool:
@@ -2130,7 +2178,7 @@ def _build_search_pool_context(messages_in: list[dict], form_state: dict) -> dic
             result = {"claims": [], "error": f"{type(e).__name__}: {e}"}
         return _pool_context("verify_review", args, result)
 
-    if _should_use_web_research(conv):
+    if _should_use_web_research(conv, form_state):
         args = {"query": last_user}
         filled = {k: v for k, v in (form_state or {}).items() if v not in (None, "", [], 0)}
         if filled:
@@ -2618,6 +2666,14 @@ def chat_turn(
     직접 사용해 conv 배열 통째로 전달하고 도구 실행 루프를 돌린다. 모델·키 규칙은 유지.
     """
     started = perf_counter()
+    routing_guardrail = _try_routing_guardrail_answer(messages_in)
+    if routing_guardrail:
+        reply_text, reason = routing_guardrail
+        return _finish_chat_turn(
+            started,
+            HarubanTurn(available=True, reply_text=reply_text, reason=reason),
+        )
+
     general_reply = _try_general_question_answer(messages_in)
     if general_reply:
         return _finish_chat_turn(

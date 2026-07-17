@@ -4,6 +4,7 @@ from datetime import date
 from types import SimpleNamespace
 
 import openai
+import pytest
 
 from apps.api.engine import haruban
 
@@ -577,6 +578,71 @@ def test_haruban_routes_fresh_broad_question_to_web_search(monkeypatch):
     assert result["tool"] == "web_search_jeju"
     assert "요즘" in result["args"]["query"]
     assert result["result"]["sources"][0]["title"] == "Visit Jeju"
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "안덕 이름의 유래는?",
+        "안덕은 뭐 하는 데야?",
+        "안덕이 알려진 이유가 뭐야?",
+        "안덕 분위기를 설명해줘",
+    ],
+)
+def test_unfamiliar_jeju_fact_questions_default_to_web_research(monkeypatch, question):
+    captured = {}
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {
+            "available": True,
+            "query": args["query"],
+            "answer": "웹에서 확인했습니다.",
+            "sources": [],
+            "source_type": "web",
+        }
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+
+    pool = haruban._build_search_pool_context(
+        [{"role": "user", "content": question}],
+        {"regions": ["andeok"]},
+    )
+
+    assert pool["tool"] == "web_search_jeju"
+    assert captured["query"] == question
+
+
+def test_social_greeting_does_not_require_model_or_search(monkeypatch):
+    monkeypatch.setattr(haruban.llm, "is_available", lambda: False)
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda _args: (_ for _ in ()).throw(AssertionError("web search must not run")),
+    )
+
+    turn = haruban.chat_turn([{"role": "user", "content": "안녕"}], {})
+
+    assert turn.available is True
+    assert "하루방" in turn.reply_text
+    assert turn.reason == "social greeting"
+
+
+def test_clearly_non_jeju_question_returns_scope_answer_without_search(monkeypatch):
+    monkeypatch.setattr(
+        haruban,
+        "_run_web_search_jeju",
+        lambda _args: (_ for _ in ()).throw(AssertionError("web search must not run")),
+    )
+
+    turn = haruban.chat_turn(
+        [{"role": "user", "content": "서울 맛집 추천해줘"}],
+        {"regions": ["andeok"]},
+    )
+
+    assert turn.available is True
+    assert "제주 여행" in turn.reply_text
+    assert turn.reason == "out of jeju scope"
 
 
 def test_web_failure_fallback_does_not_substitute_public_data_candidates():
