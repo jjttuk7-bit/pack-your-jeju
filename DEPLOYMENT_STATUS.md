@@ -1,6 +1,6 @@
 # 배포 상태 및 로드맵
 
-> 마지막 업데이트: 2026-07-06
+> 마지막 업데이트: 2026-07-17
 > 이 문서는 프로덕션 배포의 현재 스냅샷과 다음 작업을 기록한다. 검증된 사실만 담고, 아직 안 한 것은 명시적으로 "남은 작업"에 둔다.
 
 ## 1. 현재 상태
@@ -40,7 +40,40 @@
 - 최근 결과: **12/12 통과, 3지표 모두 1.00** (verified_precision · fallback_accuracy · badge_accuracy)
 - 리포트: `data/eval-reports/eval-20260704-2200.{json,md}` (발표 캡처용)
 
-## 2. 이번 세션에서 처리한 것 (2026-07-06)
+## 2. 이번 세션에서 처리한 것 (2026-07-17)
+
+### 여행 날씨 의사결정 리포트 (배포 전 기능 브랜치)
+
+- `POST /weather/report`: 실제 플랜 지역만 최대 3개씩 병렬 조회하며 일부 지역 실패 시 확인된 지역 결과를 유지한다.
+- 기상청 시간별 예보를 오전·오후·저녁으로 집계하고 장소 유형별로 `suitable / prepare / adjust / official_check / unknown`을 판정한다.
+- 기상청 발표 회차와 여행 대상 예보 시각을 분리하고 `weather-travel-v1` 서비스 정책을 원본 예보와 구분한다.
+- 프론트는 Day·시간대·`시간 고정` 편집, 변경안 미리보기, 명시적 적용, 기존 일정 유지, 안전한 되돌리기를 제공한다.
+- 기존 `/pack.weather`는 compact fallback으로 유지하고 기상청 키·특정 지역 조회 장애가 플랜·후보·PDF 기능을 막지 않게 했다.
+- 이 항목은 기능 브랜치의 로컬 자동 검증 기준이다. 원격 푸시 후 Railway·Vercel 자동 배포와 프로덕션 스모크는 별도로 확인해야 한다.
+
+### 사용자 승인형 여행 동선 추천 (프로덕션 배포 완료)
+
+- `POST /route/plan`: Day별 현재·추천 순서와 구간별 시간·거리·geometry를 반환하며 시간 고정 일정을 이동하지 않는다.
+- 네이버 Directions로 확인한 구간은 `verified_route`, 직선거리 fallback은 `estimated_route`, 혼합 결과는 `mixed_route`로 분리한다. 서버 키 미설정·timeout·공급자 오류가 기존 플랜과 지도 기능을 막지 않는다.
+- 프론트는 자동차·대중교통·도보 선택, Day 탭, 번호 마커, 현재/추천 비교, 명시적 적용, 기존 순서 유지, 안전한 되돌리기를 제공한다.
+- 플랜에 숙소 좌표가 있으면 숙소 왕복, 없으면 첫 장소를 기준점이라고 표시한다. 입력되지 않은 숙소 좌표는 만들지 않는다.
+- 로컬 전체 검증: 백엔드 `275 passed, 15 skipped`, 프론트 Vitest `28 passed`, Node 회귀 `22 passed`, TypeScript 검사와 PWA 프로덕션 빌드 성공.
+- 화면 단위 지연 로딩 후 초기 주 chunk는 `769.36KB → 390.89KB`로 약 49% 감소했고 Vite 500KB 경고가 사라졌다. 하루방(198.50KB), 대시보드(102.82KB), PDF 편집기(14.56KB)는 사용 시점에 로드되는 독립 chunk다.
+- 2026-07-17 커밋 `479d5d2`를 원격 `main`에 fast-forward하고 Railway·Vercel 자동 배포를 확인했다.
+- Railway `/health` 200, `/openapi.json`의 `/route/plan` 노출, Vercel→Railway CORS 200을 확인했다. 프로덕션 동선 요청은 네이버 Directions 서버 인증이 없어 `route-travel-v1` 기반 `estimated_route`로 정직하게 fallback한다.
+- Vercel 진입 chunk는 390,887 bytes이며, `PackingDashboard` 지연 chunk에서 `내 여행 동선`과 `동선 추천받기` 문구를 확인했다. PWA manifest와 서비스 워커도 각각 200이다.
+
+### 제주 입체 지형 지도 (배포 전 기능 브랜치)
+
+- 기존 12개 행정구역 SVG 경로와 지역 근거 API 계약은 유지하면서 바다 수심, 해안광, 섬 그림자, 한라산 음영·등고선을 SVG 레이어로 추가했다.
+- 지역별 `확인 후보 있음 / 확인 필요 / 데이터 부족` 상태와 후보 수를 지도 안에 표시하고, 선택 지역은 경계를 움직이지 않는 주황 외곽광으로 구분한다.
+- 추자도·가파도·마라도는 포인터 입력과 접근성 트리에서 제외된 장식 레이어이며, 우도는 기존처럼 12개 선택 지역 중 하나로 유지된다.
+- 외부 지도 SDK·이미지·신규 런타임 의존성은 추가하지 않았다. 장식 레이어는 포인터 이벤트를 받지 않고, Enter·Space·포커스 표시·감소된 모션 설정을 보존한다.
+- 로컬 전체 검증: 프론트 Vitest **34 passed**, Node 회귀 **25 passed**, TypeScript 검사와 PWA 프로덕션 빌드 성공.
+- 2026-07-17 로컬 빌드 기준 초기 주 JavaScript chunk는 **390.89KB**(gzip 125.28KB), `TrustMapDashboard` 지연 chunk는 **37.60KB**(gzip 12.22KB)다. Vite 500KB 경고는 없다.
+- 이 항목은 `codex/terrain-map-visual` 기능 브랜치 검증 결과다. 원격 푸시·Vercel 프로덕션 배포·브라우저 스모크는 아직 수행하지 않았다.
+
+## 2-a. 이전 세션에서 처리한 것 (2026-07-06)
 
 ### 하루방 Phase D — 능동 인사 (`POST /agent/intro`)
 - 폼에서 `regions ≥ 1 AND moments ≥ 1` 최초 충족 시 하루방 위젯이 스스로 팝업 + 첫 인사.
@@ -144,6 +177,12 @@
 - `intro.llm_used: false` — Railway에 `OPENAI_API_KEY` 미설정, 템플릿 폴백 정상 동작. (CLAUDE.md 절대 규칙 6 준수)
 - `hygiene_grade: null` — 위생등급 CSV 미적재 상태 (P2). 상세 확장 UI는 이 필드 결측 시 라인 자체를 안 그림.
 - `amenities.phone` — 유의미한 값들이 실제로 등장. 상세 확장의 "연락처" 라인에 노출됨.
+
+### 3.3 프론트 번들 크기
+
+- 초기 랜딩에 필요하지 않은 여행 조건·대시보드·피드백·검증·하루방·PDF 편집기를 React lazy chunk로 분리했다.
+- 2026-07-17 로컬 프로덕션 빌드 기준 초기 주 JavaScript chunk는 390.89KB(gzip 125.28KB)이며 Vite 500KB 경고가 없다.
+- PWA 설치용 precache에는 재방문·오프라인 사용을 위해 지연 chunk도 포함된다. 첫 화면 렌더를 막지는 않지만, 저속 네트워크의 백그라운드 precache 비용은 후속 실측 대상으로 둔다.
 
 ## 4. 남은 작업 (우선순위)
 

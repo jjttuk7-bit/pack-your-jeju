@@ -112,7 +112,7 @@ def _hourly_forecast_values(
 }
 ```
 
-`parse_vilage_fcst_payload`의 기존 `forecast`, `daily_forecasts`, `summary`는 그대로 유지하고 `hourly_forecasts`만 추가한다.
+`parse_vilage_fcst_payload`의 기존 `forecast`, `daily_forecasts`, `summary`는 그대로 유지하고 `hourly_forecasts`만 추가한다. 예보 대상 시각인 `forecast_at`과 기상청 요청의 기준 발표 회차인 `source_issued_at`을 별도 필드로 보존한다. 기존 `issued_at_label`의 호환 의미는 바꾸지 않는다.
 
 ### Step 4: 회귀 테스트
 
@@ -474,7 +474,7 @@ class WeatherReportBody(BaseModel):
 5. 변경안 생성
 6. 전체 headline과 준비물 조립
 
-지역 호출은 초기에는 순차로 유지하되 호출 수를 실제 일정 지역으로 제한한다. 후속 성능 측정 후 제한된 병렬화한다.
+지역 호출은 실제 일정에 포함된 지역으로 제한하고 `ThreadPoolExecutor(max_workers=min(3, region_count))`로 제한 병렬 조회한다. 각 호출의 기존 8초 timeout은 유지하고, 한 지역의 실패가 다른 지역 결과를 취소하지 않게 한다.
 
 ### Step 4: 공개 날씨 호환 필드 추가
 

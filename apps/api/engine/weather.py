@@ -186,6 +186,21 @@ def _vilage_base_datetime(now: datetime | None = None) -> tuple[str, str]:
     return base_day.strftime("%Y%m%d"), f"{hour:02d}00"
 
 
+def _source_issue_metadata(base_date: str, base_time: str) -> dict[str, str]:
+    """Expose the KMA source cycle separately from a forecast target hour."""
+    issued_at = datetime.strptime(
+        f"{base_date}{base_time}",
+        "%Y%m%d%H%M",
+    ).replace(tzinfo=KST)
+    return {
+        "source_issued_at": issued_at.isoformat(),
+        "source_issued_at_label": (
+            f"{issued_at.year}년 {issued_at.month}월 {issued_at.day}일 "
+            f"{issued_at.hour:02d}시 발표"
+        ),
+    }
+
+
 def _first_forecast_values(
     items: list[dict[str, Any]],
     *,
@@ -253,6 +268,64 @@ def _forecast_values_by_day(
         )
         if values:
             forecasts.append(values)
+    return forecasts
+
+
+def _hourly_forecasts(
+    items: list[dict[str, Any]],
+    *,
+    target_start: date | None = None,
+    target_days: int = 1,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Preserve public hourly values for travel-day decision reporting."""
+    current_key = (now or datetime.now(KST)).astimezone(KST).strftime("%Y%m%d%H%M")
+    target_dates: set[str] = set()
+    if target_start:
+        days = max(1, min(target_days, 3))
+        target_dates = {
+            (target_start + timedelta(days=idx)).strftime("%Y%m%d")
+            for idx in range(days)
+        }
+
+    by_time: dict[str, dict[str, str]] = {}
+    for item in items:
+        fcst_date = str(item.get("fcstDate") or "")
+        fcst_time = str(item.get("fcstTime") or "")
+        category = str(item.get("category") or "")
+        value = str(item.get("fcstValue") or "")
+        if not fcst_date or not fcst_time or not category:
+            continue
+        if target_dates and fcst_date not in target_dates:
+            continue
+        key = f"{fcst_date}{fcst_time}"
+        if key < current_key:
+            continue
+        by_time.setdefault(key, {})[category] = value
+
+    forecasts: list[dict[str, Any]] = []
+    for key, values in sorted(by_time.items()):
+        if not any(category in values for category in ("SKY", "PTY", "POP", "TMP", "WSD", "REH")):
+            continue
+        pop = _safe_float(values.get("POP"))
+        tmp = _safe_float(values.get("TMP"))
+        wind = _safe_float(values.get("WSD"))
+        humidity = _safe_float(values.get("REH"))
+        forecasts.append(
+            {
+                "date": f"{key[:4]}-{key[4:6]}-{key[6:8]}",
+                "time": f"{key[8:10]}:{key[10:12]}",
+                "sky": SKY_LABELS.get(values.get("SKY", ""), "하늘상태 확인 중"),
+                "precipitation_type": PTY_LABELS.get(
+                    values.get("PTY", ""),
+                    "강수형태 확인 중",
+                ),
+                "precipitation_probability": int(pop) if pop is not None else None,
+                "temperature": tmp,
+                "wind_speed": wind,
+                "humidity": int(humidity) if humidity is not None else None,
+            }
+        )
     return forecasts
 
 
@@ -366,6 +439,11 @@ def parse_vilage_fcst_payload(
             target_days=target_days,
         )
     ]
+    hourly_forecasts = _hourly_forecasts(
+        items,
+        target_start=target_start,
+        target_days=target_days,
+    )
     if not daily_forecasts:
         target_label = f"{target_start.isoformat()}부터 {target_days}일" if target_start else "현재 이후"
         return {
@@ -406,11 +484,19 @@ def parse_vilage_fcst_payload(
         "region": region,
         "forecast": primary.get("forecast"),
         "daily_forecasts": daily_forecasts,
+        "hourly_forecasts": hourly_forecasts,
     }
 
 
-def _build_vilage_url(key: str, *, region: str) -> str:
-    base_date, base_time = _vilage_base_datetime()
+def _build_vilage_url(
+    key: str,
+    *,
+    region: str,
+    base_date: str | None = None,
+    base_time: str | None = None,
+) -> str:
+    if base_date is None or base_time is None:
+        base_date, base_time = _vilage_base_datetime()
     nx, ny = JEJU_GRID.get(region, JEJU_GRID["jeju_city"])
     params = {
         "pageNo": "1",
@@ -433,7 +519,13 @@ def _fetch_vilage_fcst(
     target_start: date | None = None,
     target_days: int = 1,
 ) -> dict[str, Any]:
-    url = _build_vilage_url(key, region=region)
+    base_date, base_time = _vilage_base_datetime()
+    url = _build_vilage_url(
+        key,
+        region=region,
+        base_date=base_date,
+        base_time=base_time,
+    )
     req = Request(url, headers={"User-Agent": "pack-your-jeju/0.1"})
     try:
         with urlopen(req, timeout=8) as resp:
@@ -482,6 +574,7 @@ def _fetch_vilage_fcst(
             "key_env": key_name,
             "http_status": status,
             "source": "data.go.kr getVilageFcst",
+            **_source_issue_metadata(base_date, base_time),
         }
     )
     return parsed

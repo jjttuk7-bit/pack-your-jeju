@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
-from apps.api.engine.weather import parse_kma_api_hub_forecast, parse_vilage_fcst_payload
+from apps.api.engine.weather import (
+    KST,
+    _source_issue_metadata,
+    parse_kma_api_hub_forecast,
+    parse_vilage_fcst_payload,
+)
 
 
 def test_parse_kma_api_hub_forecast_extracts_weather_signals():
@@ -165,3 +170,48 @@ def test_parse_vilage_fcst_payload_returns_daily_trip_forecasts():
     ]
     assert "7월 10일" in parsed["summary"]
     assert "비 예보" in parsed["labels"]
+
+
+def test_parse_vilage_forecast_preserves_hourly_values():
+    payload = {
+        "response": {
+            "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+            "body": {
+                "items": {
+                    "item": [
+                        {"fcstDate": "20990720", "fcstTime": "0900", "category": "SKY", "fcstValue": "3"},
+                        {"fcstDate": "20990720", "fcstTime": "0900", "category": "PTY", "fcstValue": "1"},
+                        {"fcstDate": "20990720", "fcstTime": "0900", "category": "POP", "fcstValue": "70"},
+                        {"fcstDate": "20990720", "fcstTime": "0900", "category": "TMP", "fcstValue": "24"},
+                        {"fcstDate": "20990720", "fcstTime": "0900", "category": "WSD", "fcstValue": "5.2"},
+                        {"fcstDate": "20990720", "fcstTime": "1500", "category": "SKY", "fcstValue": "1"},
+                        {"fcstDate": "20990720", "fcstTime": "1500", "category": "PTY", "fcstValue": "0"},
+                        {"fcstDate": "20990720", "fcstTime": "1500", "category": "POP", "fcstValue": "20"},
+                        {"fcstDate": "20990720", "fcstTime": "1500", "category": "TMP", "fcstValue": "28"},
+                        {"fcstDate": "20990720", "fcstTime": "1500", "category": "WSD", "fcstValue": "2.1"},
+                    ]
+                }
+            },
+        }
+    }
+
+    parsed = parse_vilage_fcst_payload(
+        payload,
+        region="seongsan",
+        target_start=date(2099, 7, 20),
+        target_days=1,
+    )
+
+    assert [row["time"] for row in parsed["hourly_forecasts"]] == ["09:00", "15:00"]
+    assert parsed["hourly_forecasts"][0]["precipitation_probability"] == 70
+    assert parsed["hourly_forecasts"][0]["precipitation_type"] == "비"
+    assert parsed["hourly_forecasts"][1]["wind_speed"] == 2.1
+
+
+def test_source_issue_metadata_is_distinct_from_forecast_target_time():
+    metadata = _source_issue_metadata("20260719", "0500")
+
+    assert metadata == {
+        "source_issued_at": datetime(2026, 7, 19, 5, tzinfo=KST).isoformat(),
+        "source_issued_at_label": "2026년 7월 19일 05시 발표",
+    }

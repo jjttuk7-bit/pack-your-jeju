@@ -15,6 +15,10 @@ import type {
   VisitSignalResponse,
   VisitCheckStatus,
   VerifyResponse,
+  WeatherReportRequest,
+  WeatherReportResponse,
+  RoutePlanRequest,
+  RoutePlanResponse,
 } from './types';
 
 // 로컬 dev 기본값은 127.0.0.1로 고정 (Windows에서 localhost는 IPv6로 해석되어
@@ -93,6 +97,52 @@ export function requestRegionCoveragePreview(
   return get<RegionCoveragePreview>(
     `/region/coverage-preview?region=${encodeURIComponent(region)}`,
   );
+}
+
+export function requestWeatherReport(
+  request: WeatherReportRequest,
+): Promise<WeatherReportResponse> {
+  return post<WeatherReportResponse>('/weather/report', {
+    start_date: request.startDate,
+    days: request.days,
+    regions: request.regions,
+    items: request.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      day: item.day,
+      date: item.date,
+      daypart: item.daypart,
+      start_time: item.startTime ?? null,
+      duration_minutes: item.durationMinutes ?? null,
+      region: item.region,
+      moment: item.moment,
+      fixed: item.fixed,
+      reservation_note: item.reservationNote ?? null,
+    })),
+    dismissed_proposal_fingerprints: request.dismissedProposalFingerprints,
+  });
+}
+
+export function requestRoutePlan(
+  request: RoutePlanRequest,
+): Promise<RoutePlanResponse> {
+  return post<RoutePlanResponse>('/route/plan', {
+    mode: request.mode,
+    origin: request.origin,
+    destination: request.destination,
+    items: request.items.map((item) => ({
+      id: item.id,
+      label: item.label,
+      lat: item.lat,
+      lng: item.lng,
+      day: item.day,
+      daypart: item.daypart,
+      fixed: item.fixed,
+      weather_status: item.weatherStatus ?? null,
+      operating_check_required: item.operatingCheckRequired ?? false,
+    })),
+    dismissed_proposal_fingerprints: request.dismissedProposalFingerprints,
+  });
 }
 
 // 여행플랜 PDF 다운로드 — 서버가 조립한 pdf를 그대로 받아 브라우저 다운로드.

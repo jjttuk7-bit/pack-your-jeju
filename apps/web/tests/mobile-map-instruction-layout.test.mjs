@@ -32,3 +32,9 @@ test('desktop map instruction preserves the existing overlay from the sm breakpo
   assert.ok(classes.includes('hidden'));
   assert.ok(classes.includes('sm:block'));
 });
+
+test('terrain decoration never intercepts input and region motion respects user preference', () => {
+  assert.match(source, /data-testid="jeju-sea-layer"/);
+  assert.match(source, /pointerEvents="none"/);
+  assert.match(source, /motion-reduce:transition-none/);
+});

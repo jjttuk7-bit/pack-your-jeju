@@ -1,17 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquareText, ShieldCheck, Home } from 'lucide-react';
-import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus } from './types';
-import PackingDashboard from './components/PackingDashboard';
-import VerifyPage from './components/VerifyPage';
-import TravelFeedback from './components/TravelFeedback';
-import HarubanChat from './components/HarubanChat';
+import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus, WeatherChangeProposal, RouteChangeProposal } from './types';
 import LandingPage from './components/LandingPage';
-import TrustMapDashboard from './components/TrustMapDashboard';
 import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import { MOMENTS, REGIONS } from './data';
 import { normalizeTripStartDate, todayInJeju } from './date';
+import {
+  applyWeatherProposal,
+  planFingerprint,
+  schedulePlanItemsForWeather,
+  undoWeatherProposal,
+} from './weatherProposal';
+import {applyRouteProposal, undoRouteProposal} from './routeProposal';
+
+const PackingDashboard = lazy(() => import('./components/PackingDashboard'));
+const VerifyPage = lazy(() => import('./components/VerifyPage'));
+const TravelFeedback = lazy(() => import('./components/TravelFeedback'));
+const HarubanChat = lazy(() => import('./components/HarubanChat'));
+const TrustMapDashboard = lazy(() => import('./components/TrustMapDashboard'));
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
@@ -35,6 +43,12 @@ const defaultState: SavedTravel = {
   customMemories: [],
   selectedPlanItems: [],
   visitChecks: {},
+  weatherDismissedFingerprints: [],
+  weatherUndo: null,
+  weatherActionMessage: null,
+  routeDismissedFingerprints: [],
+  routeUndo: null,
+  routeActionMessage: null,
 };
 
 function createFreshState(): SavedTravel {
@@ -54,12 +68,18 @@ function createFreshState(): SavedTravel {
     customMemories: [],
     selectedPlanItems: [],
     visitChecks: {},
+    weatherDismissedFingerprints: [],
+    weatherUndo: null,
+    weatherActionMessage: null,
+    routeDismissedFingerprints: [],
+    routeUndo: null,
+    routeActionMessage: null,
   };
 }
 
 // legacy 상태(단일 region)에서 다중 regions로 마이그레이션.
 // 이전 앱 사용자의 localStorage에는 info.region이 문자열로 저장돼 있을 수 있다.
-function migrateSavedTravel(saved: any): SavedTravel {
+export function migrateSavedTravel(saved: any): SavedTravel {
   if (!saved || typeof saved !== 'object') return createFreshState();
   const info = saved.info ?? {};
   const validRegions = new Set(REGIONS.map((region) => region.value));
@@ -81,19 +101,24 @@ function migrateSavedTravel(saved: any): SavedTravel {
   if (!Array.isArray(info.regions)) {
     delete info.region;
   }
+  const migratedInfo: TravelInfo = {
+    ...defaultState.info,
+    ...info,
+    regions,
+    startDate: normalizeTripStartDate(info.startDate),
+    durationDays:
+      typeof info.durationDays === 'number' && Number.isFinite(info.durationDays) && info.durationDays > 0
+        ? info.durationDays
+        : defaultState.info.durationDays,
+  };
+  const selectedPlanItems = schedulePlanItemsForWeather(
+    migratedInfo,
+    Array.isArray(saved.selectedPlanItems) ? saved.selectedPlanItems : [],
+  );
   return {
     ...defaultState,
     ...saved,
-    info: {
-      ...defaultState.info,
-      ...info,
-      regions,
-      startDate: normalizeTripStartDate(info.startDate),
-      durationDays:
-        typeof info.durationDays === 'number' && Number.isFinite(info.durationDays) && info.durationDays > 0
-          ? info.durationDays
-          : defaultState.info.durationDays,
-    },
+    info: migratedInfo,
     selectedMomentIds,
     checkedItemIds: Array.isArray(saved.checkedItemIds) ? saved.checkedItemIds : [],
     checkedMemoryIds: Array.isArray(saved.checkedMemoryIds) ? saved.checkedMemoryIds : [],
@@ -103,11 +128,33 @@ function migrateSavedTravel(saved: any): SavedTravel {
         ? saved.customMomentItems
         : defaultState.customMomentItems,
     customMemories: Array.isArray(saved.customMemories) ? saved.customMemories : [],
-    selectedPlanItems: Array.isArray(saved.selectedPlanItems) ? saved.selectedPlanItems : [],
+    selectedPlanItems,
     visitChecks:
       saved.visitChecks && typeof saved.visitChecks === 'object'
         ? saved.visitChecks
         : {},
+    weatherDismissedFingerprints: Array.isArray(saved.weatherDismissedFingerprints)
+      ? saved.weatherDismissedFingerprints.filter((value: unknown) => typeof value === 'string')
+      : [],
+    weatherUndo:
+      saved.weatherUndo && typeof saved.weatherUndo === 'object'
+        ? saved.weatherUndo
+        : null,
+    weatherActionMessage:
+      typeof saved.weatherActionMessage === 'string'
+        ? saved.weatherActionMessage
+        : null,
+    routeDismissedFingerprints: Array.isArray(saved.routeDismissedFingerprints)
+      ? saved.routeDismissedFingerprints.filter((value: unknown) => typeof value === 'string')
+      : [],
+    routeUndo:
+      saved.routeUndo && typeof saved.routeUndo === 'object'
+        ? saved.routeUndo
+        : null,
+    routeActionMessage:
+      typeof saved.routeActionMessage === 'string'
+        ? saved.routeActionMessage
+        : null,
     step,
   };
 }
@@ -192,6 +239,11 @@ export default function App() {
       ...prev,
       info,
       selectedMomentIds: selectedMoments,
+      selectedPlanItems: schedulePlanItemsForWeather(info, prev.selectedPlanItems || []),
+      weatherUndo: null,
+      weatherActionMessage: null,
+      routeUndo: null,
+      routeActionMessage: null,
       step: 'dashboard'
     }));
   };
@@ -205,11 +257,19 @@ export default function App() {
     infoPatch: Partial<TravelInfo>,
     selectedMoments: MomentId[] | null,
   ) => {
-    setState(prev => ({
-      ...prev,
-      info: { ...prev.info, ...infoPatch },
-      selectedMomentIds: selectedMoments ?? prev.selectedMomentIds,
-    }));
+    setState(prev => {
+      const info = { ...prev.info, ...infoPatch };
+      return {
+        ...prev,
+        info,
+        selectedPlanItems: schedulePlanItemsForWeather(info, prev.selectedPlanItems || []),
+        selectedMomentIds: selectedMoments ?? prev.selectedMomentIds,
+        weatherUndo: null,
+        weatherActionMessage: null,
+        routeUndo: null,
+        routeActionMessage: null,
+      };
+    });
   };
 
   const handleToggleItem = (itemId: string) => {
@@ -293,11 +353,16 @@ export default function App() {
     setState(prev => {
       const current = prev.selectedPlanItems || [];
       const exists = current.some(planItem => planItem.id === item.id);
+      const selectedPlanItems = exists
+        ? current.filter(planItem => planItem.id !== item.id)
+        : schedulePlanItemsForWeather(prev.info, [...current, item]);
       return {
         ...prev,
-        selectedPlanItems: exists
-          ? current.filter(planItem => planItem.id !== item.id)
-          : [...current, item],
+        selectedPlanItems,
+        weatherUndo: null,
+        weatherActionMessage: null,
+        routeUndo: null,
+        routeActionMessage: null,
       };
     });
   };
@@ -308,7 +373,11 @@ export default function App() {
       if (current.some(planItem => planItem.id === item.id)) return prev;
       return {
         ...prev,
-        selectedPlanItems: [...current, item],
+        selectedPlanItems: schedulePlanItemsForWeather(prev.info, [...current, item]),
+        weatherUndo: null,
+        weatherActionMessage: null,
+        routeUndo: null,
+        routeActionMessage: null,
       };
     });
   };
@@ -317,10 +386,149 @@ export default function App() {
     setState(prev => ({
       ...prev,
       selectedPlanItems: (prev.selectedPlanItems || []).filter(item => item.id !== itemId),
+      weatherUndo: null,
+      weatherActionMessage: null,
+      routeUndo: null,
+      routeActionMessage: null,
       visitChecks: Object.fromEntries(
         Object.entries(prev.visitChecks || {}).filter(([id]) => id !== itemId),
       ),
     }));
+  };
+
+  const handleUpdatePlanSchedule = (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => {
+    setState(prev => {
+      const updated = (prev.selectedPlanItems || []).map((item) => {
+        if (item.id !== itemId) return item;
+        return {
+          ...item,
+          ...patch,
+          date: patch.day !== undefined && patch.day !== item.day ? null : item.date,
+        };
+      });
+      return {
+        ...prev,
+        selectedPlanItems: schedulePlanItemsForWeather(prev.info, updated),
+        weatherUndo: null,
+        weatherActionMessage: '일정 시간을 직접 수정했습니다.',
+        routeUndo: null,
+        routeActionMessage: '일정을 직접 수정했습니다. 동선을 다시 계산해 주세요.',
+      };
+    });
+  };
+
+  const handleApplyWeatherProposal = (proposal: WeatherChangeProposal) => {
+    setState(prev => {
+      const items = schedulePlanItemsForWeather(prev.info, prev.selectedPlanItems || []);
+      const result = applyWeatherProposal(items, proposal);
+      if (!result.ok) {
+        return {
+          ...prev,
+          weatherUndo: null,
+          weatherActionMessage: result.reason || '변경안을 적용하지 못했습니다.',
+        };
+      }
+      return {
+        ...prev,
+        selectedPlanItems: result.items,
+        weatherUndo: result.undo ?? null,
+        weatherActionMessage: '날씨 변경안을 플랜에 반영했습니다.',
+        routeUndo: null,
+        routeActionMessage: '날씨 변경으로 일정이 달라졌습니다. 동선을 다시 계산해 주세요.',
+      };
+    });
+  };
+
+  const handleDismissWeatherProposal = (proposal: WeatherChangeProposal) => {
+    setState(prev => ({
+      ...prev,
+      weatherDismissedFingerprints: Array.from(new Set([
+        ...(prev.weatherDismissedFingerprints || []),
+        proposal.fingerprint,
+      ])),
+      weatherActionMessage: '현재 일정을 유지했습니다. 같은 예보에서는 이 제안을 다시 띄우지 않습니다.',
+    }));
+  };
+
+  const handleUndoWeatherProposal = () => {
+    setState(prev => {
+      const undo = prev.weatherUndo;
+      const items = prev.selectedPlanItems || [];
+      if (!undo) return prev;
+      if (planFingerprint(items) !== undo.appliedPlanFingerprint) {
+        return {
+          ...prev,
+          weatherUndo: null,
+          weatherActionMessage: '이후 직접 수정한 일정이 있어 되돌리기를 적용하지 않았습니다.',
+        };
+      }
+      return {
+        ...prev,
+        selectedPlanItems: undoWeatherProposal(items, undo),
+        weatherUndo: null,
+        weatherActionMessage: '날씨 변경 전 일정으로 되돌렸습니다.',
+        routeUndo: null,
+        routeActionMessage: '일정이 달라졌습니다. 동선을 다시 계산해 주세요.',
+      };
+    });
+  };
+
+  const handleApplyRouteProposal = (proposal: RouteChangeProposal) => {
+    setState(prev => {
+      const items = schedulePlanItemsForWeather(prev.info, prev.selectedPlanItems || []);
+      const result = applyRouteProposal(items, proposal);
+      if (!result.ok) {
+        return {
+          ...prev,
+          routeUndo: null,
+          routeActionMessage: result.reason || '동선 변경안을 적용하지 못했습니다.',
+        };
+      }
+      return {
+        ...prev,
+        selectedPlanItems: result.items,
+        routeUndo: result.undo ?? null,
+        routeActionMessage: '추천 동선을 플랜에 반영했습니다.',
+        weatherUndo: null,
+        weatherActionMessage: null,
+      };
+    });
+  };
+
+  const handleDismissRouteProposal = (proposal: RouteChangeProposal) => {
+    setState(prev => ({
+      ...prev,
+      routeDismissedFingerprints: Array.from(new Set([
+        ...(prev.routeDismissedFingerprints || []),
+        proposal.fingerprint,
+      ])),
+      routeActionMessage: '현재 순서를 유지했습니다. 플랜이 달라지면 다시 동선을 계산할 수 있습니다.',
+    }));
+  };
+
+  const handleUndoRouteProposal = () => {
+    setState(prev => {
+      const undo = prev.routeUndo;
+      const items = prev.selectedPlanItems || [];
+      if (!undo) return prev;
+      const result = undoRouteProposal(items, undo);
+      if (!result.ok) {
+        return {
+          ...prev,
+          routeUndo: null,
+          routeActionMessage: result.reason || '동선 변경 전 순서로 되돌리지 못했습니다.',
+        };
+      }
+      return {
+        ...prev,
+        selectedPlanItems: result.items,
+        routeUndo: null,
+        routeActionMessage: '동선 변경 전 순서로 되돌렸습니다.',
+      };
+    });
   };
 
   const handleSetVisitCheck = (
@@ -494,11 +702,13 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <TrustMapDashboard
-                  onSubmit={handleFormSubmit}
-                  initialInfo={state.info.regions?.length ? state.info : undefined}
-                  initialMoments={state.selectedMomentIds}
-                />
+                <Suspense fallback={<ViewLoadingFallback label="여행 조건 화면" />}>
+                  <TrustMapDashboard
+                    onSubmit={handleFormSubmit}
+                    initialInfo={state.info.regions?.length ? state.info : undefined}
+                    initialMoments={state.selectedMomentIds}
+                  />
+                </Suspense>
               </motion.div>
             )}
             {state.step === 'dashboard' && (
@@ -510,36 +720,53 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <PackingDashboard
-                  info={state.info}
-                  selectedMomentIds={state.selectedMomentIds}
-                  checkedItemIds={state.checkedItemIds}
-                  checkedMemoryIds={state.checkedMemoryIds}
-                  customBasicItems={state.customBasicItems}
-                  customMomentItems={state.customMomentItems}
-                  customMemories={state.customMemories || []}
-                  selectedPlanItems={state.selectedPlanItems || []}
-                  visitChecks={state.visitChecks || {}}
-                  onToggleItem={handleToggleItem}
-                  onToggleMemory={handleToggleMemory}
-                  onAddCustomBasic={handleAddCustomBasic}
-                  onRemoveCustomBasic={handleRemoveCustomBasic}
-                  onAddCustomMomentItem={handleAddCustomMomentItem}
-                  onRemoveCustomMomentItem={handleRemoveCustomMomentItem}
-                  onAddCustomMemory={handleAddCustomMemory}
-                  onRemoveCustomMemory={handleRemoveCustomMemory}
-                  onTogglePlanItem={handleTogglePlanItem}
-                  onAddCustomPlanItem={handleAddCustomPlanItem}
-                  onRemovePlanItem={handleRemovePlanItem}
-                  onSetVisitCheck={handleSetVisitCheck}
-                  onOpenFeedback={goToFeedback}
-                  onReset={handleReset}
-                />
+                <Suspense fallback={<ViewLoadingFallback label="여행 플랜" />}>
+                  <PackingDashboard
+                    info={state.info}
+                    selectedMomentIds={state.selectedMomentIds}
+                    checkedItemIds={state.checkedItemIds}
+                    checkedMemoryIds={state.checkedMemoryIds}
+                    customBasicItems={state.customBasicItems}
+                    customMomentItems={state.customMomentItems}
+                    customMemories={state.customMemories || []}
+                    selectedPlanItems={state.selectedPlanItems || []}
+                    visitChecks={state.visitChecks || {}}
+                    weatherDismissedFingerprints={state.weatherDismissedFingerprints || []}
+                    weatherUndoAvailable={Boolean(state.weatherUndo)}
+                    weatherActionMessage={state.weatherActionMessage || null}
+                    routeDismissedFingerprints={state.routeDismissedFingerprints || []}
+                    routeUndoAvailable={Boolean(state.routeUndo)}
+                    routeActionMessage={state.routeActionMessage || null}
+                    onToggleItem={handleToggleItem}
+                    onToggleMemory={handleToggleMemory}
+                    onAddCustomBasic={handleAddCustomBasic}
+                    onRemoveCustomBasic={handleRemoveCustomBasic}
+                    onAddCustomMomentItem={handleAddCustomMomentItem}
+                    onRemoveCustomMomentItem={handleRemoveCustomMomentItem}
+                    onAddCustomMemory={handleAddCustomMemory}
+                    onRemoveCustomMemory={handleRemoveCustomMemory}
+                    onTogglePlanItem={handleTogglePlanItem}
+                    onAddCustomPlanItem={handleAddCustomPlanItem}
+                    onRemovePlanItem={handleRemovePlanItem}
+                    onUpdatePlanSchedule={handleUpdatePlanSchedule}
+                    onApplyWeatherProposal={handleApplyWeatherProposal}
+                    onDismissWeatherProposal={handleDismissWeatherProposal}
+                    onUndoWeatherProposal={handleUndoWeatherProposal}
+                    onApplyRouteProposal={handleApplyRouteProposal}
+                    onDismissRouteProposal={handleDismissRouteProposal}
+                    onUndoRouteProposal={handleUndoRouteProposal}
+                    onSetVisitCheck={handleSetVisitCheck}
+                    onOpenFeedback={goToFeedback}
+                    onReset={handleReset}
+                  />
+                </Suspense>
               </motion.div>
             )}
             {state.step === 'feedback' && (
               <motion.div key="feedback-view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }} className="w-full">
-                <TravelFeedback info={state.info} planItems={state.selectedPlanItems || []} visitChecks={state.visitChecks || {}} onSetVisitCheck={handleSetVisitCheck} onOpenPlan={goToDashboard} />
+                <Suspense fallback={<ViewLoadingFallback label="여행 피드백" />}>
+                  <TravelFeedback info={state.info} planItems={state.selectedPlanItems || []} visitChecks={state.visitChecks || {}} onSetVisitCheck={handleSetVisitCheck} onOpenPlan={goToDashboard} />
+                </Suspense>
               </motion.div>
             )}
             {state.step === 'verify' && (
@@ -551,7 +778,9 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <VerifyPage />
+                <Suspense fallback={<ViewLoadingFallback label="리뷰 검증" />}>
+                  <VerifyPage />
+                </Suspense>
               </motion.div>
             )}
           </AnimatePresence>
@@ -615,18 +844,32 @@ export default function App() {
 
       {/* 하루방 챗 위젯 — 우측 하단 상주. verify 페이지에서는 숨김 (검증 시연 화면 방해 방지). */}
       {state.step !== 'verify' && (
-        <HarubanChat
-          key={`haruban-${harubanSessionKey}`}
-          info={state.info}
-          selectedMomentIds={state.selectedMomentIds}
-          selectedPlanItems={state.selectedPlanItems || []}
-          visitChecks={state.visitChecks || {}}
-          onApplySuggestion={handleHarubanApply}
-          onAddPlanItem={handleAddCustomPlanItem}
-          onOpenVerify={goToVerify}
-        />
+        <Suspense fallback={null}>
+          <HarubanChat
+            key={`haruban-${harubanSessionKey}`}
+            info={state.info}
+            selectedMomentIds={state.selectedMomentIds}
+            selectedPlanItems={state.selectedPlanItems || []}
+            visitChecks={state.visitChecks || {}}
+            onApplySuggestion={handleHarubanApply}
+            onAddPlanItem={handleAddCustomPlanItem}
+            onOpenVerify={goToVerify}
+          />
+        </Suspense>
       )}
 
+    </div>
+  );
+}
+
+function ViewLoadingFallback({label}: {label: string}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-56 items-center justify-center rounded-[28px] border border-orange-100/70 bg-white/80 px-6 text-center shadow-pyj-card"
+    >
+      <p className="font-serif-kr text-[14px] font-bold text-basalt-2">{label}을 준비하고 있어요…</p>
     </div>
   );
 }
