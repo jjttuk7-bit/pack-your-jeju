@@ -633,12 +633,12 @@ export default function PackingDashboard(props: Props) {
           <h2 className="text-[15px] font-bold text-stone-900 tracking-tight">이번 제주 여행</h2>
           <button
             onClick={onReset}
-            className="text-[10.5px] font-semibold text-stone-500 hover:text-stone-900 inline-flex items-center gap-1 transition"
+            className="pyj-supporting-text inline-flex items-center gap-1 font-semibold transition hover:text-stone-900"
           >
             <RotateCcw className="w-3 h-3" /> 다시 세우기
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px] text-stone-700">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px] text-stone-700">
           <SummaryLine icon={<MapPin className="w-3.5 h-3.5" />} label={regionLabel} />
           <SummaryLine
             icon={<Calendar className="w-3.5 h-3.5" />}
@@ -1112,7 +1112,7 @@ function CandidateWorkbenchHeader({
           <h2 className="mt-1 font-serif-kr text-[25px] font-bold leading-tight text-basalt">
             후보를 고르고, 근거를 확인하고, 플랜에 담습니다.
           </h2>
-          <p className="mt-1.5 max-w-2xl text-[11.5px] leading-relaxed text-basalt-2">
+          <p className="pyj-supporting-text mt-1.5 max-w-2xl">
             장소명과 주소는 조회된 데이터만 사용하고, 날씨·이동·수정요청 신호는 카드 안에서 확인 필요 항목으로 분리합니다.
           </p>
         </div>
@@ -2617,7 +2617,7 @@ function ItineraryItemRow({
   const moment = MOMENTS.find((m) => m.id === it.moment);
   const momentTitle = moment?.title ?? String(it.moment);
   const momentHeader = (
-    <div className="flex items-center gap-1.5 text-[10px] text-orange-700/80 font-semibold uppercase tracking-wider mb-0.5">
+    <div className="mb-0.5 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-[#2E6D61]">
       {moment && <MomentIcon id={moment.id as any} className="w-3.5 h-3.5" />}
       <span>{momentTitle}</span>
     </div>
@@ -2690,7 +2690,7 @@ function PackItemCard({
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {typeof it.trust_score === 'number' && (
-              <span className="rounded-full border border-earth bg-white px-2 py-0.5 text-[10px] font-bold text-basalt">
+              <span className="rounded-full border border-mint/35 bg-mint/10 px-2 py-0.5 text-[11px] font-bold text-[#275E53]">
                 신뢰 {it.trust_score}
               </span>
             )}
@@ -2722,7 +2722,7 @@ function PackItemCard({
             </span>
           )}
           {!open && (
-            <span className="ml-auto text-[10px] text-citrus-2/80 font-semibold">
+            <span className="ml-auto text-[11px] font-semibold text-[#2E6D61]">
               자세히 보기 →
             </span>
           )}

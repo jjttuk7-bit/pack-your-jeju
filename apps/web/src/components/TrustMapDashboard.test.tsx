@@ -78,6 +78,7 @@ describe('TrustMapDashboard terrain map', () => {
     expect(await screen.findByTestId('jeju-sea-layer')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByTestId('jeju-coast-layer')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByTestId('hallasan-terrain-layer')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('담습니다.')).toHaveClass('whitespace-nowrap');
     expect(screen.getAllByRole('button', {name: /근거 보기/})).toHaveLength(12);
   });
 
@@ -134,6 +135,19 @@ describe('TrustMapDashboard terrain map', () => {
 
     await screen.findByRole('button', {name: '제주시 근거 보기'});
     expect(screen.getByText('중앙 음영은 지형 표현')).toBeVisible();
+    expect(screen.getByText('확인 후보 있음').closest('[data-visual-role]')).toHaveAttribute(
+      'data-visual-role',
+      'verified',
+    );
+    expect(screen.getByText('확인 필요').closest('[data-visual-role]')).toHaveAttribute(
+      'data-visual-role',
+      'caution',
+    );
+    expect(screen.getByText('데이터 부족').closest('[data-visual-role]')).toHaveAttribute(
+      'data-visual-role',
+      'neutral',
+    );
+    expect(screen.getByTestId('mobile-map-instruction')).toHaveClass('pyj-supporting-text');
   });
 
   it('keeps the surrounding islands decorative and out of the region button count', async () => {

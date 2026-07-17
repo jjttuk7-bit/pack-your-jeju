@@ -197,6 +197,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     <button
                       type="button"
                       onClick={enterApp}
+                      data-visual-role="text"
                       className="mt-9 inline-flex min-h-12 items-center gap-2 border-b border-[#3E4641] pb-1 text-[14px] font-bold text-[#303733] transition hover:border-[#B14E2D] hover:text-[#B14E2D] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B14E2D]"
                     >
                       나만의 제주 시작하기
@@ -277,7 +278,8 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     <button
                       type="button"
                       onClick={enterApp}
-                      className="inline-flex min-h-12 w-fit items-center gap-2 bg-white px-5 text-[13px] font-bold text-[#17453F] transition hover:bg-[#F2A36D] hover:text-[#25292C] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+                      data-visual-role="secondary"
+                      className="pyj-action-secondary-on-dark inline-flex min-h-12 w-fit items-center gap-2 px-5 text-[13px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                     >
                       나만의 제주를 담아보기
                       <ArrowRight className="h-4 w-4" />
@@ -324,7 +326,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 </div>
 
                 <div className="mt-10 flex justify-center">
-                  <PrimaryButton onClick={enterApp} label="내 제주 여행 만들기" />
+                  <PrimaryButton onClick={enterApp} label="내 제주 여행 만들기" visualRole="secondary" />
                 </div>
               </div>
             </section>
@@ -342,9 +344,9 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                 <div className="flex items-center px-6 py-16 sm:px-12 lg:px-16 xl:px-24">
                   <div className="max-w-xl">
                     <p className="text-[11px] font-bold tracking-[0.2em] text-[#F2A36D]">하루방과 함께</p>
-                    <h2 className="mt-5 font-serif-kr text-[38px] font-bold leading-[1.16] sm:text-[48px]">
+                    <h2 className="mt-5 max-w-[13ch] font-serif-kr text-[clamp(2.25rem,3.35vw,3rem)] font-bold leading-[1.16]">
                       검색은 덜 하고,
-                      <br />제주는 더 오래 기억하세요.
+                      <br />제주는 더 오래 <span className="whitespace-nowrap">기억하세요.</span>
                     </h2>
                     <div className="mt-9 space-y-5">
                       <Benefit icon={Search} title="최신 제주를 찾아보고" body="맛집, 명소, 숙소, 교통 정보를 웹에서 폭넓게 살펴봐요." />
@@ -354,6 +356,7 @@ export default function LandingPage({ onEnter, isUnlocked = false }: LandingPage
                     <button
                       type="button"
                       onClick={enterApp}
+                      data-visual-role="text"
                       className="mt-10 inline-flex min-h-12 items-center gap-2 border-b border-white/60 pb-1 text-[14px] font-bold text-white transition hover:border-[#F2A36D] hover:text-[#F2A36D] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                     >
                       하루방과 여행 시작하기
@@ -432,12 +435,13 @@ function Hero({ onEnter, isUnlocked }: { onEnter: () => void; isUnlocked: boolea
           <CitrusMark className="h-10 w-10" />
           <span>
             <span className="block font-serif-kr text-[19px] font-bold leading-none">제주를 담다</span>
-            <span className="mt-1 block text-[10px] font-semibold text-white/70">나만의 제주 여행 플래너</span>
+            <span className="pyj-supporting-text-on-dark mt-1 block font-semibold">나만의 제주 여행 플래너</span>
           </span>
         </button>
         <button
           type="button"
           onClick={onEnter}
+          data-visual-role="secondary"
           className="inline-flex min-h-11 items-center gap-2 border border-white/45 bg-black/10 px-4 text-[12px] font-bold backdrop-blur-md transition hover:border-white hover:bg-white hover:text-[#173F3B] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
         >
           {isUnlocked ? '내 여행 계속하기' : '여행 시작하기'}
@@ -465,7 +469,7 @@ function Hero({ onEnter, isUnlocked }: { onEnter: () => void; isUnlocked: boolea
           </p>
           <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
             <PrimaryButton onClick={onEnter} label="내 제주 여행 만들기" inverse />
-            <span className="inline-flex items-center gap-2 text-[11px] text-white/72">
+            <span className="pyj-supporting-text-on-dark inline-flex items-center gap-2">
               <Check className="h-3.5 w-3.5 text-[#F2A36D]" />
               최신 정보와 출처까지 함께 확인해요
             </span>
@@ -498,20 +502,26 @@ function PrimaryButton({
   onClick,
   label,
   inverse = false,
+  visualRole = 'primary',
 }: {
   onClick: () => void;
   label: string;
   inverse?: boolean;
+  visualRole?: 'primary' | 'secondary';
 }) {
+  const visualClass =
+    visualRole === 'secondary'
+      ? 'pyj-action-secondary'
+      : inverse
+        ? 'pyj-action-primary-inverse'
+        : 'pyj-action-primary';
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-13 items-center justify-center gap-2 px-6 text-[14px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-4 ${
-        inverse
-          ? 'bg-white text-[#173F3B] hover:bg-[#F2A36D] hover:text-[#25292C] focus-visible:outline-white'
-          : 'bg-[#E76537] text-white hover:bg-[#C6532D] focus-visible:outline-[#C6532D]'
-      }`}
+      data-visual-role={visualRole}
+      className={`${visualClass} inline-flex min-h-13 items-center justify-center gap-2 px-6 text-[14px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-4`}
     >
       {label}
       <ArrowRight className="h-4 w-4" />

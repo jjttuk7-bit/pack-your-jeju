@@ -417,7 +417,7 @@ export default function TrustMapDashboard({
                 <h1 className="mt-1 font-serif-kr text-[29px] font-bold leading-tight tracking-tight text-basalt sm:text-[38px]">
                   제주 지도에서 먼저 고르고,
                   <br className="hidden sm:block" />
-                  공공데이터 근거로 담습니다.
+                  공공데이터 근거로 <span className="whitespace-nowrap">담습니다.</span>
                 </h1>
                 <p className="mt-2 max-w-2xl text-[12.5px] leading-relaxed text-basalt-2">
                   이 화면의 후보·강점·미확인 항목은 기존 API가 조회한 값만 사용합니다.
@@ -973,7 +973,7 @@ function JejuSilhouetteMap({
 
       <div
         data-testid="mobile-map-instruction"
-        className="mt-2 rounded-2xl border border-earth bg-white/82 px-3 py-2 text-[11px] leading-relaxed text-basalt-2 shadow-sm sm:hidden"
+        className="pyj-supporting-text mt-2 rounded-2xl border border-earth bg-white/82 px-3 py-2 shadow-sm sm:hidden"
       >
         지역 면을 누르면 아래 근거가 바뀝니다. 선택은 아래 버튼으로 플랜 후보에 담습니다.
       </div>
@@ -983,10 +983,10 @@ function JejuSilhouetteMap({
 
 function MapLegend() {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-semibold text-basalt-2">
-      <LegendDot className="bg-mint" label="확인 후보 있음" />
-      <LegendDot className="bg-amber-400" label="확인 필요" />
-      <LegendDot className="bg-stone-300" label="데이터 부족" />
+    <div className="pyj-supporting-text flex flex-wrap items-center gap-2 font-semibold">
+      <LegendDot className="pyj-status-dot-verified" label="확인 후보 있음" visualRole="verified" />
+      <LegendDot className="pyj-status-dot-caution" label="확인 필요" visualRole="caution" />
+      <LegendDot className="pyj-status-dot-neutral" label="데이터 부족" visualRole="neutral" />
       <span className="inline-flex items-center gap-1.5 rounded-full border border-[#B8D8D1] bg-white/70 px-2 py-1">
         <span
           aria-hidden="true"
@@ -998,9 +998,20 @@ function MapLegend() {
   );
 }
 
-function LegendDot({ className, label }: { className: string; label: string }) {
+function LegendDot({
+  className,
+  label,
+  visualRole,
+}: {
+  className: string;
+  label: string;
+  visualRole: 'verified' | 'caution' | 'neutral';
+}) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-earth bg-white/70 px-2 py-1">
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-earth bg-white/70 px-2 py-1"
+      data-visual-role={visualRole}
+    >
       <span className={`h-2.5 w-2.5 rounded-full ${className}`} />
       {label}
     </span>

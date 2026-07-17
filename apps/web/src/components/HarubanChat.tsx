@@ -541,7 +541,7 @@ export default function HarubanChat({
               id="haruban-messages"
             >
               {entries.length === 0 && !introLoading && (
-                <div className="text-[12px] text-basalt-2/70 leading-relaxed px-1">
+                <div className="pyj-supporting-text px-1">
                   제주에서 궁금한 지역이나 여행 취향을 편하게 물어보세요.
                   <br />
                   하루방 에이전트가 최신 웹 정보를 폭넓게 검색해 맛집·명소·숙소·교통을 비교해 드립니다.
@@ -590,7 +590,7 @@ export default function HarubanChat({
               })}
 
               {introLoading && (
-                <div className="flex items-center gap-1.5 text-[11px] text-basalt-2/60 px-1">
+                <div className="pyj-supporting-text flex items-center gap-1.5 px-1">
                   <Loader2 className="w-3 h-3 animate-spin" /> 하루방 에이전트가 여행 근거를 확인하고 있어요...
                 </div>
               )}
@@ -729,7 +729,7 @@ function WebPlaceCandidatePicker({
       <div className="flex items-center justify-between gap-3 border-b border-[#2D6F65]/20 px-3 py-2.5">
         <div>
           <p className="text-[11.5px] font-bold text-basalt">검색한 장소를 플랜에 담기</p>
-          <p className="mt-0.5 text-[9.5px] text-basalt-2/65">원문 출처와 검색 시점을 함께 보관합니다.</p>
+          <p className="pyj-supporting-text mt-0.5">원문 출처와 검색 시점을 함께 보관합니다.</p>
         </div>
         <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[9.5px] font-bold text-[#2D6F65]">
           {candidates.length}곳
@@ -759,7 +759,7 @@ function WebPlaceCandidatePicker({
                   )}
                 </span>
                 {(candidate.address || candidate.note) && (
-                  <span className="mt-1 block text-[10px] leading-relaxed text-basalt-2/75 line-clamp-2">
+                  <span className="pyj-supporting-text mt-1 block line-clamp-2">
                     {candidate.address || candidate.note}
                   </span>
                 )}
@@ -779,7 +779,7 @@ function WebPlaceCandidatePicker({
         })}
       </div>
 
-      <div className="flex items-center gap-1.5 border-t border-[#2D6F65]/20 bg-white/70 px-3 py-2.5 text-[10px] font-semibold text-[#2D6F65]">
+      <div className="flex items-center gap-1.5 border-t border-[#2D6F65]/20 bg-white/70 px-3 py-2.5 text-[12px] font-semibold text-[#2D6F65]">
         <Check className="h-3.5 w-3.5 shrink-0" />
         체크하면 즉시 내 플랜에 반영됩니다. 삭제는 내 플랜에서 할 수 있어요.
       </div>
@@ -810,7 +810,7 @@ function MessageBubble({
       >
         {isUser ? <div className="whitespace-pre-wrap">{content}</div> : <AssistantMarkdown content={content} />}
         {!isUser && contract && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-earth/50 pt-2 text-[10px] leading-none text-basalt-2/70">
+          <div className="pyj-supporting-text mt-2 flex flex-wrap items-center gap-1.5 border-t border-earth/50 pt-2 leading-none">
             {sourceLabel && (
               <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-1 font-bold">
                 <ShieldCheck className="h-3 w-3 text-citrus-2" />
@@ -888,7 +888,7 @@ function AssistantMarkdown({ content }: { content: string }) {
         hr: () => <hr className="my-3 border-earth/70" />,
         table: ({ children }) => (
           <div className="my-2 overflow-x-auto rounded-md border border-earth/70 bg-white/50">
-            <table className="min-w-full border-collapse text-left text-[11px]">{children}</table>
+            <table className="min-w-full border-collapse text-left text-[12px]">{children}</table>
           </div>
         ),
         th: ({ children }) => (
