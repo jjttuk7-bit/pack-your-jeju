@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PackResponse, TravelInfo } from '../types';
+import type { PackResponse, TravelInfo, TravelPlanItem } from '../types';
 import {
   requestCandidatePage,
   requestPack,
@@ -66,8 +66,21 @@ const packResponse: PackResponse = {
 
 const noop = vi.fn();
 
-function renderDashboard() {
-  return render(
+const scheduledPlanItem: TravelPlanItem = {
+  id: 'plan-candidate-1',
+  name: '산방산 둘레길',
+  moment: 'beach_walk',
+  source: 'web_search',
+  day: 1,
+  daypart: 'afternoon',
+  startTime: '14:00',
+};
+
+function dashboardElement(
+  selectedPlanItems: TravelPlanItem[] = [],
+  onUpdatePlanSchedule = noop,
+) {
+  return (
     <PackingDashboard
       info={info}
       selectedMomentIds={['beach_walk']}
@@ -89,7 +102,7 @@ function renderDashboard() {
         culture_stop: [],
       }}
       customMemories={[]}
-      selectedPlanItems={[]}
+      selectedPlanItems={selectedPlanItems}
       visitChecks={{}}
       weatherDismissedFingerprints={[]}
       weatherUndoAvailable={false}
@@ -108,7 +121,7 @@ function renderDashboard() {
       onTogglePlanItem={noop}
       onAddCustomPlanItem={noop}
       onRemovePlanItem={noop}
-      onUpdatePlanSchedule={noop}
+      onUpdatePlanSchedule={onUpdatePlanSchedule}
       onApplyWeatherProposal={noop}
       onDismissWeatherProposal={noop}
       onUndoWeatherProposal={noop}
@@ -118,8 +131,15 @@ function renderDashboard() {
       onSetVisitCheck={noop}
       onOpenFeedback={noop}
       onReset={noop}
-    />,
+    />
   );
+}
+
+function renderDashboard(
+  selectedPlanItems: TravelPlanItem[] = [],
+  onUpdatePlanSchedule = noop,
+) {
+  return render(dashboardElement(selectedPlanItems, onUpdatePlanSchedule));
 }
 
 describe('PackingDashboard pack journey guide', () => {
@@ -148,6 +168,39 @@ describe('PackingDashboard pack journey guide', () => {
     expect(document.getElementById('my-plan-builder')).toBeInTheDocument();
     expect(document.getElementById('view-mode-tabs')).toBeInTheDocument();
     expect(document.getElementById('plan-export-actions')).toBeInTheDocument();
+  });
+
+  it('introduces all four actions in order without trusting preloaded day data', async () => {
+    const onUpdatePlanSchedule = vi.fn();
+    const { rerender } = renderDashboard([], onUpdatePlanSchedule);
+
+    await screen.findByRole('navigation', { name: '여행팩 만드는 순서' });
+    expect(
+      screen.getByRole('button', { name: /후보 살펴보기 현재/ }),
+    ).toHaveAttribute('aria-current', 'step');
+
+    fireEvent.click(screen.getByRole('button', { name: '지금 후보 둘러보기' }));
+    expect(
+      screen.getByRole('button', { name: /플랜에 담기 현재/ }),
+    ).toHaveAttribute('aria-current', 'step');
+
+    rerender(dashboardElement([scheduledPlanItem], onUpdatePlanSchedule));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /일정 정하기 현재/ }),
+      ).toHaveAttribute('aria-current', 'step');
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '산방산 둘레길 오전으로 설정' }),
+    );
+    expect(onUpdatePlanSchedule).toHaveBeenCalledWith('plan-candidate-1', {
+      daypart: 'morning',
+      startTime: '09:00',
+    });
+    expect(
+      screen.getByRole('button', { name: /저장·공유하기 현재/ }),
+    ).toHaveAttribute('aria-current', 'step');
   });
 
   it('scrolls and focuses existing sections while respecting reduced motion', async () => {

@@ -64,7 +64,11 @@ import WeatherDecisionReport from './WeatherDecisionReport';
 import TravelRouteCard from './TravelRouteCard';
 import TravelRouteMap from './TravelRouteMap';
 import PackJourneyGuide from './PackJourneyGuide';
-import { derivePackJourneyState } from '../packJourneyGuide';
+import {
+  advancePackJourneyStep,
+  derivePackJourneyState,
+  type PackJourneyStepId,
+} from '../packJourneyGuide';
 
 const PlanPdfEditor = lazy(() => import('./PlanPdfEditor'));
 
@@ -240,8 +244,11 @@ export default function PackingDashboard(props: Props) {
   const [routeBasisFingerprint, setRouteBasisFingerprint] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [packJourneyStepId, setPackJourneyStepId] =
+    useState<PackJourneyStepId>('candidates');
   const dashboardRef = useRef<HTMLDivElement>(null);
   const resizingSidebarRef = useRef(false);
+  const previousPlanItemCountRef = useRef(selectedPlanItems.length);
 
   useEffect(() => {
     const finishResize = () => {
@@ -279,6 +286,16 @@ export default function PackingDashboard(props: Props) {
   useEffect(() => {
     window.localStorage.setItem(PLAN_SIDEBAR_STORAGE_KEY, String(planSidebarWidth));
   }, [planSidebarWidth]);
+
+  useEffect(() => {
+    const previousCount = previousPlanItemCountRef.current;
+    previousPlanItemCountRef.current = selectedPlanItems.length;
+    if (selectedPlanItems.length <= previousCount) return;
+
+    setPackJourneyStepId((currentStepId) =>
+      advancePackJourneyStep(currentStepId, 'plan_item_added'),
+    );
+  }, [selectedPlanItems.length]);
 
   useEffect(() => {
     const fitSidebarToViewport = () => {
@@ -323,8 +340,8 @@ export default function PackingDashboard(props: Props) {
   );
   const packItems = useMemo(() => collectPackItems(packResp), [packResp]);
   const packJourneyState = useMemo(
-    () => derivePackJourneyState(packItems.length, selectedPlanItems),
-    [packItems.length, selectedPlanItems],
+    () => derivePackJourneyState(packJourneyStepId),
+    [packJourneyStepId],
   );
   const currentPlanItemsForMap = useMemo(
     () => filterPlanItemsForCurrentPack(selectedPlanItems, packItems),
@@ -418,6 +435,18 @@ export default function PackingDashboard(props: Props) {
       block: 'start',
     });
     target.focus({ preventScroll: true });
+    if (targetId === 'candidate-workbench-header') {
+      setPackJourneyStepId((currentStepId) =>
+        advancePackJourneyStep(currentStepId, 'candidates_viewed'),
+      );
+    }
+  };
+
+  const handleUpdatePlanSchedule: Props['onUpdatePlanSchedule'] = (itemId, patch) => {
+    onUpdatePlanSchedule(itemId, patch);
+    setPackJourneyStepId((currentStepId) =>
+      advancePackJourneyStep(currentStepId, 'schedule_updated'),
+    );
   };
 
   const handleCopyShare = async () => {
@@ -808,7 +837,7 @@ export default function PackingDashboard(props: Props) {
           visitChecks={visitChecks}
           onAddCustomPlanItem={onAddCustomPlanItem}
           onRemovePlanItem={onRemovePlanItem}
-          onUpdatePlanSchedule={onUpdatePlanSchedule}
+          onUpdatePlanSchedule={handleUpdatePlanSchedule}
           onSetVisitCheck={onSetVisitCheck}
         />
       )}

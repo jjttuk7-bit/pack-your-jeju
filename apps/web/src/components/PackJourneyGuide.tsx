@@ -110,9 +110,12 @@ export default function PackJourneyGuide({ state, onNavigate }: Props) {
               <span className="mt-3 block text-sm font-bold leading-snug text-basalt">
                 {step.label}
               </span>
+              <span className="mt-1.5 block text-[11px] leading-[1.45] text-basalt/65">
+                {step.guidance}
+              </span>
               <span
                 className={[
-                  'mt-1 block text-[11px] font-bold',
+                  'mt-2 block text-[11px] font-bold',
                   isCurrent
                     ? 'text-citrus'
                     : isComplete
