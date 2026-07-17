@@ -1,13 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquareText, ShieldCheck, Home } from 'lucide-react';
 import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus, WeatherChangeProposal, RouteChangeProposal } from './types';
-import PackingDashboard from './components/PackingDashboard';
-import VerifyPage from './components/VerifyPage';
-import TravelFeedback from './components/TravelFeedback';
-import HarubanChat from './components/HarubanChat';
 import LandingPage from './components/LandingPage';
-import TrustMapDashboard from './components/TrustMapDashboard';
 import CitrusMark from './components/marks/CitrusMark';
 import WaveLine from './components/marks/WaveLine';
 import { MOMENTS, REGIONS } from './data';
@@ -19,6 +14,12 @@ import {
   undoWeatherProposal,
 } from './weatherProposal';
 import {applyRouteProposal, undoRouteProposal} from './routeProposal';
+
+const PackingDashboard = lazy(() => import('./components/PackingDashboard'));
+const VerifyPage = lazy(() => import('./components/VerifyPage'));
+const TravelFeedback = lazy(() => import('./components/TravelFeedback'));
+const HarubanChat = lazy(() => import('./components/HarubanChat'));
+const TrustMapDashboard = lazy(() => import('./components/TrustMapDashboard'));
 
 const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
@@ -701,11 +702,13 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <TrustMapDashboard
-                  onSubmit={handleFormSubmit}
-                  initialInfo={state.info.regions?.length ? state.info : undefined}
-                  initialMoments={state.selectedMomentIds}
-                />
+                <Suspense fallback={<ViewLoadingFallback label="여행 조건 화면" />}>
+                  <TrustMapDashboard
+                    onSubmit={handleFormSubmit}
+                    initialInfo={state.info.regions?.length ? state.info : undefined}
+                    initialMoments={state.selectedMomentIds}
+                  />
+                </Suspense>
               </motion.div>
             )}
             {state.step === 'dashboard' && (
@@ -717,49 +720,53 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <PackingDashboard
-                  info={state.info}
-                  selectedMomentIds={state.selectedMomentIds}
-                  checkedItemIds={state.checkedItemIds}
-                  checkedMemoryIds={state.checkedMemoryIds}
-                  customBasicItems={state.customBasicItems}
-                  customMomentItems={state.customMomentItems}
-                  customMemories={state.customMemories || []}
-                  selectedPlanItems={state.selectedPlanItems || []}
-                  visitChecks={state.visitChecks || {}}
-                  weatherDismissedFingerprints={state.weatherDismissedFingerprints || []}
-                  weatherUndoAvailable={Boolean(state.weatherUndo)}
-                  weatherActionMessage={state.weatherActionMessage || null}
-                  routeDismissedFingerprints={state.routeDismissedFingerprints || []}
-                  routeUndoAvailable={Boolean(state.routeUndo)}
-                  routeActionMessage={state.routeActionMessage || null}
-                  onToggleItem={handleToggleItem}
-                  onToggleMemory={handleToggleMemory}
-                  onAddCustomBasic={handleAddCustomBasic}
-                  onRemoveCustomBasic={handleRemoveCustomBasic}
-                  onAddCustomMomentItem={handleAddCustomMomentItem}
-                  onRemoveCustomMomentItem={handleRemoveCustomMomentItem}
-                  onAddCustomMemory={handleAddCustomMemory}
-                  onRemoveCustomMemory={handleRemoveCustomMemory}
-                  onTogglePlanItem={handleTogglePlanItem}
-                  onAddCustomPlanItem={handleAddCustomPlanItem}
-                  onRemovePlanItem={handleRemovePlanItem}
-                  onUpdatePlanSchedule={handleUpdatePlanSchedule}
-                  onApplyWeatherProposal={handleApplyWeatherProposal}
-                  onDismissWeatherProposal={handleDismissWeatherProposal}
-                  onUndoWeatherProposal={handleUndoWeatherProposal}
-                  onApplyRouteProposal={handleApplyRouteProposal}
-                  onDismissRouteProposal={handleDismissRouteProposal}
-                  onUndoRouteProposal={handleUndoRouteProposal}
-                  onSetVisitCheck={handleSetVisitCheck}
-                  onOpenFeedback={goToFeedback}
-                  onReset={handleReset}
-                />
+                <Suspense fallback={<ViewLoadingFallback label="여행 플랜" />}>
+                  <PackingDashboard
+                    info={state.info}
+                    selectedMomentIds={state.selectedMomentIds}
+                    checkedItemIds={state.checkedItemIds}
+                    checkedMemoryIds={state.checkedMemoryIds}
+                    customBasicItems={state.customBasicItems}
+                    customMomentItems={state.customMomentItems}
+                    customMemories={state.customMemories || []}
+                    selectedPlanItems={state.selectedPlanItems || []}
+                    visitChecks={state.visitChecks || {}}
+                    weatherDismissedFingerprints={state.weatherDismissedFingerprints || []}
+                    weatherUndoAvailable={Boolean(state.weatherUndo)}
+                    weatherActionMessage={state.weatherActionMessage || null}
+                    routeDismissedFingerprints={state.routeDismissedFingerprints || []}
+                    routeUndoAvailable={Boolean(state.routeUndo)}
+                    routeActionMessage={state.routeActionMessage || null}
+                    onToggleItem={handleToggleItem}
+                    onToggleMemory={handleToggleMemory}
+                    onAddCustomBasic={handleAddCustomBasic}
+                    onRemoveCustomBasic={handleRemoveCustomBasic}
+                    onAddCustomMomentItem={handleAddCustomMomentItem}
+                    onRemoveCustomMomentItem={handleRemoveCustomMomentItem}
+                    onAddCustomMemory={handleAddCustomMemory}
+                    onRemoveCustomMemory={handleRemoveCustomMemory}
+                    onTogglePlanItem={handleTogglePlanItem}
+                    onAddCustomPlanItem={handleAddCustomPlanItem}
+                    onRemovePlanItem={handleRemovePlanItem}
+                    onUpdatePlanSchedule={handleUpdatePlanSchedule}
+                    onApplyWeatherProposal={handleApplyWeatherProposal}
+                    onDismissWeatherProposal={handleDismissWeatherProposal}
+                    onUndoWeatherProposal={handleUndoWeatherProposal}
+                    onApplyRouteProposal={handleApplyRouteProposal}
+                    onDismissRouteProposal={handleDismissRouteProposal}
+                    onUndoRouteProposal={handleUndoRouteProposal}
+                    onSetVisitCheck={handleSetVisitCheck}
+                    onOpenFeedback={goToFeedback}
+                    onReset={handleReset}
+                  />
+                </Suspense>
               </motion.div>
             )}
             {state.step === 'feedback' && (
               <motion.div key="feedback-view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }} className="w-full">
-                <TravelFeedback info={state.info} planItems={state.selectedPlanItems || []} visitChecks={state.visitChecks || {}} onSetVisitCheck={handleSetVisitCheck} onOpenPlan={goToDashboard} />
+                <Suspense fallback={<ViewLoadingFallback label="여행 피드백" />}>
+                  <TravelFeedback info={state.info} planItems={state.selectedPlanItems || []} visitChecks={state.visitChecks || {}} onSetVisitCheck={handleSetVisitCheck} onOpenPlan={goToDashboard} />
+                </Suspense>
               </motion.div>
             )}
             {state.step === 'verify' && (
@@ -771,7 +778,9 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <VerifyPage />
+                <Suspense fallback={<ViewLoadingFallback label="리뷰 검증" />}>
+                  <VerifyPage />
+                </Suspense>
               </motion.div>
             )}
           </AnimatePresence>
@@ -835,18 +844,32 @@ export default function App() {
 
       {/* 하루방 챗 위젯 — 우측 하단 상주. verify 페이지에서는 숨김 (검증 시연 화면 방해 방지). */}
       {state.step !== 'verify' && (
-        <HarubanChat
-          key={`haruban-${harubanSessionKey}`}
-          info={state.info}
-          selectedMomentIds={state.selectedMomentIds}
-          selectedPlanItems={state.selectedPlanItems || []}
-          visitChecks={state.visitChecks || {}}
-          onApplySuggestion={handleHarubanApply}
-          onAddPlanItem={handleAddCustomPlanItem}
-          onOpenVerify={goToVerify}
-        />
+        <Suspense fallback={null}>
+          <HarubanChat
+            key={`haruban-${harubanSessionKey}`}
+            info={state.info}
+            selectedMomentIds={state.selectedMomentIds}
+            selectedPlanItems={state.selectedPlanItems || []}
+            visitChecks={state.visitChecks || {}}
+            onApplySuggestion={handleHarubanApply}
+            onAddPlanItem={handleAddCustomPlanItem}
+            onOpenVerify={goToVerify}
+          />
+        </Suspense>
       )}
 
+    </div>
+  );
+}
+
+function ViewLoadingFallback({label}: {label: string}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-56 items-center justify-center rounded-[28px] border border-orange-100/70 bg-white/80 px-6 text-center shadow-pyj-card"
+    >
+      <p className="font-serif-kr text-[14px] font-bold text-basalt-2">{label}을 준비하고 있어요…</p>
     </div>
   );
 }

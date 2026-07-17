@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Loader2,
@@ -59,11 +59,12 @@ import {
 import { hasFinishedCandidateSection, mergeCandidateSection } from '../candidatePagination';
 import Badge from './Badge';
 import MomentIcon from './marks/MomentIcon';
-import PlanPdfEditor from './PlanPdfEditor';
 import PlaceDetail from './PlaceDetail';
 import WeatherDecisionReport from './WeatherDecisionReport';
 import TravelRouteCard from './TravelRouteCard';
 import TravelRouteMap from './TravelRouteMap';
+
+const PlanPdfEditor = lazy(() => import('./PlanPdfEditor'));
 
 interface Props {
   info: TravelInfo;
@@ -993,14 +994,29 @@ export default function PackingDashboard(props: Props) {
       </div>
         </main>
       </div>
-      <PlanPdfEditor
-        open={planPdfEditorOpen}
-        info={info}
-        selectedMomentIds={selectedMomentIds}
-        selectedPlanItems={selectedPlanItems}
-        packingItems={planPackingItems.map((suggestion) => suggestion.item)}
-        onClose={() => setPlanPdfEditorOpen(false)}
-      />
+      {planPdfEditorOpen && (
+        <Suspense fallback={<PdfEditorLoadingFallback />}>
+          <PlanPdfEditor
+            open
+            info={info}
+            selectedMomentIds={selectedMomentIds}
+            selectedPlanItems={selectedPlanItems}
+            packingItems={planPackingItems.map((suggestion) => suggestion.item)}
+            onClose={() => setPlanPdfEditorOpen(false)}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+function PdfEditorLoadingFallback() {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-basalt/35 p-4 backdrop-blur-sm" role="status" aria-live="polite">
+      <div className="rounded-3xl border border-orange-100 bg-[#FFFDF8] px-7 py-6 text-center shadow-2xl">
+        <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-citrus" aria-hidden="true" />
+        <p className="font-serif-kr text-[14px] font-bold text-basalt">여행 플랜 PDF 편집기를 준비하고 있어요…</p>
+      </div>
     </div>
   );
 }
