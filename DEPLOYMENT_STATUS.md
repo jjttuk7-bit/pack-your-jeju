@@ -51,6 +51,16 @@
 - 기존 `/pack.weather`는 compact fallback으로 유지하고 기상청 키·특정 지역 조회 장애가 플랜·후보·PDF 기능을 막지 않게 했다.
 - 이 항목은 기능 브랜치의 로컬 자동 검증 기준이다. 원격 푸시 후 Railway·Vercel 자동 배포와 프로덕션 스모크는 별도로 확인해야 한다.
 
+### 사용자 승인형 여행 동선 추천 (배포 전 기능 브랜치)
+
+- `POST /route/plan`: Day별 현재·추천 순서와 구간별 시간·거리·geometry를 반환하며 시간 고정 일정을 이동하지 않는다.
+- 네이버 Directions로 확인한 구간은 `verified_route`, 직선거리 fallback은 `estimated_route`, 혼합 결과는 `mixed_route`로 분리한다. 서버 키 미설정·timeout·공급자 오류가 기존 플랜과 지도 기능을 막지 않는다.
+- 프론트는 자동차·대중교통·도보 선택, Day 탭, 번호 마커, 현재/추천 비교, 명시적 적용, 기존 순서 유지, 안전한 되돌리기를 제공한다.
+- 플랜에 숙소 좌표가 있으면 숙소 왕복, 없으면 첫 장소를 기준점이라고 표시한다. 입력되지 않은 숙소 좌표는 만들지 않는다.
+- 로컬 전체 검증: 백엔드 `275 passed, 15 skipped`, 프론트 Vitest `28 passed`, Node 회귀 `22 passed`, TypeScript 검사와 PWA 프로덕션 빌드 성공.
+- Vite 주 chunk는 약 769KB로 500KB 권고선을 넘는다. 기능 오류는 아니며 배포 전 차단 조건으로 두지 않고 후속 lazy loading 대상으로 유지한다.
+- 아직 원격 푸시·Railway/Vercel 배포·프로덕션 스모크를 수행하지 않았다.
+
 ## 2-a. 이전 세션에서 처리한 것 (2026-07-06)
 
 ### 하루방 Phase D — 능동 인사 (`POST /agent/intro`)
