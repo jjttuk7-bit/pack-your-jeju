@@ -220,6 +220,7 @@ def test_web_source_classifier_marks_personal_publishing_hosts_as_experience():
 
 def test_web_source_role_guardrail_replaces_universal_official_claim():
     reply = (
+        "안덕은 자연 풍경과 마을 경험을 함께 비교해 볼 수 있는 지역입니다.\n\n"
         "모두 공식 또는 공개 플랫폼을 통해 직접 확인된 사항만 정리했습니다.\n\n"
         "## 추천 장소\n**돈사돈**\n- 특징: 흑돼지 전문점입니다."
     )
@@ -234,6 +235,8 @@ def test_web_source_role_guardrail_replaces_universal_official_claim():
     assert "모두 공식 또는 공개 플랫폼" not in guarded
     assert "출처 구성: 공식 1건, 후기 1건" in guarded
     assert "방문 전 재확인" in guarded
+    assert guarded.startswith("안덕은")
+    assert guarded.rfind("출처 구성:") > guarded.find("안덕은")
 
 
 def test_web_research_uses_one_builtin_search_for_original_question(monkeypatch):

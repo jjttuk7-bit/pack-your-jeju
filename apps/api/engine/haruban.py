@@ -905,7 +905,7 @@ def _enforce_web_source_role_disclosure(reply: str, sources: list[dict]) -> str:
         if counts[source_class]:
             parts.append(f"{label} {counts[source_class]}건")
     disclosure = (
-        f"출처 구성: {', '.join(parts)}입니다. "
+        f"## 확인 범위\n출처 구성: {', '.join(parts)}입니다. "
         "후기·기타 웹 출처가 포함된 후보의 운영 정보는 방문 전 재확인이 필요합니다."
     )
 
@@ -920,7 +920,7 @@ def _enforce_web_source_role_disclosure(reply: str, sources: list[dict]) -> str:
         guarded_reply,
     )
     guarded_reply = re.sub(r"\n{3,}", "\n\n", guarded_reply).strip()
-    return f"{disclosure}\n\n{guarded_reply}".strip()
+    return f"{guarded_reply}\n\n{disclosure}".strip()
 
 
 def _extract_response_sources(resp: Any) -> list[dict]:
