@@ -1,5 +1,8 @@
 # Pack Guidance Navigation Implementation Plan
 
+> 2026-07-18 변경: 데이터만으로 단계를 계산하는 Task 1과 관련 통합 방식은
+> `2026-07-18-pack-journey-sequential-guidance.md`로 대체됐다.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add a non-blocking four-step guide to the existing pack dashboard so users always know how to move from candidates to a saved or shared travel plan.
