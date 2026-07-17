@@ -241,6 +241,9 @@ const REGION_SHAPES: RegionShape[] = [
   },
 ];
 
+const JEJU_ISLAND_PATH =
+  'M36 236 L54 190 L52 155 L76 128 L118 109 L168 88 L263 62 L351 48 L432 39 L500 75 L525 101 L550 146 L527 179 L472 174 L433 222 L356 239 L292 253 L214 266 L148 257 L112 286 L66 270 Z';
+
 export default function TrustMapDashboard({
   onSubmit,
   initialInfo,
@@ -476,6 +479,147 @@ export default function TrustMapDashboard({
   );
 }
 
+function JejuMapDefs() {
+  return (
+    <defs>
+      <linearGradient id="jejuSeaDepth" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#FBFEFD" />
+        <stop offset="0.55" stopColor="#E6F3F0" />
+        <stop offset="1" stopColor="#CDE4DF" />
+      </linearGradient>
+      <radialGradient id="hallasanRelief" cx="50%" cy="48%" r="48%">
+        <stop offset="0" stopColor="#3F7669" stopOpacity="0.32" />
+        <stop offset="0.42" stopColor="#74A496" stopOpacity="0.17" />
+        <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+      </radialGradient>
+      <filter id="jejuIslandDepth" x="-15%" y="-20%" width="130%" height="150%">
+        <feDropShadow
+          dx="0"
+          dy="13"
+          stdDeviation="10"
+          floodColor="#44665F"
+          floodOpacity="0.24"
+        />
+      </filter>
+      <filter id="jejuRegionShadow" x="-8%" y="-8%" width="116%" height="116%">
+        <feDropShadow
+          dx="0"
+          dy="5"
+          stdDeviation="4"
+          floodColor="#44665F"
+          floodOpacity="0.1"
+        />
+      </filter>
+      <linearGradient
+        id="jejuRoad"
+        x1="42"
+        y1="190"
+        x2="519"
+        y2="116"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop stopColor="#FFFFFF" stopOpacity="0.95" />
+        <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.72" />
+        <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.95" />
+      </linearGradient>
+      <clipPath id="jejuIslandClip">
+        <path d={JEJU_ISLAND_PATH} />
+      </clipPath>
+    </defs>
+  );
+}
+
+function JejuSeaLayer() {
+  return (
+    <g data-testid="jeju-sea-layer" aria-hidden="true" pointerEvents="none">
+      <rect width="567" height="312" fill="url(#jejuSeaDepth)" />
+      <path
+        d="M-24 92 C72 61 143 74 224 50 C316 22 406 27 590 72"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity="0.7"
+        strokeWidth="2"
+      />
+      <path
+        d="M-18 270 C84 239 141 278 233 286 C337 295 429 263 592 230"
+        fill="none"
+        stroke="#99C7BE"
+        strokeDasharray="3 8"
+        strokeLinecap="round"
+        strokeOpacity="0.44"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M-22 117 C60 101 101 87 158 59 M392 299 C466 279 523 265 591 250"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity="0.5"
+        strokeWidth="1"
+      />
+    </g>
+  );
+}
+
+function JejuCoastLayer() {
+  return (
+    <g data-testid="jeju-coast-layer" aria-hidden="true" pointerEvents="none">
+      <path d={JEJU_ISLAND_PATH} fill="#FFFFFF" fillOpacity="0.52" filter="url(#jejuIslandDepth)" />
+      <path
+        d={JEJU_ISLAND_PATH}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity="0.92"
+        strokeWidth="6"
+      />
+    </g>
+  );
+}
+
+function HallasanTerrainLayer() {
+  return (
+    <g
+      data-testid="hallasan-terrain-layer"
+      aria-hidden="true"
+      pointerEvents="none"
+      clipPath="url(#jejuIslandClip)"
+    >
+      <ellipse cx="292" cy="163" rx="148" ry="96" fill="url(#hallasanRelief)" />
+      <ellipse
+        cx="292"
+        cy="163"
+        rx="119"
+        ry="73"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity="0.34"
+        strokeWidth="1.5"
+      />
+      <ellipse
+        cx="292"
+        cy="163"
+        rx="83"
+        ry="50"
+        fill="none"
+        stroke="#376B60"
+        strokeDasharray="2 5"
+        strokeLinecap="round"
+        strokeOpacity="0.18"
+        strokeWidth="1.5"
+      />
+      <ellipse
+        cx="292"
+        cy="163"
+        rx="45"
+        ry="25"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity="0.38"
+        strokeWidth="1.2"
+      />
+    </g>
+  );
+}
+
 function JejuSilhouetteMap({
   activeRegion,
   selectedRegions,
@@ -495,24 +639,16 @@ function JejuSilhouetteMap({
 }) {
   return (
     <div className="mx-auto mt-4 w-full max-w-4xl">
-      <div className="relative aspect-[567/312] w-full overflow-hidden rounded-[26px] border border-orange-100/70 bg-[#F8F2E7]">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,249,240,0.78))]" />
+      <div className="relative aspect-[567/312] w-full overflow-hidden rounded-[26px] border border-[#CDE5DF] bg-[#E6F3F0] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)]">
         <svg
           viewBox="0 0 567 312"
           role="img"
           aria-label="제주 행정구역 선택 지도"
           className="absolute inset-0 h-full w-full"
         >
-        <defs>
-          <filter id="jejuRegionShadow" x="-8%" y="-8%" width="116%" height="116%">
-            <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor="#8B6C49" floodOpacity="0.12" />
-          </filter>
-          <linearGradient id="jejuRoad" x1="42" y1="190" x2="519" y2="116" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.72" />
-            <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.95" />
-          </linearGradient>
-        </defs>
+        <JejuMapDefs />
+        <JejuSeaLayer />
+        <JejuCoastLayer />
 
         <g filter="url(#jejuRegionShadow)">
           {REGION_SHAPES.map((shape) => {
@@ -545,6 +681,8 @@ function JejuSilhouetteMap({
             );
           })}
         </g>
+
+        <HallasanTerrainLayer />
 
         <path
           d="M40 205 C73 187 77 225 114 206 C170 177 198 157 245 162 C296 168 304 141 355 139 C403 137 391 126 435 110 C467 98 492 88 520 82"
