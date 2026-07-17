@@ -2240,9 +2240,15 @@ def _build_search_pool_context(
 
     if _should_use_web_research(conv, form_state, conversation_state):
         args = {"query": _resolve_web_research_query(last_user, conversation_state)}
-        filled = {k: v for k, v in (form_state or {}).items() if v not in (None, "", [], 0)}
-        if filled:
-            args["context"] = json.dumps(filled, ensure_ascii=False)
+        context_payload = {
+            k: v for k, v in (form_state or {}).items()
+            if v not in (None, "", [], 0)
+        }
+        bounded_state = _bounded_conversation_state(conversation_state)
+        if bounded_state:
+            context_payload["conversation_state"] = bounded_state
+        if context_payload:
+            args["context"] = json.dumps(context_payload, ensure_ascii=False)
         try:
             result = _run_web_search_jeju(args)
         except Exception as e:
@@ -2669,6 +2675,38 @@ def _form_context_block(form_state: dict) -> str:
     )
 
 
+def _bounded_conversation_state(conversation_state: dict | None) -> dict:
+    state = conversation_state or {}
+    bounded: dict[str, Any] = {}
+    for key in ("last_user_question", "last_research_query"):
+        value = str(state.get(key) or "").strip()
+        if value:
+            bounded[key] = value[:500]
+    for key, limit in (
+        ("active_regions", 8),
+        ("active_place_names", 5),
+        ("shown_place_names", 40),
+        ("excluded_constraints", 10),
+    ):
+        values = state.get(key) or []
+        if isinstance(values, list):
+            cleaned = [str(value).strip()[:200] for value in values if str(value).strip()]
+            if cleaned:
+                bounded[key] = cleaned[:limit]
+    if state.get("web_research_active"):
+        bounded["web_research_active"] = True
+    return bounded
+
+
+def _conversation_context_block(conversation_state: dict | None) -> str:
+    bounded = _bounded_conversation_state(conversation_state)
+    if not bounded:
+        return ""
+    return "\n\n현재 채팅 세션의 구조화 문맥 (참고용):\n" + json.dumps(
+        bounded, ensure_ascii=False, indent=2
+    )
+
+
 # ─── 대화 실행 ───
 
 @dataclass(frozen=True)
@@ -2769,7 +2807,11 @@ def chat_turn(
                 "답변은 한국어 존댓말 3~5문장으로, 바로 실행할 수 있는 계획 방식 중심으로 말한다."
             )
             resp = llm.complete(
-                system=system + _form_context_block(form_state),
+                system=(
+                    system
+                    + _form_context_block(form_state)
+                    + _conversation_context_block(conversation_state)
+                ),
                 user=_free_advice_user_text(messages_in),
                 max_completion_tokens=500,
                 temperature=0.7,
@@ -2785,7 +2827,11 @@ def chat_turn(
             ),
         )
 
-    system_prompt = _BASE_SYSTEM_PROMPT + _form_context_block(form_state)
+    system_prompt = (
+        _BASE_SYSTEM_PROMPT
+        + _form_context_block(form_state)
+        + _conversation_context_block(conversation_state)
+    )
     search_pool_started = perf_counter()
     search_pool = _build_search_pool_context(messages_in, form_state, conversation_state)
     logger.info(

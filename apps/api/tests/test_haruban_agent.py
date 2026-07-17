@@ -692,6 +692,52 @@ def test_short_followup_without_subject_asks_for_target(monkeypatch):
     assert turn.reason == "context target required"
 
 
+def test_conversation_state_is_bounded_in_prompt_context():
+    block = haruban._conversation_context_block({
+        "last_user_question": "안덕은 어떤 곳이야?",
+        "last_research_query": "안덕은 어떤 곳이야?",
+        "active_regions": ["andeok"],
+        "active_place_names": ["산방산"],
+        "shown_place_names": ["산방산", "용머리해안"],
+        "excluded_constraints": ["용머리해안은 빼줘"],
+        "web_research_active": True,
+        "ignored_field": "노출되면 안 됨",
+    })
+
+    assert "안덕은 어떤 곳이야?" in block
+    assert "산방산" in block
+    assert "용머리해안은 빼줘" in block
+    assert "ignored_field" not in block
+    assert "노출되면 안 됨" not in block
+
+
+def test_web_search_context_includes_structured_conversation_state(monkeypatch):
+    captured = {}
+    state = {
+        "last_research_query": "안덕은 어떤 곳이야?",
+        "active_regions": ["andeok"],
+        "active_place_names": ["산방산"],
+        "shown_place_names": ["산방산"],
+        "excluded_constraints": [],
+        "web_research_active": True,
+    }
+
+    def fake_web_search(args):
+        captured.update(args)
+        return {"available": True, "query": args["query"], "answer": "확인", "sources": []}
+
+    monkeypatch.setattr(haruban, "_run_web_search_jeju", fake_web_search)
+    haruban._build_search_pool_context(
+        [{"role": "user", "content": "거기는 왜 유명해?"}],
+        {"regions": ["andeok"]},
+        state,
+    )
+
+    context = json.loads(captured["context"])
+    assert context["regions"] == ["andeok"]
+    assert context["conversation_state"]["active_place_names"] == ["산방산"]
+
+
 def test_web_failure_fallback_does_not_substitute_public_data_candidates():
     reply = haruban._fallback_reply_from_tool_messages([
         {"role": "user", "content": "구좌에서 가장 맛집은?"},

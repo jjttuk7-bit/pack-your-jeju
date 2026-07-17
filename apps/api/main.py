@@ -443,9 +443,22 @@ class HarubangMessage(BaseModel):
     name: str | None = None
 
 
+class HarubangConversationState(BaseModel):
+    last_user_question: str = Field(default="", max_length=500)
+    last_research_query: str = Field(default="", max_length=500)
+    active_regions: list[str] = Field(default_factory=list, max_length=8)
+    active_place_names: list[str] = Field(default_factory=list, max_length=5)
+    shown_place_names: list[str] = Field(default_factory=list, max_length=40)
+    excluded_constraints: list[str] = Field(default_factory=list, max_length=10)
+    web_research_active: bool = False
+
+
 class HarubangChatBody(BaseModel):
     messages: list[HarubangMessage] = Field(min_length=1, max_length=30)
     form_state: dict = Field(default_factory=dict)
+    conversation_state: HarubangConversationState = Field(
+        default_factory=HarubangConversationState,
+    )
 
 
 @app.post("/agent/chat")
@@ -455,7 +468,11 @@ def agent_chat(body: HarubangChatBody) -> dict[str, Any]:
     LLM 미가용 시 available=False → 프론트가 안내.
     """
     messages_in = [m.model_dump(exclude_none=True) for m in body.messages]
-    turn = haruban_mod.chat_turn(messages_in, body.form_state)
+    turn = haruban_mod.chat_turn(
+        messages_in,
+        body.form_state,
+        conversation_state=body.conversation_state.model_dump(),
+    )
     return {
         "available": turn.available,
         "reply_text": turn.reply_text,
