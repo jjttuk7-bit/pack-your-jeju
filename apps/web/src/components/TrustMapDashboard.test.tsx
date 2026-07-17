@@ -99,4 +99,14 @@ describe('TrustMapDashboard terrain map', () => {
     await screen.findByRole('button', {name: '제주시 근거 보기'});
     expect(screen.getByText('중앙 음영은 지형 표현')).toBeVisible();
   });
+
+  it('keeps the surrounding islands decorative and out of the region button count', async () => {
+    render(<TrustMapDashboard onSubmit={vi.fn()} />);
+
+    expect(await screen.findByTestId('jeju-offshore-islands')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getAllByRole('button', {name: /근거 보기/})).toHaveLength(12);
+  });
 });

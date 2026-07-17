@@ -519,6 +519,15 @@ function JejuMapDefs() {
           floodOpacity="0.62"
         />
       </filter>
+      <filter id="jejuIsletDepth" x="-35%" y="-35%" width="170%" height="190%">
+        <feDropShadow
+          dx="0"
+          dy="3"
+          stdDeviation="2.5"
+          floodColor="#52766E"
+          floodOpacity="0.2"
+        />
+      </filter>
       <linearGradient
         id="jejuRoad"
         x1="42"
@@ -625,6 +634,83 @@ function HallasanTerrainLayer() {
         strokeOpacity="0.38"
         strokeWidth="1.2"
       />
+    </g>
+  );
+}
+
+function OffshoreIslands() {
+  return (
+    <g
+      data-testid="jeju-offshore-islands"
+      aria-hidden="true"
+      pointerEvents="none"
+      filter="url(#jejuIsletDepth)"
+      className="font-semibold"
+    >
+      <path
+        d="M18 57 C29 48 43 52 54 64 C43 74 28 72 18 57 Z"
+        fill="#B9D8E8"
+        stroke="#FFFFFF"
+        strokeOpacity="0.78"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M31 48 C36 43 42 45 46 50 C41 54 35 54 31 48 Z"
+        fill="#CDE4EE"
+        opacity="0.9"
+      />
+      <text
+        x="58"
+        y="65"
+        fill="#52706A"
+        stroke="#FFFFFF"
+        strokeOpacity="0.65"
+        strokeWidth="2"
+        paintOrder="stroke"
+        className="text-[11px]"
+      >
+        추자도
+      </text>
+
+      <path
+        d="M87 287 L100 281 L111 291 L100 300 L87 295 Z"
+        fill="#AFCBC5"
+        stroke="#FFFFFF"
+        strokeOpacity="0.8"
+        strokeWidth="1.5"
+      />
+      <text
+        x="49"
+        y="296"
+        fill="#607B74"
+        stroke="#FFFFFF"
+        strokeOpacity="0.68"
+        strokeWidth="2"
+        paintOrder="stroke"
+        className="hidden text-[10px] sm:block"
+      >
+        가파도
+      </text>
+
+      <path
+        d="M118 301 L130 295 L141 303 L130 310 L118 306 Z"
+        fill="#96B9B1"
+        stroke="#FFFFFF"
+        strokeOpacity="0.82"
+        strokeWidth="1.5"
+      />
+      <text
+        x="107"
+        y="309"
+        fill="#607B74"
+        stroke="#FFFFFF"
+        strokeOpacity="0.68"
+        strokeWidth="2"
+        paintOrder="stroke"
+        className="hidden text-[10px] sm:block"
+      >
+        마라도
+      </text>
     </g>
   );
 }
@@ -790,14 +876,7 @@ function JejuSilhouetteMap({
           );
         })}
 
-        <g className="fill-[#C8DDF0] text-[12px] font-semibold text-basalt-2">
-          <path d="M20 58 C31 51 43 56 52 66 C40 73 28 70 20 58 Z" />
-          <text x="55" y="68" className="fill-basalt-2 text-[12px]">추자도</text>
-          <path d="M88 287 L100 282 L109 291 L99 299 Z" className="fill-stone-300" />
-          <text x="52" y="296" className="fill-basalt-2 text-[11px]">가파도</text>
-          <path d="M119 301 L129 296 L139 303 L129 309 Z" className="fill-stone-300" />
-          <text x="108" y="309" className="fill-basalt-2 text-[11px]">마라도</text>
-        </g>
+        <OffshoreIslands />
         </svg>
 
         <div
