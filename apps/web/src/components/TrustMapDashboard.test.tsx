@@ -110,6 +110,25 @@ describe('TrustMapDashboard terrain map', () => {
     expect(jeju).toHaveAttribute('data-active', 'true');
   });
 
+  it('keeps an unselected region active so it can be added after another region', async () => {
+    const user = userEvent.setup();
+    render(
+      <TrustMapDashboard
+        onSubmit={vi.fn()}
+        initialInfo={{...twoRegionTravelInfo, regions: ['hallim']}}
+        initialMoments={['oreum']}
+      />,
+    );
+
+    const gujwa = await screen.findByRole('button', {name: '구좌 근거 보기'});
+    await user.click(gujwa);
+
+    expect(gujwa).toHaveAttribute('data-active', 'true');
+    expect(
+      screen.getByRole('button', {name: '구좌를 플랜 후보에 담기'}),
+    ).toBeVisible();
+  });
+
   it('separates terrain shading from public-data status in the legend', async () => {
     render(<TrustMapDashboard onSubmit={vi.fn()} />);
 
@@ -193,5 +212,25 @@ describe('TrustMapDashboard terrain map', () => {
     expect(
       within(inspector).getByText('한림에서 오름에 올라 바람 맞기'),
     ).toBeVisible();
+  });
+
+  it('keeps progress, the scrollable inspector, and primary actions accessible', async () => {
+    render(
+      <TrustMapDashboard
+        onSubmit={vi.fn()}
+        initialInfo={{...twoRegionTravelInfo, regions: ['hallim']}}
+        initialMoments={fiveSelectedMoments}
+      />,
+    );
+
+    const inspector = await screen.findByTestId('region-moment-inspector');
+    expect(within(inspector).getByRole('progressbar')).toHaveAttribute(
+      'max',
+      '5',
+    );
+    expect(screen.getByRole('button', {name: /제주팩 받기/})).toBeEnabled();
+    expect(screen.getByTestId('region-panel-scroll-area')).toHaveClass(
+      'overflow-y-auto',
+    );
   });
 });

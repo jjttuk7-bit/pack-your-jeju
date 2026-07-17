@@ -343,9 +343,7 @@ export default function TrustMapDashboard({
   }, []);
 
   useEffect(() => {
-    const region = activeRegion && selectedRegions.includes(activeRegion)
-      ? activeRegion
-      : selectedRegions[0];
+    const region = activeRegion ?? selectedRegions[0];
     const moment = activeMoment && selectedMoments.includes(activeMoment)
       ? activeMoment
       : selectedMoments[0];
@@ -384,10 +382,13 @@ export default function TrustMapDashboard({
   };
 
   const toggleRegion = (region: RegionId) => {
-    setActiveRegion(region);
-    setSelectedRegions((prev) =>
-      prev.includes(region) ? prev.filter((id) => id !== region) : [...prev, region],
-    );
+    const selected = selectedRegions.includes(region);
+    const nextRegions = selected
+      ? selectedRegions.filter((id) => id !== region)
+      : [...selectedRegions, region];
+
+    setSelectedRegions(nextRegions);
+    setActiveRegion(selected ? nextRegions[0] ?? region : region);
   };
 
   const toggleMoment = (moment: MomentId) => {
@@ -512,47 +513,49 @@ export default function TrustMapDashboard({
           </main>
 
           <aside className="border-t border-earth bg-white/82 p-4 sm:p-5 lg:border-l lg:border-t-0">
-            {activeEntry && activeRegion ? (
-              <RegionPanel
-                region={activeEntry}
-                preview={activePreview}
-                tone={activeTone}
-                previewLoading={previewLoading}
-                selectedMoments={selectedMoments}
-                selectedRegions={selectedRegions}
-                activeMoment={activeMoment}
-                reviewedCount={reviewedCount}
-                combinationCount={combinations.length}
-                activeCombinationPosition={
-                  activeCombinationIndex >= 0 ? activeCombinationIndex + 1 : 0
-                }
-                reviewedCombinations={reviewedCombinations}
-                showUnreviewedOnly={showUnreviewedOnly}
-                selected={selectedRegions.includes(activeRegion)}
-                selectedLabels={selectedLabels}
-                coverageSummary={coverageSummary}
-                canSubmit={selectedMoments.length > 0}
-                onInspectCombination={inspectCombination}
-                onPreviousCombination={() => inspectCombinationAt(activeCombinationIndex - 1)}
-                onNextCombination={() => inspectCombinationAt(activeCombinationIndex + 1)}
-                hasPreviousCombination={activeCombinationIndex > 0}
-                hasNextCombination={
-                  activeCombinationIndex >= 0 &&
-                  activeCombinationIndex < combinations.length - 1
-                }
-                onToggleUnreviewedOnly={() =>
-                  setShowUnreviewedOnly((current) => !current)
-                }
-                onToggle={() => toggleRegion(activeRegion)}
-                onSubmit={submitPlan}
-              />
-            ) : (
-              <DashboardStartPanel
-                previewLoading={previewLoading}
-                summary={dashboardSummary}
-                selectedMomentCount={selectedMoments.length}
-              />
-            )}
+            <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-2rem)]">
+              {activeEntry && activeRegion ? (
+                <RegionPanel
+                  region={activeEntry}
+                  preview={activePreview}
+                  tone={activeTone}
+                  previewLoading={previewLoading}
+                  selectedMoments={selectedMoments}
+                  selectedRegions={selectedRegions}
+                  activeMoment={activeMoment}
+                  reviewedCount={reviewedCount}
+                  combinationCount={combinations.length}
+                  activeCombinationPosition={
+                    activeCombinationIndex >= 0 ? activeCombinationIndex + 1 : 0
+                  }
+                  reviewedCombinations={reviewedCombinations}
+                  showUnreviewedOnly={showUnreviewedOnly}
+                  selected={selectedRegions.includes(activeRegion)}
+                  selectedLabels={selectedLabels}
+                  coverageSummary={coverageSummary}
+                  canSubmit={selectedMoments.length > 0}
+                  onInspectCombination={inspectCombination}
+                  onPreviousCombination={() => inspectCombinationAt(activeCombinationIndex - 1)}
+                  onNextCombination={() => inspectCombinationAt(activeCombinationIndex + 1)}
+                  hasPreviousCombination={activeCombinationIndex > 0}
+                  hasNextCombination={
+                    activeCombinationIndex >= 0 &&
+                    activeCombinationIndex < combinations.length - 1
+                  }
+                  onToggleUnreviewedOnly={() =>
+                    setShowUnreviewedOnly((current) => !current)
+                  }
+                  onToggle={() => toggleRegion(activeRegion)}
+                  onSubmit={submitPlan}
+                />
+              ) : (
+                <DashboardStartPanel
+                  previewLoading={previewLoading}
+                  summary={dashboardSummary}
+                  selectedMomentCount={selectedMoments.length}
+                />
+              )}
+            </div>
           </aside>
         </div>
       </section>
@@ -1177,7 +1180,7 @@ function RegionPanel({
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-citrus-2">
           선택 지역 근거
@@ -1187,6 +1190,10 @@ function RegionPanel({
         </h2>
       </div>
 
+      <div
+        data-testid="region-panel-scroll-area"
+        className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1"
+      >
       <div className={`mt-4 rounded-2xl border p-3 text-[12px] leading-relaxed ${panelToneClass(tone)}`}>
         {previewLoading ? (
           <span className="inline-flex items-center gap-1.5">
@@ -1264,6 +1271,12 @@ function RegionPanel({
           <p className="mt-1 text-[11px] font-bold text-mint">
             확인 {reviewedCount} / {combinationCount}
           </p>
+          <progress
+            aria-label="조합 확인 진행률"
+            value={reviewedCount}
+            max={combinationCount || 1}
+            className="mt-2 h-1.5 w-full accent-mint"
+          />
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="text-[10px] text-basalt-2">
               현재 {activeCombinationPosition} / {combinationCount}
@@ -1272,7 +1285,7 @@ function RegionPanel({
               type="button"
               aria-pressed={showUnreviewedOnly}
               onClick={onToggleUnreviewedOnly}
-              className="rounded-full border border-earth bg-white px-2 py-1 text-[10px] font-bold text-basalt-2"
+              className="min-h-11 rounded-full border border-earth bg-white px-3 py-2 text-[10px] font-bold text-basalt-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus focus-visible:ring-offset-2"
             >
               {showUnreviewedOnly ? '전체 보기' : '미확인만 보기'}
             </button>
@@ -1291,7 +1304,7 @@ function RegionPanel({
                     const moment = activeMoment ?? selectedMoments[0];
                     if (moment) onInspectCombination(regionId, moment);
                   }}
-                  className="rounded-full border border-earth bg-white px-2 py-1 text-[10px] font-bold text-basalt-2"
+                  className="min-h-11 rounded-full border border-earth bg-white px-3 py-2 text-[10px] font-bold text-basalt-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus focus-visible:ring-offset-2"
                 >
                   {label}
                 </button>
@@ -1310,7 +1323,7 @@ function RegionPanel({
                   aria-pressed={momentId === activeMoment}
                   aria-label={`${region.label}에서 ${moment.title} 조합 확인`}
                   onClick={() => onInspectCombination(region.value, momentId)}
-                  className="rounded-xl border border-earth bg-[#FFF9F0] px-2 py-1.5 text-[10px] font-bold text-basalt-2"
+                  className="min-h-11 rounded-xl border border-earth bg-[#FFF9F0] px-3 py-2 text-left text-[10px] font-bold text-basalt-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus focus-visible:ring-offset-2"
                 >
                   {moment.title}
                 </button>
@@ -1323,7 +1336,7 @@ function RegionPanel({
               type="button"
               disabled={!hasPreviousCombination}
               onClick={onPreviousCombination}
-              className="flex-1 rounded-xl border border-earth bg-white px-2 py-1.5 text-[10px] font-bold text-basalt-2 disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-xl border border-earth bg-white px-3 py-2 text-[10px] font-bold text-basalt-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus focus-visible:ring-offset-2 disabled:opacity-40"
             >
               이전 조합
             </button>
@@ -1331,7 +1344,7 @@ function RegionPanel({
               type="button"
               disabled={!hasNextCombination}
               onClick={onNextCombination}
-              className="flex-1 rounded-xl border border-earth bg-white px-2 py-1.5 text-[10px] font-bold text-basalt-2 disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-xl border border-earth bg-white px-3 py-2 text-[10px] font-bold text-basalt-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus focus-visible:ring-offset-2 disabled:opacity-40"
             >
               다음 조합
             </button>
@@ -1371,6 +1384,7 @@ function RegionPanel({
           </p>
         </div>
       )}
+      </div>
 
       <div className="mt-auto pt-5">
         <button
