@@ -14,12 +14,12 @@ describe('region moment inspector model', () => {
         ['oreum', 'beach_walk', 'quiet_cafe'],
       ),
     ).toEqual([
-      { region: 'hallim', moment: 'oreum', key: 'hallim:oreum' },
-      { region: 'hallim', moment: 'beach_walk', key: 'hallim:beach_walk' },
-      { region: 'hallim', moment: 'quiet_cafe', key: 'hallim:quiet_cafe' },
-      { region: 'gujwa', moment: 'oreum', key: 'gujwa:oreum' },
-      { region: 'gujwa', moment: 'beach_walk', key: 'gujwa:beach_walk' },
-      { region: 'gujwa', moment: 'quiet_cafe', key: 'gujwa:quiet_cafe' },
+      { region: 'hallim', moment: 'oreum' },
+      { region: 'hallim', moment: 'beach_walk' },
+      { region: 'hallim', moment: 'quiet_cafe' },
+      { region: 'gujwa', moment: 'oreum' },
+      { region: 'gujwa', moment: 'beach_walk' },
+      { region: 'gujwa', moment: 'quiet_cafe' },
     ]);
   });
 
