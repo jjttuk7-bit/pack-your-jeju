@@ -1,9 +1,9 @@
-import {render, screen} from '@testing-library/react';
+import {render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {requestRegionCoveragePreview} from '../api';
-import type {RegionCoveragePreview} from '../types';
+import type {MomentId, RegionCoveragePreview, TravelInfo} from '../types';
 import TrustMapDashboard from './TrustMapDashboard';
 
 
@@ -12,6 +12,23 @@ vi.mock('../api', () => ({
 }));
 
 const mockedPreview = vi.mocked(requestRegionCoveragePreview);
+
+const twoRegionTravelInfo: TravelInfo = {
+  regions: ['hallim', 'gujwa'],
+  startDate: '2026-07-20',
+  durationDays: 3,
+  companion: 'solo',
+  purpose: 'healing',
+  specialNotes: '동서쪽의 순간을 차분히 비교하고 싶어요.',
+};
+
+const fiveSelectedMoments: MomentId[] = [
+  'oreum',
+  'beach_walk',
+  'sunset',
+  'local_food',
+  'quiet_cafe',
+];
 
 function previewFor(region: string): RegionCoveragePreview {
   return {
@@ -108,5 +125,43 @@ describe('TrustMapDashboard terrain map', () => {
       'true',
     );
     expect(screen.getAllByRole('button', {name: /근거 보기/})).toHaveLength(12);
+  });
+
+  it('summarizes every selected region and moment combination and switches regions', async () => {
+    const user = userEvent.setup();
+    render(
+      <TrustMapDashboard
+        onSubmit={vi.fn()}
+        initialInfo={twoRegionTravelInfo}
+        initialMoments={fiveSelectedMoments}
+      />,
+    );
+
+    const inspector = await screen.findByTestId('region-moment-inspector');
+    expect(inspector).toHaveTextContent('2개 지역 · 5개 순간 · 총 10개 조합');
+    expect(within(inspector).getAllByRole('button', {name: /조합 확인/})).toHaveLength(5);
+
+    await user.click(within(inspector).getByRole('button', {name: '구좌 지역 조합 보기'}));
+
+    expect(within(inspector).getByText('구좌에서 오름에 올라 바람 맞기')).toBeVisible();
+  });
+
+  it('advances the confirmation count across selected region and moment combinations', async () => {
+    const user = userEvent.setup();
+    render(
+      <TrustMapDashboard
+        onSubmit={vi.fn()}
+        initialInfo={twoRegionTravelInfo}
+        initialMoments={fiveSelectedMoments.slice(0, 2)}
+      />,
+    );
+
+    const inspector = await screen.findByTestId('region-moment-inspector');
+    expect(within(inspector).getByText('확인 1 / 4')).toBeVisible();
+
+    await user.click(within(inspector).getByRole('button', {name: '다음 조합'}));
+
+    expect(within(inspector).getByText('확인 2 / 4')).toBeVisible();
+    expect(within(inspector).getByText('한림에서 바다 산책하기')).toBeVisible();
   });
 });
