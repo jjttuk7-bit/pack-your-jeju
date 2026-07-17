@@ -2731,6 +2731,31 @@ def chat_turn(
     )
 
 
+def _preloaded_tool_fallback_turn(
+    conv: list[dict],
+    trace: list[dict],
+    *,
+    reason: str,
+    preloaded_tool: str,
+    answer_contract: dict | None,
+    place_candidates: list[dict],
+) -> HarubanTurn:
+    reply_text = _fallback_reply_from_tool_messages(conv)
+    if preloaded_tool == "web_search_jeju":
+        reply_text = _enforce_web_source_role_disclosure(
+            reply_text,
+            _web_sources_from_pool_context(conv),
+        )
+    return HarubanTurn(
+        available=True,
+        reply_text=reply_text,
+        tool_trace=trace,
+        reason=f"{reason}; used preloaded tool fallback",
+        answer_contract=answer_contract or {},
+        place_candidates=place_candidates,
+    )
+
+
 def _chat_turn_raw(
     conv: list[dict],
     trace: list[dict],
@@ -2778,6 +2803,15 @@ def _chat_turn_raw(
                 (perf_counter() - completion_started) * 1000,
                 f"{type(e).__name__}: {e}",
             )
+            if preloaded_tool:
+                return _preloaded_tool_fallback_turn(
+                    conv,
+                    trace,
+                    reason=f"openai call failed: {e}",
+                    preloaded_tool=preloaded_tool,
+                    answer_contract=answer_contract,
+                    place_candidates=resolved_candidates,
+                )
             return HarubanTurn(available=False, reason=f"openai call failed: {e}", tool_trace=trace)
         logger.info(
             "haruban chat completion completed iteration=%d preloaded_tool=%s elapsed_ms=%.1f",
@@ -2788,6 +2822,15 @@ def _chat_turn_raw(
 
         choice = resp.choices[0] if resp.choices else None
         if not choice:
+            if preloaded_tool:
+                return _preloaded_tool_fallback_turn(
+                    conv,
+                    trace,
+                    reason="no choice returned",
+                    preloaded_tool=preloaded_tool,
+                    answer_contract=answer_contract,
+                    place_candidates=resolved_candidates,
+                )
             return HarubanTurn(available=False, reason="no choice returned", tool_trace=trace)
         msg = choice.message
         tool_calls = getattr(msg, "tool_calls", None) or []

@@ -420,6 +420,97 @@ def test_preloaded_search_pool_disables_duplicate_model_tool_calls(monkeypatch):
     assert captured["reasoning_effort"] == "low"
 
 
+def test_preloaded_search_falls_back_when_final_model_call_fails(monkeypatch):
+    contract = {"answer_type": "region_overview", "source_type": "web"}
+    candidates = [{"name": "산방산", "region": "andeok"}]
+    conv = [
+        {
+            "role": "system",
+            "content": haruban._format_search_pool_context({
+                "tool": "web_search_jeju",
+                "result": {
+                    "available": True,
+                    "answer": "안덕은 산방산과 해안 경관을 함께 보기 좋은 서남부 지역입니다.",
+                    "sources": [{
+                        "title": "제주 관광 공식",
+                        "url": "https://example.com/andeok",
+                        "source_class": "official",
+                    }],
+                },
+            }),
+        },
+        {"role": "user", "content": "안덕은 어떤 곳이야?"},
+    ]
+
+    class FailingCompletions:
+        @staticmethod
+        def create(**_kwargs):
+            raise TimeoutError("final model timeout")
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=FailingCompletions()),
+    )
+    monkeypatch.setattr(openai, "OpenAI", lambda **_kwargs: fake_client)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    turn = haruban._chat_turn_raw(
+        conv,
+        [{"tool": "preload:web_search_jeju", "args": {}, "result_size": 10}],
+        3,
+        {},
+        answer_contract=contract,
+        preloaded_tool="web_search_jeju",
+        place_candidates=candidates,
+    )
+
+    assert turn.available is True
+    assert "안덕은 산방산과 해안 경관" in turn.reply_text
+    assert turn.answer_contract == contract
+    assert turn.place_candidates == candidates
+    assert "fallback" in turn.reason
+
+
+def test_preloaded_search_falls_back_when_final_model_returns_no_choice(monkeypatch):
+    conv = [
+        {
+            "role": "system",
+            "content": haruban._format_search_pool_context({
+                "tool": "web_search_jeju",
+                "result": {
+                    "available": True,
+                    "answer": "안덕은 산과 바다를 함께 둘러보기 좋은 지역입니다.",
+                    "sources": [],
+                },
+            }),
+        },
+        {"role": "user", "content": "안덕은 어떤 곳이야?"},
+    ]
+
+    class EmptyCompletions:
+        @staticmethod
+        def create(**_kwargs):
+            return SimpleNamespace(choices=[])
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=EmptyCompletions()),
+    )
+    monkeypatch.setattr(openai, "OpenAI", lambda **_kwargs: fake_client)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    turn = haruban._chat_turn_raw(
+        conv,
+        [{"tool": "preload:web_search_jeju", "args": {}, "result_size": 10}],
+        3,
+        {},
+        preloaded_tool="web_search_jeju",
+    )
+
+    assert turn.available is True
+    assert "안덕은 산과 바다" in turn.reply_text
+    assert "no choice returned" in turn.reason
+    assert "fallback" in turn.reason
+
+
 def test_preloaded_web_answer_applies_source_role_guardrail(monkeypatch):
     message = SimpleNamespace(
         content=(
