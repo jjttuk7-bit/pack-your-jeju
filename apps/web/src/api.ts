@@ -17,6 +17,8 @@ import type {
   VerifyResponse,
   WeatherReportRequest,
   WeatherReportResponse,
+  RoutePlanRequest,
+  RoutePlanResponse,
 } from './types';
 
 // 로컬 dev 기본값은 127.0.0.1로 고정 (Windows에서 localhost는 IPv6로 해석되어
@@ -116,6 +118,28 @@ export function requestWeatherReport(
       moment: item.moment,
       fixed: item.fixed,
       reservation_note: item.reservationNote ?? null,
+    })),
+    dismissed_proposal_fingerprints: request.dismissedProposalFingerprints,
+  });
+}
+
+export function requestRoutePlan(
+  request: RoutePlanRequest,
+): Promise<RoutePlanResponse> {
+  return post<RoutePlanResponse>('/route/plan', {
+    mode: request.mode,
+    origin: request.origin,
+    destination: request.destination,
+    items: request.items.map((item) => ({
+      id: item.id,
+      label: item.label,
+      lat: item.lat,
+      lng: item.lng,
+      day: item.day,
+      daypart: item.daypart,
+      fixed: item.fixed,
+      weather_status: item.weatherStatus ?? null,
+      operating_check_required: item.operatingCheckRequired ?? false,
     })),
     dismissed_proposal_fingerprints: request.dismissedProposalFingerprints,
   });

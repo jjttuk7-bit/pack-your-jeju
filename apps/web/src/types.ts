@@ -200,6 +200,97 @@ export interface WeatherReportResponse {
   };
 }
 
+export type RouteMode = 'driving' | 'transit' | 'walking';
+
+export type RouteStatus =
+  | 'verified_route'
+  | 'estimated_route'
+  | 'mixed_route'
+  | 'unavailable';
+
+export interface RouteLocation {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
+export interface RoutePlanRequestItem extends RouteLocation {
+  id: string;
+  day: number;
+  daypart: Daypart;
+  fixed: boolean;
+  weatherStatus?: WeatherDecisionStatus | null;
+  operatingCheckRequired?: boolean;
+}
+
+export interface RoutePlanRequest {
+  mode: RouteMode;
+  origin: RouteLocation;
+  destination: RouteLocation;
+  items: RoutePlanRequestItem[];
+  dismissedProposalFingerprints: string[];
+}
+
+export interface RouteSegment {
+  from_id: string;
+  to_id: string;
+  distance_m: number;
+  duration_s: number;
+  status: RouteStatus;
+  provider: string;
+  geometry: Array<{lat: number; lng: number}>;
+  checked_at?: string | null;
+  fallback_reason?: string | null;
+}
+
+export interface RouteSummary {
+  item_ids: string[];
+  segments: RouteSegment[];
+  total_duration_s: number;
+  total_distance_m: number;
+  status: RouteStatus;
+}
+
+export interface RouteDayResult {
+  day: number;
+  headline: string;
+  current_item_ids: string[];
+  recommended_item_ids: string[];
+  current: RouteSummary;
+  recommended: RouteSummary;
+}
+
+export interface RouteProposalOperation {
+  type: 'reorder_day_items';
+  day: number;
+  ordered_item_ids: string[];
+}
+
+export interface RouteChangeProposal {
+  proposal_id: string;
+  fingerprint: string;
+  base_plan_fingerprint: string;
+  operations: RouteProposalOperation[];
+  saved_duration_s: number;
+  saved_distance_m: number;
+  reasons: string[];
+}
+
+export interface RoutePlanResponse {
+  status: RouteStatus;
+  headline: string;
+  partial: boolean;
+  days: RouteDayResult[];
+  proposal: RouteChangeProposal | null;
+  provider_meta: {
+    providers: string[];
+    checked_at: string;
+    verified_segments: number;
+    estimated_segments: number;
+    failures: Array<{from_id: string; to_id: string; reason: string}>;
+  };
+}
+
 export type VisitCheckStatus =
   | 'visited'
   | 'not_visited'
