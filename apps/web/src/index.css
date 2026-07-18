@@ -959,40 +959,87 @@
 
 /* 밝은 서피스 유틸 → 소프트 다크 서피스.
    컴포넌트의 arbitrary 클래스(bg-[#FDF6EA] 등)를 일일이 고치지 않고
-   접두 그룹으로 매핑한다 (bg-[#F..]=웜 페이퍼, bg-[#E..]=민트 틴트). */
-:root[data-pyj-theme='dark'] [class*='bg-white'] { background-color: #3A3E43; }
-:root[data-pyj-theme='dark'] [class*='bg-[#F'] { background-color: #34383D; }
-:root[data-pyj-theme='dark'] [class*='bg-[#E'] { background-color: #2F3A36; }
-:root[data-pyj-theme='dark'] [class*='bg-stone'] { background-color: #3A3D41; }
-:root[data-pyj-theme='dark'] [class*='bg-amber'] { background-color: rgba(216, 154, 36, 0.16); }
-:root[data-pyj-theme='dark'] [class*='bg-orange'] { background-color: rgba(239, 133, 79, 0.14); }
-:root[data-pyj-theme='dark'] [class*='bg-rose'] { background-color: rgba(226, 110, 110, 0.14); }
+   접두 그룹으로 매핑한다 (bg-[#F..]=웜 페이퍼, bg-[#E..]=민트 틴트).
+   [class^=..], [class*=' ..'] 쌍은 "클래스 단어의 시작"만 매칭 —
+   hover:bg-white / disabled:bg-stone-300 같은 variant 오탐을 막는다. */
+:root[data-pyj-theme='dark'] [class^='bg-white'],
+:root[data-pyj-theme='dark'] [class*=' bg-white'] { background-color: #3A3E43; }
+:root[data-pyj-theme='dark'] [class^='bg-[#F'],
+:root[data-pyj-theme='dark'] [class*=' bg-[#F'] { background-color: #34383D; }
+:root[data-pyj-theme='dark'] [class^='bg-[#E'],
+:root[data-pyj-theme='dark'] [class*=' bg-[#E'] { background-color: #2F3A36; }
+:root[data-pyj-theme='dark'] [class^='bg-stone'],
+:root[data-pyj-theme='dark'] [class*=' bg-stone'] { background-color: #3A3D41; }
+:root[data-pyj-theme='dark'] [class^='bg-amber'],
+:root[data-pyj-theme='dark'] [class*=' bg-amber'] { background-color: rgba(216, 154, 36, 0.16); }
+:root[data-pyj-theme='dark'] [class^='bg-orange'],
+:root[data-pyj-theme='dark'] [class*=' bg-orange'] { background-color: rgba(239, 133, 79, 0.14); }
+:root[data-pyj-theme='dark'] [class^='bg-rose'],
+:root[data-pyj-theme='dark'] [class*=' bg-rose'] { background-color: rgba(226, 110, 110, 0.14); }
 
-:root[data-pyj-theme='dark'] [class*='border-white'] { border-color: rgba(236, 231, 220, 0.16); }
-:root[data-pyj-theme='dark'] [class*='border-stone'] { border-color: rgba(236, 231, 220, 0.14); }
-:root[data-pyj-theme='dark'] [class*='border-amber'] { border-color: rgba(216, 154, 36, 0.38); }
-:root[data-pyj-theme='dark'] [class*='border-orange'] { border-color: rgba(239, 133, 79, 0.34); }
-:root[data-pyj-theme='dark'] [class*='border-rose'] { border-color: rgba(226, 110, 110, 0.34); }
-:root[data-pyj-theme='dark'] [class*='border-[#2'] { border-color: #5F9B8C; }
-:root[data-pyj-theme='dark'] [class*='border-[#E'],
-:root[data-pyj-theme='dark'] [class*='border-[#D'] { border-color: rgba(236, 231, 220, 0.18); }
-:root[data-pyj-theme='dark'] [class*='border-[#C'],
-:root[data-pyj-theme='dark'] [class*='border-[#B8'] { border-color: rgba(140, 183, 173, 0.4); }
-:root[data-pyj-theme='dark'] [class*='border-[#8'] { border-color: rgba(140, 183, 173, 0.55); }
+:root[data-pyj-theme='dark'] [class^='border-white'],
+:root[data-pyj-theme='dark'] [class*=' border-white'] { border-color: rgba(236, 231, 220, 0.16); }
+:root[data-pyj-theme='dark'] [class^='border-stone'],
+:root[data-pyj-theme='dark'] [class*=' border-stone'] { border-color: rgba(236, 231, 220, 0.14); }
+:root[data-pyj-theme='dark'] [class^='border-amber'],
+:root[data-pyj-theme='dark'] [class*=' border-amber'] { border-color: rgba(216, 154, 36, 0.38); }
+:root[data-pyj-theme='dark'] [class^='border-orange'],
+:root[data-pyj-theme='dark'] [class*=' border-orange'] { border-color: rgba(239, 133, 79, 0.34); }
+:root[data-pyj-theme='dark'] [class^='border-rose'],
+:root[data-pyj-theme='dark'] [class*=' border-rose'] { border-color: rgba(226, 110, 110, 0.34); }
+:root[data-pyj-theme='dark'] [class^='border-[#2'],
+:root[data-pyj-theme='dark'] [class*=' border-[#2'] { border-color: #5F9B8C; }
+:root[data-pyj-theme='dark'] [class^='border-[#E'],
+:root[data-pyj-theme='dark'] [class*=' border-[#E'],
+:root[data-pyj-theme='dark'] [class^='border-[#D'],
+:root[data-pyj-theme='dark'] [class*=' border-[#D'] { border-color: rgba(236, 231, 220, 0.18); }
+:root[data-pyj-theme='dark'] [class^='border-[#C'],
+:root[data-pyj-theme='dark'] [class*=' border-[#C'],
+:root[data-pyj-theme='dark'] [class^='border-[#B8'],
+:root[data-pyj-theme='dark'] [class*=' border-[#B8'] { border-color: rgba(140, 183, 173, 0.4); }
+:root[data-pyj-theme='dark'] [class^='border-[#8'],
+:root[data-pyj-theme='dark'] [class*=' border-[#8'] { border-color: rgba(140, 183, 173, 0.55); }
 
 /* 밝은 배경 전제의 진한 틴트 텍스트 → 다크에서 읽히는 밝은 톤 */
-:root[data-pyj-theme='dark'] [class*='text-[#2'] { color: #9CCFC2; }
-:root[data-pyj-theme='dark'] [class*='text-[#9'],
-:root[data-pyj-theme='dark'] [class*='text-[#A8'] { color: #F0A27B; }
-:root[data-pyj-theme='dark'] [class*='text-amber'] { color: #E9C87D; }
-:root[data-pyj-theme='dark'] [class*='text-rose'] { color: #F1A3A3; }
-:root[data-pyj-theme='dark'] [class*='text-stone-9'],
-:root[data-pyj-theme='dark'] [class*='text-stone-8'],
-:root[data-pyj-theme='dark'] [class*='text-stone-7'] { color: #DDD7CB; }
-:root[data-pyj-theme='dark'] [class*='text-stone-6'],
-:root[data-pyj-theme='dark'] [class*='text-stone-5'],
-:root[data-pyj-theme='dark'] [class*='text-stone-4'] { color: #A3A8AB; }
-:root[data-pyj-theme='dark'] [class*='text-stone-3'] { color: #7B8083; }
+:root[data-pyj-theme='dark'] [class^='text-[#2'],
+:root[data-pyj-theme='dark'] [class*=' text-[#2'] { color: #9CCFC2; }
+:root[data-pyj-theme='dark'] [class^='text-[#9'],
+:root[data-pyj-theme='dark'] [class*=' text-[#9'],
+:root[data-pyj-theme='dark'] [class^='text-[#A8'],
+:root[data-pyj-theme='dark'] [class*=' text-[#A8'] { color: #F0A27B; }
+:root[data-pyj-theme='dark'] [class^='text-amber'],
+:root[data-pyj-theme='dark'] [class*=' text-amber'] { color: #E9C87D; }
+:root[data-pyj-theme='dark'] [class^='text-rose'],
+:root[data-pyj-theme='dark'] [class*=' text-rose'] { color: #F1A3A3; }
+:root[data-pyj-theme='dark'] [class^='text-stone-9'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-9'],
+:root[data-pyj-theme='dark'] [class^='text-stone-8'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-8'],
+:root[data-pyj-theme='dark'] [class^='text-stone-7'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-7'] { color: #DDD7CB; }
+:root[data-pyj-theme='dark'] [class^='text-stone-6'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-6'],
+:root[data-pyj-theme='dark'] [class^='text-stone-5'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-5'],
+:root[data-pyj-theme='dark'] [class^='text-stone-4'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-4'] { color: #A3A8AB; }
+:root[data-pyj-theme='dark'] [class^='text-stone-3'],
+:root[data-pyj-theme='dark'] [class*=' text-stone-3'] { color: #7B8083; }
+
+/* 라이트 그라데이션 패널(background-image) — 색 스탑을 다크 서피스로 교체.
+   지도 배경의 민트 그라데이션(D9../8D../4F..)은 라이트 유지가 의도라 제외. */
+:root[data-pyj-theme='dark'] [class^='from-[#F'],
+:root[data-pyj-theme='dark'] [class*=' from-[#F'] { --tw-gradient-from: #34383D; }
+:root[data-pyj-theme='dark'] [class^='via-[#F'],
+:root[data-pyj-theme='dark'] [class*=' via-[#F'] { --tw-gradient-via: #33373B; }
+:root[data-pyj-theme='dark'] [class^='to-[#F'],
+:root[data-pyj-theme='dark'] [class*=' to-[#F'] { --tw-gradient-to: #2F3337; }
+:root[data-pyj-theme='dark'] [class^='via-white'],
+:root[data-pyj-theme='dark'] [class*=' via-white'] { --tw-gradient-via: #3A3E43; }
+:root[data-pyj-theme='dark'] [class^='from-white'],
+:root[data-pyj-theme='dark'] [class*=' from-white'] { --tw-gradient-from: #3A3E43; }
+:root[data-pyj-theme='dark'] [class^='to-white'],
+:root[data-pyj-theme='dark'] [class*=' to-white'] { --tw-gradient-to: #3A3E43; }
 
 /* 하단 바당 이미지 오버레이 — 크림 그라데이션을 다크로, 이미지는 톤 다운 */
 :root[data-pyj-theme='dark'] [class*='from-[#F1E4CE]'] {
