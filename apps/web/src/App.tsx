@@ -601,13 +601,13 @@ export default function App() {
       <div className="relative z-10 w-full max-w-[1500px] flex flex-col flex-1" id="app-container">
 
         {/* Header — 비대칭, 왼쪽 정렬, 감귤 마스코트 */}
-        <header className="relative overflow-hidden pt-2 pb-8" id="app-header">
+        <header className="relative overflow-hidden pt-2 pb-5 sm:pb-8" id="app-header">
           <HeaderHallasanScene />
           <CitrusRollTransition
             play={playCitrusRoll}
             onComplete={() => setPlayCitrusRoll(false)}
           />
-          <div className="relative z-10 flex items-start gap-4 mb-2">
+          <div className="relative z-10 mb-2 flex items-center gap-3 sm:items-start sm:gap-4">
             {/* 마스코트 클릭 = 처음 화면 (관례상 로고=홈). */}
             <motion.button
               type="button"
@@ -618,16 +618,16 @@ export default function App() {
               transition={{ duration: 0.6, type: 'spring' }}
               whileHover={{ scale: 1.06, rotate: -6 }}
               whileTap={{ scale: 0.95 }}
-              className="shrink-0 -mt-1 rounded-full focus:outline-none focus:ring-2 focus:ring-citrus/40"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-citrus/40 sm:-mt-1 sm:h-auto sm:w-auto"
             >
-              <CitrusMark className="w-[68px] h-[68px]" />
+              <CitrusMark className="h-12 w-12 sm:h-[68px] sm:w-[68px]" />
             </motion.button>
             <div className="flex-1 min-w-0">
               <motion.p
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1, duration: 0.5 }}
-                className="text-[10px] font-bold text-citrus-2 tracking-[0.2em] uppercase mb-1"
+                className="mb-0.5 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.12em] text-citrus-2 sm:mb-1 sm:text-[10px] sm:tracking-[0.2em]"
               >
                 제주 · 신뢰 여행 준비
               </motion.p>
@@ -635,7 +635,7 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.15, duration: 0.5 }}
-                className="font-serif-kr text-[34px] font-bold text-basalt tracking-tight leading-[1.1]"
+                className="whitespace-nowrap font-serif-kr text-[26px] font-bold leading-none tracking-tight text-basalt sm:text-[34px] sm:leading-[1.1]"
                 id="brand-name"
               >
                 제주를 담다
@@ -644,41 +644,57 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.25, duration: 0.5 }}
-                className="text-[11px] text-basalt-2 mt-1.5 font-medium tracking-wide"
+                className="mt-1.5 hidden text-[11px] font-medium tracking-wide text-basalt-2 sm:block"
               >
                 혼저옵서예. 짐 싸기 전에 확인부터.
               </motion.p>
             </div>
-            {/* 명시적 '처음 화면' 아이콘 버튼 (로고 클릭과 병행 — 발견성 강화). */}
-            <motion.button
-              type="button"
-              onClick={handleGoLanding}
-              aria-label="처음 화면으로"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.35, duration: 0.4 }}
-              className="shrink-0 -mt-1 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-earth bg-white/70 hover:bg-white transition text-[10.5px] font-semibold text-basalt-2 hover:text-basalt"
-            >
-              <Home className="w-3 h-3" />
-              <span>처음</span>
-            </motion.button>
-            {/* 다크모드 토글 — setup·dashboard 공통 헤더라 두 화면 모두에서 보인다. */}
-            <motion.button
-              type="button"
-              onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
-              aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-              aria-pressed={theme === 'dark'}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4, duration: 0.4 }}
-              className="shrink-0 -mt-1 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-earth bg-white/70 hover:bg-white transition text-[10.5px] font-semibold text-basalt-2 hover:text-basalt"
-            >
-              {theme === 'dark' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
-              <span>{theme === 'dark' ? '라이트' : '다크'}</span>
-            </motion.button>
+            <div className="flex shrink-0 items-center gap-2">
+              {/* 모바일에서는 44px 아이콘 버튼, 데스크톱에서는 설명 레이블을 함께 노출한다. */}
+              <motion.button
+                type="button"
+                onClick={handleGoLanding}
+                aria-label="처음 화면으로"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.35, duration: 0.4 }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-earth bg-white/70 text-[10.5px] font-semibold text-basalt-2 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-basalt focus:outline-none focus:ring-2 focus:ring-citrus/40 sm:-mt-1 sm:h-auto sm:w-auto sm:gap-1 sm:px-2.5 sm:py-1.5 sm:shadow-none"
+              >
+                <Home className="h-[18px] w-[18px] sm:h-3 sm:w-3" />
+                <span className="hidden sm:inline">처음</span>
+              </motion.button>
+              {/* 다크모드 토글 — setup·dashboard 공통 헤더라 두 화면 모두에서 보인다. */}
+              <motion.button
+                type="button"
+                onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+                aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+                aria-pressed={theme === 'dark'}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.4 }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-earth bg-white/70 text-[10.5px] font-semibold text-basalt-2 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-basalt focus:outline-none focus:ring-2 focus:ring-citrus/40 sm:-mt-1 sm:h-auto sm:w-auto sm:gap-1 sm:px-2.5 sm:py-1.5 sm:shadow-none"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-[18px] w-[18px] sm:h-3 sm:w-3" />
+                ) : (
+                  <Moon className="h-[18px] w-[18px] sm:h-3 sm:w-3" />
+                )}
+                <span className="hidden sm:inline">{theme === 'dark' ? '라이트' : '다크'}</span>
+              </motion.button>
+            </div>
           </div>
 
-          <WaveLine className="relative z-20 w-full h-5 mt-3" />
+          <motion.p
+            data-mobile-header-support
+            initial={{ opacity: 0, y: -3 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.28, duration: 0.45 }}
+            className="relative z-10 ml-[60px] mt-2 border-l-2 border-citrus/70 pl-3 text-[11px] font-medium tracking-[-0.01em] text-basalt-2 sm:hidden"
+          >
+            짐 싸기 전에, 제주를 먼저 확인해요.
+          </motion.p>
+
+          <WaveLine className="relative z-20 mt-4 h-5 w-full sm:mt-3" />
 
           <motion.p
             initial={{ opacity: 0 }}
