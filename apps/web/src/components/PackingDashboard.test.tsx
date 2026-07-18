@@ -207,6 +207,33 @@ describe('PackingDashboard pack journey guide', () => {
     ).toHaveAttribute('aria-current', 'step');
   }, 15_000);
 
+  it('advances to step 4 when the schedule day is changed via the day dropdown', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const onUpdatePlanSchedule = vi.fn();
+    const { rerender } = renderDashboard([], onUpdatePlanSchedule);
+
+    await screen.findByRole('navigation', { name: '여행팩 만드는 순서' });
+    fireEvent.click(screen.getByRole('button', { name: '지금 후보 둘러보기' }));
+    rerender(dashboardElement([scheduledPlanItem], onUpdatePlanSchedule));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /일정 정하기 현재/ }),
+      ).toHaveAttribute('aria-current', 'step');
+    });
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: '산방산 둘레길 여행 날짜' }),
+      { target: { value: '2' } },
+    );
+    expect(onUpdatePlanSchedule).toHaveBeenCalledWith('plan-candidate-1', { day: 2 });
+    expect(
+      screen.getByRole('button', { name: /저장·공유하기 현재/ }),
+    ).toHaveAttribute('aria-current', 'step');
+  }, 15_000);
+
   it('scrolls and focuses existing sections while respecting reduced motion', async () => {
     const scrollIntoView = vi.fn();
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
