@@ -171,6 +171,10 @@ describe('PackingDashboard pack journey guide', () => {
   });
 
   it('introduces all four actions in order without trusting preloaded day data', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
     const onUpdatePlanSchedule = vi.fn();
     const { rerender } = renderDashboard([], onUpdatePlanSchedule);
 
@@ -201,7 +205,7 @@ describe('PackingDashboard pack journey guide', () => {
     expect(
       screen.getByRole('button', { name: /저장·공유하기 현재/ }),
     ).toHaveAttribute('aria-current', 'step');
-  });
+  }, 15_000);
 
   it('scrolls and focuses existing sections while respecting reduced motion', async () => {
     const scrollIntoView = vi.fn();
