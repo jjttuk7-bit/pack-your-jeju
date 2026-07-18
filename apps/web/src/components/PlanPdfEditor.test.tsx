@@ -11,7 +11,7 @@ vi.mock('../api', () => ({
 }));
 
 const info: TravelInfo = {
-  regions: ['jeju'],
+  regions: ['jeju_city'],
   startDate: '2026-07-20',
   durationDays: 2,
   companion: 'solo',

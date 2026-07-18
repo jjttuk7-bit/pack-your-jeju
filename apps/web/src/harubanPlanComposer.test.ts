@@ -10,7 +10,7 @@ import type {
 
 
 const info: TravelInfo = {
-  regions: ['jeju'],
+  regions: ['jeju_city'],
   startDate: '2026-07-20',
   durationDays: 2,
   companion: 'solo',
@@ -23,7 +23,7 @@ const items: TravelPlanItem[] = [
     name: '제주 숲',
     moment: 'forest',
     source: 'public_data',
-    region: 'jeju',
+    region: 'jeju_city',
     day: 1,
     daypart: 'morning',
     startTime: '09:00',
@@ -35,7 +35,7 @@ const items: TravelPlanItem[] = [
     name: '제주 카페',
     moment: 'cafe',
     source: 'web_search',
-    region: 'jeju',
+    region: 'jeju_city',
     day: 1,
     daypart: 'afternoon',
     startTime: '14:00',
@@ -47,7 +47,7 @@ const items: TravelPlanItem[] = [
     name: '예약한 식당',
     moment: 'food',
     source: 'user_added',
-    region: 'jeju',
+    region: 'jeju_city',
     day: 2,
     daypart: 'evening',
     startTime: '18:00',
@@ -64,7 +64,7 @@ function weatherReport(): WeatherReportResponse {
     impacts: [
       {
         item_id: 'a',
-        region: 'jeju',
+        region: 'jeju_city',
         date: '2026-07-20',
         daypart: 'morning',
         status: 'adjust',
@@ -89,8 +89,8 @@ function weatherReport(): WeatherReportResponse {
     ],
     forecast_meta: {
       provider: 'kma',
-      requested_regions: ['jeju'],
-      available_regions: ['jeju'],
+      requested_regions: ['jeju_city'],
+      available_regions: ['jeju_city'],
       unavailable_regions: [],
       partial: false,
       issues: [],

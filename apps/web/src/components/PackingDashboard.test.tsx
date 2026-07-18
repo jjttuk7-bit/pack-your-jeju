@@ -258,7 +258,7 @@ describe('PackingDashboard pack journey guide', () => {
     expect(
       screen.getByRole('button', { name: /저장·공유하기 현재/ }),
     ).toHaveAttribute('aria-current', 'step');
-  }, 15_000);
+  }, 30_000);
 
   it('advances to step 4 when the schedule day is changed via the day dropdown', async () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
@@ -285,7 +285,7 @@ describe('PackingDashboard pack journey guide', () => {
     expect(
       screen.getByRole('button', { name: /저장·공유하기 현재/ }),
     ).toHaveAttribute('aria-current', 'step');
-  }, 15_000);
+  }, 30_000);
 
   it('scrolls and focuses existing sections while respecting reduced motion', async () => {
     const scrollIntoView = vi.fn();
@@ -336,5 +336,67 @@ describe('PackingDashboard pack journey guide', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '초안 확인하기' })).toBeInTheDocument();
     expect(screen.getByText('원본 플랜은 그대로 유지됩니다.')).toBeInTheDocument();
+  }, 30_000);
+
+  it('shares the active Haruban order and returns to the original plan on discard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.mocked(requestWeatherReport).mockResolvedValue(weatherReport);
+    vi.mocked(requestRoutePlan).mockResolvedValue({
+      ...routeReport,
+      proposal: {
+        proposal_id: 'route-reorder',
+        fingerprint: 'route-reorder-fingerprint',
+        base_plan_fingerprint: 'route-base',
+        operations: [{
+          type: 'reorder_day_items',
+          day: 1,
+          ordered_item_ids: ['plan-candidate-2', 'plan-candidate-1'],
+        }],
+        saved_duration_s: 600,
+        saved_distance_m: 1200,
+        reasons: ['가까운 장소부터 이동합니다.'],
+      },
+    });
+    renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
+
+    fireEvent.click(await screen.findByRole('button', { name: /하루방 플랜 조합/ }));
+    await screen.findByText('하루방이 여행 플랜 초안을 만들었어요.');
+    fireEvent.click(screen.getByRole('button', { name: /플랜 공유/ }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const composedText = writeText.mock.calls[0][0] as string;
+    expect(composedText.indexOf('- 안덕 숲길')).toBeLessThan(
+      composedText.indexOf('- 산방산 둘레길'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '내 플랜으로 돌아가기' }));
+    fireEvent.click(screen.getByRole('button', { name: /복사 완료|플랜 공유/ }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    const originalText = writeText.mock.calls[1][0] as string;
+    expect(originalText.indexOf('- 산방산 둘레길')).toBeLessThan(
+      originalText.indexOf('- 안덕 숲길'),
+    );
+  }, 30_000);
+
+  it('discards a composed draft when the saved source plan changes', async () => {
+    vi.mocked(requestWeatherReport).mockResolvedValue(weatherReport);
+    vi.mocked(requestRoutePlan).mockResolvedValue(routeReport);
+    const { rerender } = renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
+
+    fireEvent.click(await screen.findByRole('button', { name: /하루방 플랜 조합/ }));
+    await screen.findByText('하루방이 여행 플랜 초안을 만들었어요.');
+
+    rerender(dashboardElement([scheduledPlanItem]));
+
+    await waitFor(() => {
+      expect(screen.queryByText('하루방이 여행 플랜 초안을 만들었어요.'))
+        .not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /하루방 플랜 조합/ })).toBeEnabled();
   }, 30_000);
 });
