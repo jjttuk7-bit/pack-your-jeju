@@ -76,6 +76,16 @@
       linear-gradient(180deg, #F5EEDF 0%, #F1E4CE 58%, #EBDDC8 100%);
   }
 
+  /* 앱 화면 캔버스 — 깊은 모래. 크림 대비 한 단계 눌러 흰 카드가 뜨게 한다.
+     ID 셀렉터라 setup의 .pyj-dashboard 기본 그라데이션도 함께 통일된다.
+     랜딩은 #app-root 밖이라 영향 없음. */
+  #app-root {
+    background:
+      radial-gradient(900px 300px at 75% 0%, rgba(168, 183, 122, 0.20), transparent 70%),
+      radial-gradient(700px 300px at 5% 10%, rgba(255, 214, 160, 0.25), transparent 70%),
+      linear-gradient(180deg, #EDE0C6 0%, #E7D6B6 55%, #E3D2AF 100%);
+  }
+
   .pyj-dashboard::before {
     content: '';
     position: absolute;
@@ -104,14 +114,15 @@
     mix-blend-mode: multiply;
   }
 
-  /* 카드 시스템 (Warm ivory · basalt-hint shadow) */
+  /* 카드 시스템 (Warm ivory · basalt-hint shadow)
+     보더·그림자는 깊은 모래 배경 위에서 카드 층위가 잡히는 강도로. */
   .card-jeju {
     background: #FFFEFA;
     border-radius: 22px;
-    border: 1px solid rgba(201, 169, 127, 0.28);
+    border: 1px solid rgba(178, 143, 96, 0.45);
     box-shadow:
       0 1px 0 rgba(46, 50, 53, 0.03),
-      0 12px 32px -18px rgba(46, 50, 53, 0.18);
+      0 14px 34px -18px rgba(94, 74, 46, 0.28);
   }
 
   /* 강조 카드 (감귤 톤) */
@@ -140,7 +151,7 @@
   .bg-citrus-2    { background-color: var(--pyj-citrus-2); }
   .bg-mint        { background-color: var(--pyj-mint); }
   .bg-earth       { background-color: var(--pyj-earth); }
-  .border-earth   { border-color: rgba(201, 169, 127, 0.4); }
+  .border-earth   { border-color: rgba(178, 143, 96, 0.5); }
   .border-citrus  { border-color: var(--pyj-citrus); }
   .border-mint    { border-color: var(--pyj-mint); }
   .border-basalt-2 { border-color: var(--pyj-basalt-2); }
@@ -905,7 +916,8 @@
   color: #FFE4D1;
 }
 
-:root[data-pyj-theme='dark'] .pyj-dashboard {
+:root[data-pyj-theme='dark'] .pyj-dashboard,
+:root[data-pyj-theme='dark'] #app-root {
   background:
     radial-gradient(900px 260px at 72% 0%, rgba(117, 132, 91, 0.20), transparent 72%),
     radial-gradient(620px 260px at 4% 12%, rgba(239, 133, 79, 0.10), transparent 72%),
