@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquareText, ShieldCheck, Home } from 'lucide-react';
+import { MessageSquareText, ShieldCheck, Home, Moon, Sun } from 'lucide-react';
 import { TravelInfo, MomentId, SavedTravel, TravelPlanItem, VisitCheck, VisitCheckStatus, WeatherChangeProposal, RouteChangeProposal } from './types';
 import LandingPage from './components/LandingPage';
 import CitrusMark from './components/marks/CitrusMark';
@@ -25,6 +25,8 @@ const LOCAL_STORAGE_KEY = 'pack_your_jeju_state_v1';
 // 시연용 문지기 통과 여부. 로그인 계정 시스템 없음 — 발표 초대 코드 통과 표시만.
 const GATE_STORAGE_KEY = 'pack_your_jeju_gate_v1';
 const CITRUS_ROLL_PENDING_KEY = 'pack_your_jeju_citrus_roll_pending_v1';
+// 다크모드 선호. 랜딩은 라이트 전용이라 대시보드 화면에서만 속성을 켠다.
+const THEME_STORAGE_KEY = 'pack_your_jeju_theme_v1';
 
 const defaultState: SavedTravel = {
   info: {
@@ -187,6 +189,27 @@ export default function App() {
   // 주소로 새로 들어오면 인증 상태와 관계없이 랜딩을 먼저 보여준다.
   // 인증이 남아 있으면 랜딩 CTA가 곧바로 대시보드 진입 버튼으로 동작한다.
   const [showLanding, setShowLanding] = useState(true);
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  // 랜딩에서는 항상 라이트 유지 — 대시보드류 화면에서만 다크 속성 적용.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark' && authenticated && !showLanding) {
+      root.dataset.pyjTheme = 'dark';
+    } else {
+      delete root.dataset.pyjTheme;
+    }
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {}
+  }, [theme, authenticated, showLanding]);
 
   const handleEnter = () => {
     try {
@@ -638,6 +661,20 @@ export default function App() {
             >
               <Home className="w-3 h-3" />
               <span>처음</span>
+            </motion.button>
+            {/* 다크모드 토글 — setup·dashboard 공통 헤더라 두 화면 모두에서 보인다. */}
+            <motion.button
+              type="button"
+              onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+              aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              aria-pressed={theme === 'dark'}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              className="shrink-0 -mt-1 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-earth bg-white/70 hover:bg-white transition text-[10.5px] font-semibold text-basalt-2 hover:text-basalt"
+            >
+              {theme === 'dark' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+              <span>{theme === 'dark' ? '라이트' : '다크'}</span>
             </motion.button>
           </div>
 
