@@ -1,0 +1,41 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="제주를 담다 감귤">
+  <rect width="512" height="512" fill="#FDF6EA"/>
+  <g transform="translate(16 16) scale(7.5)">
+    <path
+      d="M 32 12 C 26 8, 20 8, 18 10 C 22 14, 28 16, 32 16 Z"
+      fill="#4A8779"
+    />
+    <path
+      d="M 32 12 C 26 8, 20 8, 18 10"
+      fill="none"
+      stroke="#3B6E62"
+      stroke-width="1"
+    />
+    <path
+      d="M 32 12 C 32 14, 32 16, 32 18"
+      fill="none"
+      stroke="#3B6E62"
+      stroke-linecap="round"
+      stroke-width="2"
+    />
+    <defs>
+      <radialGradient id="pwa-citrus-fill" cx="0.42" cy="0.36">
+        <stop offset="0" stop-color="#FBB56B"/>
+        <stop offset="0.6" stop-color="#EB7B34"/>
+        <stop offset="1" stop-color="#B94E1E"/>
+      </radialGradient>
+    </defs>
+    <circle cx="32" cy="38" r="20" fill="url(#pwa-citrus-fill)"/>
+    <ellipse cx="25" cy="32" rx="5" ry="3" fill="#FFE4C2" opacity="0.65"/>
+    <g fill="#B94E1E" opacity="0.45">
+      <circle cx="38" cy="34" r="0.9"/>
+      <circle cx="42" cy="40" r="0.9"/>
+      <circle cx="30" cy="46" r="0.9"/>
+      <circle cx="24" cy="42" r="0.9"/>
+      <circle cx="36" cy="48" r="0.9"/>
+      <circle cx="44" cy="46" r="0.7"/>
+      <circle cx="22" cy="36" r="0.7"/>
+    </g>
+    <circle cx="32" cy="55" r="1.5" fill="#8A3712" opacity="0.5"/>
+  </g>
+</svg>
