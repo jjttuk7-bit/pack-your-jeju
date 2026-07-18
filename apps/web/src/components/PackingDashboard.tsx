@@ -48,6 +48,7 @@ import type {
   RouteLocation,
   RouteMode,
   RoutePlanResponse,
+  HarubanPlanDraft,
 } from '../types';
 import { MOMENTS, REGIONS, COMPANIONS, PURPOSES } from '../data';
 import { requestCandidatePage, requestPack, requestRoutePlan, requestVisitSignal, requestWeatherReport } from '../api';
@@ -69,6 +70,7 @@ import {
   derivePackJourneyState,
   type PackJourneyStepId,
 } from '../packJourneyGuide';
+import { createHarubanPlanDraft } from '../harubanPlanComposer';
 
 const PlanPdfEditor = lazy(() => import('./PlanPdfEditor'));
 
@@ -244,11 +246,18 @@ export default function PackingDashboard(props: Props) {
   const [routeBasisFingerprint, setRouteBasisFingerprint] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [harubanDraft, setHarubanDraft] = useState<HarubanPlanDraft | null>(null);
+  const [harubanCompositionStatus, setHarubanCompositionStatus] = useState<
+    'idle' | 'weather' | 'route' | 'done'
+  >('idle');
+  const [harubanCompositionError, setHarubanCompositionError] = useState<string | null>(null);
   const [packJourneyStepId, setPackJourneyStepId] =
     useState<PackJourneyStepId>('candidates');
   const dashboardRef = useRef<HTMLDivElement>(null);
   const resizingSidebarRef = useRef(false);
   const previousPlanItemCountRef = useRef(selectedPlanItems.length);
+  const currentPlanFingerprintRef = useRef(planFingerprint(selectedPlanItems));
+  currentPlanFingerprintRef.current = planFingerprint(selectedPlanItems);
 
   useEffect(() => {
     const finishResize = () => {
@@ -371,6 +380,13 @@ export default function PackingDashboard(props: Props) {
     () => planFingerprint(scheduledPlanItems),
     [scheduledPlanItems],
   );
+  useEffect(() => {
+    if (!harubanDraft) return;
+    if (harubanDraft.sourcePlanFingerprint === planFingerprint(selectedPlanItems)) return;
+    setHarubanDraft(null);
+    setHarubanCompositionStatus('idle');
+    setHarubanCompositionError(null);
+  }, [harubanDraft, selectedPlanItems]);
   const visibleWeatherReport = useMemo(() => {
     if (!weatherReport) return null;
     const dismissed = new Set(weatherDismissedFingerprints);
@@ -419,9 +435,10 @@ export default function PackingDashboard(props: Props) {
     () => visibleRouteResponse?.days.find((day) => day.day === routeActiveDay) ?? null,
     [visibleRouteResponse, routeActiveDay],
   );
+  const activePlanItems = harubanDraft?.items ?? selectedPlanItems;
   const shareText = useMemo(
-    () => packResp ? buildShareText(info, selectedMomentIds, packResp, selectedPlanItems, visitChecks) : '',
-    [info, selectedMomentIds, packResp, selectedPlanItems, visitChecks]
+    () => packResp ? buildShareText(info, selectedMomentIds, packResp, activePlanItems, visitChecks) : '',
+    [activePlanItems, info, selectedMomentIds, packResp, visitChecks]
   );
   const hasPackInput = info.regions.length > 0 && selectedMomentIds.length > 0;
 
@@ -460,6 +477,119 @@ export default function PackingDashboard(props: Props) {
     } catch (_e) {
       setShareError('브라우저에서 복사를 허용하지 않았어요.');
     }
+  };
+
+  const handleComposeHarubanPlan = async () => {
+    if (selectedPlanItems.length === 0 || harubanCompositionStatus === 'weather'
+      || harubanCompositionStatus === 'route') return;
+
+    const sourceItems = structuredClone(selectedPlanItems);
+    const sourceFingerprint = planFingerprint(sourceItems);
+    let freshWeatherReport: WeatherReportResponse | null = null;
+    let freshRouteReport: RoutePlanResponse | null = null;
+    let weatherError: string | null = null;
+    let routeErrorMessage: string | null = null;
+
+    setHarubanDraft(null);
+    setHarubanCompositionError(null);
+    setHarubanCompositionStatus('weather');
+
+    const weatherScheduledItems = schedulePlanItemsForWeather(info, sourceItems);
+    const reportItems = toWeatherReportItems(info, weatherScheduledItems);
+    try {
+      freshWeatherReport = await requestWeatherReport({
+        startDate: info.startDate,
+        days: info.durationDays,
+        regions: Array.from(new Set(reportItems.map((item) => item.region))),
+        items: reportItems,
+        dismissedProposalFingerprints: [],
+      });
+    } catch (compositionWeatherError: unknown) {
+      weatherError = compositionWeatherError instanceof Error
+        ? compositionWeatherError.message
+        : '날씨 정보를 확인하지 못했어요.';
+    }
+
+    setHarubanCompositionStatus('route');
+    const weatherDraft = createHarubanPlanDraft({
+      info,
+      items: sourceItems,
+      weatherReport: freshWeatherReport,
+      weatherError,
+    });
+    const compositionRouteItems = enrichPlanItemsWithCoordinates(weatherDraft.items, packItems)
+      .filter((item) => Boolean(resolveItemCoordinate(item)));
+    const endpointItem = compositionRouteItems.find((item) => item.moment === 'stay')
+      ?? compositionRouteItems[0];
+    const endpointCoordinate = endpointItem ? resolveItemCoordinate(endpointItem) : null;
+    const hasComparableDay = Array.from(new Set(compositionRouteItems.map((item) => item.day)))
+      .some((day) => compositionRouteItems.filter((item) => item.day === day).length >= 2);
+
+    if (!endpointItem || !endpointCoordinate || !hasComparableDay) {
+      routeErrorMessage = '같은 Day에 위치가 확인된 장소가 2곳 이상 없어 동선은 유지했어요.';
+    } else {
+      const weatherStatusByItem = new Map(
+        (freshWeatherReport?.impacts ?? []).map((impact) => [impact.item_id, impact.status]),
+      );
+      const endpoint: RouteLocation = {
+        label: endpointItem.moment === 'stay' ? endpointItem.name : `${endpointItem.name} 기준`,
+        lat: endpointCoordinate.lat,
+        lng: endpointCoordinate.lng,
+      };
+      try {
+        const routeResult = await requestRoutePlan({
+          mode: routeMode,
+          origin: endpoint,
+          destination: endpoint,
+          items: compositionRouteItems.flatMap((item) => {
+            const coordinate = resolveItemCoordinate(item);
+            if (!coordinate || !item.day || !item.daypart) return [];
+            return [{
+              id: item.id,
+              label: item.name,
+              lat: coordinate.lat,
+              lng: coordinate.lng,
+              day: item.day,
+              daypart: item.daypart,
+              fixed: item.fixed ?? false,
+              weatherStatus: weatherStatusByItem.get(item.id) ?? null,
+              operatingCheckRequired: Boolean(item.check_required?.length),
+            }];
+          }),
+          dismissedProposalFingerprints: [],
+        });
+        freshRouteReport = {
+          ...routeResult,
+          proposal: routeResult.proposal
+            ? {
+              ...routeResult.proposal,
+              basePlanFingerprint: planFingerprint(weatherDraft.items),
+            }
+            : null,
+        };
+      } catch (compositionRouteError: unknown) {
+        routeErrorMessage = compositionRouteError instanceof Error
+          ? compositionRouteError.message
+          : '동선을 계산하지 못했어요.';
+      }
+    }
+
+    if (currentPlanFingerprintRef.current !== sourceFingerprint) {
+      setHarubanCompositionStatus('idle');
+      setHarubanCompositionError('플랜이 변경되어 조합을 멈췄어요. 다시 눌러 주세요.');
+      return;
+    }
+
+    const nextDraft = createHarubanPlanDraft({
+      info,
+      items: sourceItems,
+      weatherReport: freshWeatherReport,
+      routeReport: freshRouteReport,
+      weatherError,
+      routeError: routeErrorMessage,
+    });
+    setHarubanDraft(nextDraft);
+    setHarubanCompositionStatus('done');
   };
 
   const handleRequestRoute = async () => {
@@ -835,6 +965,16 @@ export default function PackingDashboard(props: Props) {
           planItems={selectedPlanItems}
           durationDays={info.durationDays}
           visitChecks={visitChecks}
+          harubanDraft={harubanDraft}
+          compositionStatus={harubanCompositionStatus}
+          compositionError={harubanCompositionError}
+          onComposeHarubanPlan={handleComposeHarubanPlan}
+          onOpenHarubanDraft={() => setPlanPdfEditorOpen(true)}
+          onDiscardHarubanDraft={() => {
+            setHarubanDraft(null);
+            setHarubanCompositionStatus('idle');
+            setHarubanCompositionError(null);
+          }}
           onAddCustomPlanItem={onAddCustomPlanItem}
           onRemovePlanItem={onRemovePlanItem}
           onUpdatePlanSchedule={handleUpdatePlanSchedule}
@@ -1061,6 +1201,13 @@ export default function PackingDashboard(props: Props) {
             selectedMomentIds={selectedMomentIds}
             selectedPlanItems={selectedPlanItems}
             packingItems={planPackingItems.map((suggestion) => suggestion.item)}
+            initialDraft={harubanDraft}
+            composition={harubanDraft}
+            onDraftChange={(nextDraft) => {
+              setHarubanDraft((current) => current
+                ? {...current, title: nextDraft.title, items: nextDraft.items}
+                : current);
+            }}
             onClose={() => setPlanPdfEditorOpen(false)}
           />
         </Suspense>
@@ -1261,6 +1408,12 @@ function PlanBuilderCard({
   planItems,
   durationDays,
   visitChecks,
+  harubanDraft,
+  compositionStatus,
+  compositionError,
+  onComposeHarubanPlan,
+  onOpenHarubanDraft,
+  onDiscardHarubanDraft,
   onAddCustomPlanItem,
   onRemovePlanItem,
   onUpdatePlanSchedule,
@@ -1269,6 +1422,12 @@ function PlanBuilderCard({
   planItems: TravelPlanItem[];
   durationDays: number;
   visitChecks: Record<string, VisitCheck>;
+  harubanDraft: HarubanPlanDraft | null;
+  compositionStatus: 'idle' | 'weather' | 'route' | 'done';
+  compositionError: string | null;
+  onComposeHarubanPlan: () => void;
+  onOpenHarubanDraft: () => void;
+  onDiscardHarubanDraft: () => void;
   onAddCustomPlanItem: (item: TravelPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
   onUpdatePlanSchedule: (
@@ -1316,6 +1475,83 @@ function PlanBuilderCard({
         <span className="rounded-full border border-earth bg-[#FDF6EA] px-2.5 py-1 text-[10px] font-bold text-basalt-2">
           {planItems.length}개
         </span>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[#E6B48D] bg-gradient-to-br from-[#FFF4E8] via-white to-[#EDF7F2]">
+        {harubanDraft ? (
+          <div className="p-4">
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-citrus text-white shadow-sm">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[12px] font-extrabold text-basalt">
+                  하루방이 여행 플랜 초안을 만들었어요.
+                </p>
+                <p className="mt-1 text-[10.5px] leading-relaxed text-basalt-2">
+                  <span className="block">날씨와 이동 동선을 반영한 추천안입니다.</span>
+                  <span className="block">원본 플랜은 그대로 유지됩니다.</span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={onOpenHarubanDraft}
+                className="col-span-2 rounded-xl bg-citrus px-3 py-2.5 text-[11px] font-bold text-white transition hover:bg-citrus-2"
+              >
+                초안 확인하기
+              </button>
+              <button
+                type="button"
+                onClick={onComposeHarubanPlan}
+                className="rounded-xl border border-earth bg-white px-3 py-2 text-[10.5px] font-bold text-basalt-2 transition hover:border-citrus"
+              >
+                다시 조합
+              </button>
+              <button
+                type="button"
+                onClick={onDiscardHarubanDraft}
+                className="rounded-xl border border-earth bg-white px-3 py-2 text-[10.5px] font-bold text-basalt-2 transition hover:border-citrus"
+              >
+                내 플랜으로 돌아가기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4">
+            <button
+              type="button"
+              onClick={onComposeHarubanPlan}
+              disabled={planItems.length === 0 || compositionStatus === 'weather'
+                || compositionStatus === 'route'}
+              className="flex w-full items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-citrus text-white shadow-sm">
+                {compositionStatus === 'weather' || compositionStatus === 'route'
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Sparkles className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-extrabold text-basalt">
+                  {compositionStatus === 'weather'
+                    ? '날씨를 확인하고 있어요'
+                    : compositionStatus === 'route'
+                      ? '이동 동선을 맞추고 있어요'
+                      : '하루방 플랜 조합'}
+                </span>
+                <span className="mt-0.5 block text-[10.5px] leading-relaxed text-basalt-2">
+                  담아둔 장소를 날씨와 동선에 맞춰 수정 가능한 일정 초안으로 만들어요.
+                </span>
+              </span>
+            </button>
+            {compositionError && (
+              <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[10px] text-rose-700">
+                {compositionError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {planItems.length === 0 ? (

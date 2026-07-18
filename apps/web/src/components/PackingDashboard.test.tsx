@@ -1,6 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PackResponse, TravelInfo, TravelPlanItem } from '../types';
+import type {
+  PackResponse,
+  RoutePlanResponse,
+  TravelInfo,
+  TravelPlanItem,
+  WeatherReportResponse,
+} from '../types';
 import {
   requestCandidatePage,
   requestPack,
@@ -74,6 +80,53 @@ const scheduledPlanItem: TravelPlanItem = {
   day: 1,
   daypart: 'afternoon',
   startTime: '14:00',
+  latitude: 33.24,
+  longitude: 126.31,
+};
+
+const secondScheduledPlanItem: TravelPlanItem = {
+  id: 'plan-candidate-2',
+  name: '안덕 숲길',
+  moment: 'gotjawal',
+  source: 'public_data',
+  region: 'andeok',
+  day: 1,
+  daypart: 'morning',
+  startTime: '09:00',
+  latitude: 33.25,
+  longitude: 126.32,
+};
+
+const weatherReport: WeatherReportResponse = {
+  status: 'suitable',
+  headline: '선택한 일정은 현재 예보와 잘 맞아요.',
+  periods: [],
+  impacts: [],
+  proposals: [],
+  forecast_meta: {
+    provider: 'kma',
+    requested_regions: ['andeok'],
+    available_regions: ['andeok'],
+    unavailable_regions: [],
+    partial: false,
+    issues: [],
+    failures: [],
+  },
+};
+
+const routeReport: RoutePlanResponse = {
+  status: 'verified_route',
+  headline: '가까운 장소부터 잇는 동선으로 정리했어요.',
+  partial: false,
+  days: [],
+  proposal: null,
+  provider_meta: {
+    providers: ['test-route'],
+    checked_at: '2026-07-18T01:00:00Z',
+    verified_segments: 1,
+    estimated_segments: 0,
+    failures: [],
+  },
 };
 
 function dashboardElement(
@@ -263,4 +316,25 @@ describe('PackingDashboard pack journey guide', () => {
     });
     await waitFor(() => expect(document.getElementById('plan-export-actions')).toHaveFocus());
   });
+
+  it('optionally composes saved places with fresh weather and route checks', async () => {
+    vi.mocked(requestWeatherReport).mockResolvedValue(weatherReport);
+    vi.mocked(requestRoutePlan).mockResolvedValue(routeReport);
+    renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
+
+    const composeButton = await screen.findByRole('button', {
+      name: /하루방 플랜 조합/,
+    });
+    fireEvent.click(composeButton);
+
+    await waitFor(() => {
+      expect(requestRoutePlan).toHaveBeenCalled();
+    });
+    expect(requestWeatherReport).toHaveBeenCalled();
+    expect(
+      await screen.findByText('하루방이 여행 플랜 초안을 만들었어요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '초안 확인하기' })).toBeInTheDocument();
+    expect(screen.getByText('원본 플랜은 그대로 유지됩니다.')).toBeInTheDocument();
+  }, 30_000);
 });

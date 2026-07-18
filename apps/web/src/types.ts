@@ -298,6 +298,35 @@ export interface RoutePlanResponse {
   };
 }
 
+export type HarubanPlanCheckStatus =
+  | 'applied'
+  | 'unchanged'
+  | 'partial'
+  | 'unavailable';
+
+export interface HarubanPlanCheckState {
+  status: HarubanPlanCheckStatus;
+  headline: string;
+  checkedAt?: string | null;
+}
+
+export interface HarubanPlanDraftItem extends TravelPlanItem {
+  day: number;
+  order: number;
+  pdfMemo: string;
+}
+
+export interface HarubanPlanDraft {
+  title: string;
+  items: HarubanPlanDraftItem[];
+  sourcePlanFingerprint: string;
+  createdAt: string;
+  weather: HarubanPlanCheckState;
+  route: HarubanPlanCheckState;
+  reasonsByItemId: Record<string, string[]>;
+  warnings: string[];
+}
+
 export type VisitCheckStatus =
   | 'visited'
   | 'not_visited'
