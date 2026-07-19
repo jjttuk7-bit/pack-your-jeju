@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   PackResponse,
@@ -15,6 +15,7 @@ import {
   requestVisitSignal,
   requestWeatherReport,
 } from '../api';
+import { schedulePlanItemsForWeather } from '../weatherProposal';
 import PackingDashboard from './PackingDashboard';
 
 vi.mock('../api', () => ({
@@ -233,31 +234,43 @@ function CustomScheduleDashboard({
     scheduledPlanItem,
     secondScheduledPlanItem,
   ]);
+  const customItem = items.find((item) => item.id.startsWith('pdf-user-')) ?? null;
 
-  return dashboardElement(
-    items,
-    noop,
-    (itemId) => {
-      onRemovePlanItem(itemId);
-      setItems((current) => current.filter((item) => item.id !== itemId));
-    },
-    (item) => {
-      onAddCustomPlanItem(item);
-      setItems((current) => [...current, item]);
-    },
+  return (
+    <>
+      {dashboardElement(
+        items,
+        noop,
+        (itemId) => {
+          onRemovePlanItem(itemId);
+          setItems((current) => current.filter((item) => item.id !== itemId));
+        },
+        (item) => {
+          onAddCustomPlanItem(item);
+          setItems((current) => (
+            schedulePlanItemsForWeather(info, [...current, item])
+          ));
+        },
+      )}
+      <output data-testid="parent-custom-schedule">
+        {customItem ? JSON.stringify(customItem) : ''}
+      </output>
+    </>
   );
 }
 
-async function addDayTwoCustomSchedule() {
+async function addDayTwoCustomSchedule(startTime = '18:30') {
   fireEvent.click(await screen.findByRole('button', {
     name: 'Day 2 일정 직접 추가',
   }));
   fireEvent.change(screen.getByLabelText('일정명'), {
     target: {value: '렌터카 반납'},
   });
-  fireEvent.change(screen.getByLabelText('시간'), {
-    target: {value: '18:30'},
-  });
+  if (startTime) {
+    fireEvent.change(screen.getByLabelText('시간'), {
+      target: {value: startTime},
+    });
+  }
   fireEvent.change(screen.getByLabelText('장소 또는 주소'), {
     target: {value: '제주공항 렌터카하우스'},
   });
@@ -509,6 +522,57 @@ describe('PackingDashboard pack journey guide', () => {
       expect(screen.queryByRole('heading', {name: '렌터카 반납'}))
         .not.toBeInTheDocument();
     });
+  }, 30_000);
+
+  it('keeps an untimed custom schedule identical after parent auto-scheduling', async () => {
+    const onAddCustomPlanItem = vi.fn();
+    render(
+      <CustomScheduleDashboard
+        onAddCustomPlanItem={onAddCustomPlanItem}
+        onRemovePlanItem={noop}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    await addDayTwoCustomSchedule('');
+
+    await waitFor(() => expect(onAddCustomPlanItem).toHaveBeenCalledOnce());
+    const callbackItem = onAddCustomPlanItem.mock.calls[0][0] as TravelPlanItem;
+    await waitFor(() => {
+      expect(screen.getByTestId('parent-custom-schedule').textContent).not.toBe('');
+    });
+    const parentItem = JSON.parse(
+      screen.getByTestId('parent-custom-schedule').textContent ?? '',
+    ) as TravelPlanItem;
+
+    expect(callbackItem).toMatchObject({
+      id: expect.stringMatching(/^pdf-user-/),
+      day: 2,
+      startTime: '09:00',
+      fixed: false,
+    });
+    expect(parentItem).toMatchObject({
+      id: callbackItem.id,
+      day: callbackItem.day,
+      startTime: callbackItem.startTime,
+      fixed: callbackItem.fixed,
+    });
+    const customScheduleHeading = await screen.findByRole('heading', {
+      name: '렌터카 반납',
+    });
+    expect(within(customScheduleHeading.closest('article')!).getByText(
+      '09:00 · 시간 지정',
+    )).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+    fireEvent.click(screen.getByRole('button', {name: /여행 플랜 PDF/}));
+
+    const reopenedHeading = await screen.findByRole('heading', {
+      name: '렌터카 반납',
+    });
+    expect(within(reopenedHeading.closest('article')!).getByText(
+      '09:00 · 시간 지정',
+    )).toBeInTheDocument();
   }, 30_000);
 
   it('keeps a custom schedule after closing and reopening the PDF editor', async () => {

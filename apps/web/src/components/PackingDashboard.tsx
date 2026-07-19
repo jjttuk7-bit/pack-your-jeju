@@ -213,11 +213,32 @@ function savedPlanSidebarWidth(): number {
   return Math.min(Math.max(saved, PLAN_SIDEBAR_MIN_WIDTH), PLAN_SIDEBAR_MAX_WIDTH);
 }
 
-function createPlanPdfUserItemId(): string {
-  const generatedId = typeof globalThis.crypto?.randomUUID === 'function'
-    ? globalThis.crypto.randomUUID()
-    : `${Date.now()}-${nextPlanPdfUserItemSequence += 1}`;
-  return `pdf-user-${generatedId}`;
+function createPlanPdfUserItemId(occupiedIds: Set<string>): string {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const sequence = nextPlanPdfUserItemSequence += 1;
+    let generatedId: string;
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      generatedId = globalThis.crypto.randomUUID();
+    } else {
+      const randomValues = new Uint32Array(2);
+      if (typeof globalThis.crypto?.getRandomValues === 'function') {
+        globalThis.crypto.getRandomValues(randomValues);
+      }
+      generatedId = [
+        Date.now().toString(36),
+        sequence.toString(36),
+        ...Array.from(randomValues, (value) => value.toString(36)),
+      ].join('-');
+    }
+    const candidate = `pdf-user-${generatedId}`;
+    if (!occupiedIds.has(candidate)) return candidate;
+  }
+
+  let candidate: string;
+  do {
+    candidate = `pdf-user-${Date.now().toString(36)}-${nextPlanPdfUserItemSequence += 1}`;
+  } while (occupiedIds.has(candidate));
+  return candidate;
 }
 
 export default function PackingDashboard(props: Props) {
@@ -533,16 +554,25 @@ export default function PackingDashboard(props: Props) {
 
   const handleAddPlanPdfCustomSchedule = (input: PlanPdfCustomScheduleInput) => {
     if (!pdfWorkspace) return;
+    const occupiedIds = new Set([
+      ...selectedPlanItems.map((item) => item.id),
+      ...pdfWorkspace.draft.items.map((item) => item.id),
+    ]);
     const item = buildPlanPdfCustomScheduleItem(
       input,
-      createPlanPdfUserItemId(),
+      createPlanPdfUserItemId(occupiedIds),
       info.durationDays,
     );
     if (!item) return;
+    const canonicalItem = schedulePlanItemsForWeather(
+      info,
+      [...selectedPlanItems, item],
+    ).find((candidate) => candidate.id === item.id);
+    if (!canonicalItem) return;
 
-    onAddCustomPlanItem(item);
+    onAddCustomPlanItem(canonicalItem);
     setPdfWorkspace((current) => current
-      ? addCustomPlanPdfWorkspaceItem(current, item, info.durationDays)
+      ? addCustomPlanPdfWorkspaceItem(current, canonicalItem, info.durationDays)
       : current);
     setWorkspaceRevision((value) => value + 1);
   };
