@@ -309,11 +309,26 @@ def _ticket(item: Any, styles: dict[str, ParagraphStyle]) -> KeepTogether:
 
     detail_parts: list[Flowable] = [
         Paragraph(_paragraph_text(item.name), styles["ticket_title"]),
-        Paragraph(
-            _paragraph_text(item.address or "주소는 여행 전 확인해 주세요."),
-            styles["ticket_meta"],
-        ),
     ]
+    if item.start_time:
+        fixed_label = " · 고정 일정" if item.fixed else ""
+        detail_parts.append(
+            Paragraph(
+                _paragraph_text(f"{item.start_time}{fixed_label}"),
+                styles["ticket_meta"],
+            )
+        )
+    address_copy = (
+        item.address
+        or (
+            "사용자가 직접 입력한 일정입니다."
+            if item.source == "user_added"
+            else "주소는 여행 전 확인해 주세요."
+        )
+    )
+    detail_parts.append(
+        Paragraph(_paragraph_text(address_copy), styles["ticket_meta"])
+    )
     if item.memo:
         detail_parts.extend(
             [

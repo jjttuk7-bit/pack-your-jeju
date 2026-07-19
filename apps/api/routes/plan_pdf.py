@@ -27,6 +27,11 @@ class PlanPdfItemInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     day: int = Field(ge=1, le=14)
     order: int = Field(ge=1, le=100)
+    start_time: str | None = Field(
+        default=None,
+        pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$",
+    )
+    fixed: bool = False
     source: Literal["public_data", "web_search", "user_added"]
     address: str | None = Field(default=None, max_length=300)
     memo: str | None = Field(default=None, max_length=800)

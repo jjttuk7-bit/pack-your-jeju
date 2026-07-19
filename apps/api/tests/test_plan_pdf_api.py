@@ -70,6 +70,8 @@ def _valid_request(**overrides):
                 "day": 2,
                 "order": 2,
                 "source": "user_added",
+                "start_time": "18:30",
+                "fixed": True,
                 "memo": "숙소 근처인지 확인",
                 "check_required": [],
             },
@@ -100,6 +102,15 @@ def test_plan_pdf_rejects_invalid_title_source_and_day():
     assert day_response.status_code == 422
 
 
+def test_plan_pdf_rejects_invalid_start_time():
+    invalid_time = _valid_request()
+    invalid_time["items"][0]["start_time"] = "25:00"
+
+    response = client.post("/plan/pdf", json=invalid_time)
+
+    assert response.status_code == 422
+
+
 def test_plan_pdf_returns_passport_pdf_with_selected_places_and_evidence():
     response = client.post("/plan/pdf", json=_valid_request())
 
@@ -125,3 +136,6 @@ def test_plan_pdf_returns_passport_pdf_with_selected_places_and_evidence():
     assert "공공데이터" in text
     assert "하루방 웹검색" in text
     assert "직접 추가·미검증" in text
+    assert "18:30" in text
+    assert "고정 일정" in text
+    assert "사용자가 직접 입력한 일정입니다." in text

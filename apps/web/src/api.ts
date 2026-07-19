@@ -186,6 +186,8 @@ export interface TravelPlanPdfRequestItem {
   name: string;
   day: number;
   order: number;
+  start_time: string | null;
+  fixed: boolean;
   source: 'public_data' | 'web_search' | 'user_added';
   address: string | null;
   memo: string | null;

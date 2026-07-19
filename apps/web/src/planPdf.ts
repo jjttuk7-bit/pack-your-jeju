@@ -168,6 +168,8 @@ export function buildTravelPlanPdfRequest(
       name: item.name,
       day: item.day,
       order: item.order,
+      start_time: item.startTime ?? null,
+      fixed: item.fixed ?? false,
       source: item.source,
       address: item.address ?? null,
       memo: item.pdfMemo.trim() || null,
