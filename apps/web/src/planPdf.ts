@@ -12,9 +12,44 @@ export interface PlanPdfDraft {
   items: PlanPdfDraftItem[];
 }
 
+export interface PlanPdfCustomScheduleInput {
+  name: string;
+  day: number;
+  startTime: string;
+  address: string;
+  note: string;
+}
+
+const PLAN_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
 function normalizedDays(durationDays: number): number {
   if (!Number.isFinite(durationDays)) return 1;
   return Math.max(1, Math.floor(durationDays));
+}
+
+export function buildPlanPdfCustomScheduleItem(
+  input: PlanPdfCustomScheduleInput,
+  id: string,
+  durationDays: number,
+): TravelPlanItem | null {
+  const name = input.name.trim();
+  const startTime = input.startTime.trim();
+  if (!name || (startTime && !PLAN_TIME_PATTERN.test(startTime))) return null;
+
+  const days = normalizedDays(durationDays);
+  const requestedDay = Number.isFinite(input.day) ? Math.floor(input.day) : 1;
+
+  return {
+    id,
+    name,
+    moment: 'user_added',
+    source: 'user_added',
+    day: Math.min(days, Math.max(1, requestedDay)),
+    startTime: startTime || null,
+    fixed: Boolean(startTime),
+    address: input.address.trim() || null,
+    note: input.note.trim() || null,
+  };
 }
 
 function renumberByDay(items: PlanPdfDraftItem[], durationDays?: number): PlanPdfDraftItem[] {
