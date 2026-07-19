@@ -97,6 +97,17 @@ const secondScheduledPlanItem: TravelPlanItem = {
   longitude: 126.32,
 };
 
+const thirdScheduledPlanItem: TravelPlanItem = {
+  id: 'plan-candidate-3',
+  name: '안덕 카페',
+  moment: 'quiet_cafe',
+  source: 'user_added',
+  region: 'andeok',
+  day: 2,
+  daypart: 'afternoon',
+  startTime: '15:00',
+};
+
 const weatherReport: WeatherReportResponse = {
   status: 'suitable',
   headline: '선택한 일정은 현재 예보와 잘 맞아요.',
@@ -132,6 +143,7 @@ const routeReport: RoutePlanResponse = {
 function dashboardElement(
   selectedPlanItems: TravelPlanItem[] = [],
   onUpdatePlanSchedule = noop,
+  onRemovePlanItem = noop,
 ) {
   return (
     <PackingDashboard
@@ -173,7 +185,7 @@ function dashboardElement(
       onRemoveCustomMemory={noop}
       onTogglePlanItem={noop}
       onAddCustomPlanItem={noop}
-      onRemovePlanItem={noop}
+      onRemovePlanItem={onRemovePlanItem}
       onUpdatePlanSchedule={onUpdatePlanSchedule}
       onApplyWeatherProposal={noop}
       onDismissWeatherProposal={noop}
@@ -191,8 +203,13 @@ function dashboardElement(
 function renderDashboard(
   selectedPlanItems: TravelPlanItem[] = [],
   onUpdatePlanSchedule = noop,
+  onRemovePlanItem = noop,
 ) {
-  return render(dashboardElement(selectedPlanItems, onUpdatePlanSchedule));
+  return render(dashboardElement(
+    selectedPlanItems,
+    onUpdatePlanSchedule,
+    onRemovePlanItem,
+  ));
 }
 
 describe('PackingDashboard pack journey guide', () => {
@@ -383,20 +400,99 @@ describe('PackingDashboard pack journey guide', () => {
     );
   }, 30_000);
 
-  it('discards a composed draft when the saved source plan changes', async () => {
+  it('keeps ordinary PDF edits when the editor closes and opens again', async () => {
+    renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+      target: {value: '노을 전에 도착'},
+    });
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+    fireEvent.click(screen.getByRole('button', {name: /여행 플랜 PDF/}));
+
+    expect(await screen.findByDisplayValue('노을 전에 도착')).toBeInTheDocument();
+  }, 30_000);
+
+  it('excludes only from the PDF workspace and shares the remaining items', async () => {
+    const onRemovePlanItem = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {writeText},
+    });
+    renderDashboard(
+      [scheduledPlanItem, secondScheduledPlanItem],
+      noop,
+      onRemovePlanItem,
+    );
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    fireEvent.click(await screen.findByRole('button', {
+      name: '안덕 숲길 초안에서 제외',
+    }));
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+
+    expect(onRemovePlanItem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: /플랜 공유/}));
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    expect(writeText.mock.calls[0][0]).not.toContain('- 안덕 숲길');
+  }, 30_000);
+
+  it('keeps the draft, offers new source places, and removes deleted source places', async () => {
+    const {rerender} = renderDashboard([
+      scheduledPlanItem,
+      secondScheduledPlanItem,
+    ]);
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+      target: {value: '기존 메모 유지'},
+    });
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+
+    rerender(dashboardElement([
+      scheduledPlanItem,
+      secondScheduledPlanItem,
+      thirdScheduledPlanItem,
+    ]));
+    fireEvent.click(screen.getByRole('button', {name: /여행 플랜 PDF/}));
+    expect(await screen.findByDisplayValue('기존 메모 유지')).toBeInTheDocument();
+    expect(screen.getByText('새로 담은 장소 1곳이 있어요')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', {name: '안덕 카페'})).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {
+      name: '선택한 장소 초안에 추가',
+    }));
+    expect(await screen.findByRole('heading', {name: '안덕 카페'}))
+      .toBeInTheDocument();
+
+    rerender(dashboardElement([
+      scheduledPlanItem,
+      thirdScheduledPlanItem,
+    ]));
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', {name: '안덕 숲길'}))
+        .not.toBeInTheDocument();
+    });
+  }, 30_000);
+
+  it('keeps Haruban evidence and edits after closing and reopening the workspace', async () => {
     vi.mocked(requestWeatherReport).mockResolvedValue(weatherReport);
     vi.mocked(requestRoutePlan).mockResolvedValue(routeReport);
-    const { rerender } = renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
+    renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
 
     fireEvent.click(await screen.findByRole('button', { name: /하루방 플랜 조합/ }));
     await screen.findByText('하루방이 여행 플랜 초안을 만들었어요.');
-
-    rerender(dashboardElement([scheduledPlanItem]));
-
-    await waitFor(() => {
-      expect(screen.queryByText('하루방이 여행 플랜 초안을 만들었어요.'))
-        .not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: '초안 확인하기'}));
+    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+      target: {value: '하루방 초안 메모'},
     });
-    expect(screen.getByRole('button', { name: /하루방 플랜 조합/ })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+    fireEvent.click(screen.getByRole('button', {name: '초안 확인하기'}));
+
+    expect(await screen.findByText('하루방 추천 초안')).toBeInTheDocument();
+    expect(screen.getAllByText('선택한 일정은 현재 예보와 잘 맞아요.').length)
+      .toBeGreaterThan(0);
+    expect(screen.getByDisplayValue('하루방 초안 메모')).toBeInTheDocument();
   }, 30_000);
 });

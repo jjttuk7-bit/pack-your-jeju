@@ -71,6 +71,16 @@ import {
   type PackJourneyStepId,
 } from '../packJourneyGuide';
 import { createHarubanPlanDraft } from '../harubanPlanComposer';
+import {
+  addPendingPlanPdfItems,
+  createPlanPdfWorkspace,
+  excludePlanPdfWorkspaceItem,
+  findPendingPlanPdfSourceItems,
+  syncRemovedPlanPdfSourceItems,
+  undoExcludedPlanPdfWorkspaceItem,
+  updatePlanPdfWorkspaceDraft,
+  type PlanPdfWorkspace,
+} from '../planPdfWorkspace';
 
 const PlanPdfEditor = lazy(() => import('./PlanPdfEditor'));
 
@@ -246,7 +256,8 @@ export default function PackingDashboard(props: Props) {
   const [routeBasisFingerprint, setRouteBasisFingerprint] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [harubanDraft, setHarubanDraft] = useState<HarubanPlanDraft | null>(null);
+  const [pdfWorkspace, setPdfWorkspace] = useState<PlanPdfWorkspace | null>(null);
+  const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [harubanCompositionStatus, setHarubanCompositionStatus] = useState<
     'idle' | 'weather' | 'route' | 'done'
   >('idle');
@@ -380,13 +391,23 @@ export default function PackingDashboard(props: Props) {
     () => planFingerprint(scheduledPlanItems),
     [scheduledPlanItems],
   );
+  const harubanDraft = pdfWorkspace?.composition ?? null;
+  const pendingPlanPdfSourceItems = useMemo(
+    () => pdfWorkspace
+      ? findPendingPlanPdfSourceItems(pdfWorkspace, selectedPlanItems)
+      : [],
+    [pdfWorkspace, selectedPlanItems],
+  );
   useEffect(() => {
-    if (!harubanDraft) return;
-    if (harubanDraft.sourcePlanFingerprint === planFingerprint(selectedPlanItems)) return;
-    setHarubanDraft(null);
-    setHarubanCompositionStatus('idle');
-    setHarubanCompositionError(null);
-  }, [harubanDraft, selectedPlanItems]);
+    if (!pdfWorkspace) return;
+    const nextWorkspace = syncRemovedPlanPdfSourceItems(
+      pdfWorkspace,
+      selectedPlanItems,
+    );
+    if (nextWorkspace === pdfWorkspace) return;
+    setPdfWorkspace(nextWorkspace);
+    setWorkspaceRevision((value) => value + 1);
+  }, [pdfWorkspace, selectedPlanItems]);
   const visibleWeatherReport = useMemo(() => {
     if (!weatherReport) return null;
     const dismissed = new Set(weatherDismissedFingerprints);
@@ -435,7 +456,7 @@ export default function PackingDashboard(props: Props) {
     () => visibleRouteResponse?.days.find((day) => day.day === routeActiveDay) ?? null,
     [visibleRouteResponse, routeActiveDay],
   );
-  const activePlanItems = harubanDraft?.items ?? selectedPlanItems;
+  const activePlanItems = pdfWorkspace?.draft.items ?? selectedPlanItems;
   const shareText = useMemo(
     () => packResp ? buildShareText(info, selectedMomentIds, packResp, activePlanItems, visitChecks) : '',
     [activePlanItems, info, selectedMomentIds, packResp, visitChecks]
@@ -479,6 +500,14 @@ export default function PackingDashboard(props: Props) {
     }
   };
 
+  const openPlanPdfEditor = () => {
+    setPdfWorkspace((current) => current ?? createPlanPdfWorkspace({
+      sourceItems: selectedPlanItems,
+      durationDays: info.durationDays,
+    }));
+    setPlanPdfEditorOpen(true);
+  };
+
   const handleComposeHarubanPlan = async () => {
     if (selectedPlanItems.length === 0 || harubanCompositionStatus === 'weather'
       || harubanCompositionStatus === 'route') return;
@@ -490,7 +519,7 @@ export default function PackingDashboard(props: Props) {
     let weatherError: string | null = null;
     let routeErrorMessage: string | null = null;
 
-    setHarubanDraft(null);
+    setPdfWorkspace(null);
     setHarubanCompositionError(null);
     setHarubanCompositionStatus('weather');
 
@@ -588,7 +617,13 @@ export default function PackingDashboard(props: Props) {
       weatherError,
       routeError: routeErrorMessage,
     });
-    setHarubanDraft(nextDraft);
+    setPdfWorkspace(createPlanPdfWorkspace({
+      sourceItems,
+      durationDays: info.durationDays,
+      initialDraft: nextDraft,
+      composition: nextDraft,
+    }));
+    setWorkspaceRevision((value) => value + 1);
     setHarubanCompositionStatus('done');
   };
 
@@ -836,7 +871,7 @@ export default function PackingDashboard(props: Props) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setPlanPdfEditorOpen(true)}
+                onClick={openPlanPdfEditor}
                 disabled={selectedPlanItems.length === 0}
                 className="rounded-2xl px-3 py-3 bg-citrus text-white font-serif-kr font-bold text-[13px] hover:bg-citrus-2 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5 shadow-jeju-chip"
               >
@@ -969,9 +1004,10 @@ export default function PackingDashboard(props: Props) {
           compositionStatus={harubanCompositionStatus}
           compositionError={harubanCompositionError}
           onComposeHarubanPlan={handleComposeHarubanPlan}
-          onOpenHarubanDraft={() => setPlanPdfEditorOpen(true)}
+          onOpenHarubanDraft={openPlanPdfEditor}
           onDiscardHarubanDraft={() => {
-            setHarubanDraft(null);
+            setPdfWorkspace(null);
+            setWorkspaceRevision((value) => value + 1);
             setHarubanCompositionStatus('idle');
             setHarubanCompositionError(null);
           }}
@@ -1201,12 +1237,42 @@ export default function PackingDashboard(props: Props) {
             selectedMomentIds={selectedMomentIds}
             selectedPlanItems={selectedPlanItems}
             packingItems={planPackingItems.map((suggestion) => suggestion.item)}
-            initialDraft={harubanDraft}
+            initialDraft={pdfWorkspace?.draft}
             composition={harubanDraft}
+            pendingSourceItems={pendingPlanPdfSourceItems}
+            canUndoExclude={Boolean(pdfWorkspace?.excludedItems.length)}
+            savedAt={pdfWorkspace?.updatedAt ?? null}
+            workspaceRevision={String(workspaceRevision)}
             onDraftChange={(nextDraft) => {
-              setHarubanDraft((current) => current
-                ? {...current, title: nextDraft.title, items: nextDraft.items}
+              setPdfWorkspace((current) => current
+                ? updatePlanPdfWorkspaceDraft(current, nextDraft)
                 : current);
+            }}
+            onExcludeItem={(itemId) => {
+              setPdfWorkspace((current) => current
+                ? excludePlanPdfWorkspaceItem(current, itemId)
+                : current);
+              setWorkspaceRevision((value) => value + 1);
+            }}
+            onUndoExclude={() => {
+              setPdfWorkspace((current) => current
+                ? undoExcludedPlanPdfWorkspaceItem(
+                  current,
+                  info.durationDays,
+                )
+                : current);
+              setWorkspaceRevision((value) => value + 1);
+            }}
+            onAddPendingItems={(itemIds) => {
+              setPdfWorkspace((current) => current
+                ? addPendingPlanPdfItems(
+                  current,
+                  selectedPlanItems,
+                  itemIds,
+                  info.durationDays,
+                )
+                : current);
+              setWorkspaceRevision((value) => value + 1);
             }}
             onClose={() => setPlanPdfEditorOpen(false)}
           />

@@ -576,6 +576,7 @@ function PlanItemEditor({
                 value={item.pdfMemo}
                 maxLength={800}
                 rows={2}
+                aria-label={`${item.name} 여행 메모`}
                 onChange={(event) => onChangeMemo(item.id, event.target.value)}
                 className="mt-1 w-full resize-none bg-transparent text-[11px] leading-relaxed text-basalt outline-none placeholder:text-stone-300"
                 placeholder="이 장소에서 하고 싶은 일이나 기억할 내용을 적어보세요."
