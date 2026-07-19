@@ -15,6 +15,7 @@ export interface PlanPdfWorkspace {
   composition: HarubanPlanDraft | null;
   knownSourceItemIds: string[];
   excludedItems: ExcludedPlanPdfItem[];
+  recentlyAddedItemId: string | null;
   updatedAt: string;
 }
 
@@ -94,6 +95,7 @@ export function createPlanPdfWorkspace({
     composition: composition ? structuredClone(composition) : null,
     knownSourceItemIds: [...new Set(sourceItems.map((item) => item.id))],
     excludedItems: [],
+    recentlyAddedItemId: null,
     updatedAt: timestamp(now),
   };
 }
@@ -239,6 +241,71 @@ export function addPendingPlanPdfItems(
   };
 }
 
+export function addCustomPlanPdfWorkspaceItem(
+  workspace: PlanPdfWorkspace,
+  item: TravelPlanItem,
+  durationDays: number,
+  now?: string,
+): PlanPdfWorkspace {
+  if (
+    workspace.knownSourceItemIds.includes(item.id)
+    || workspace.draft.items.some((candidate) => candidate.id === item.id)
+  ) {
+    return workspace;
+  }
+
+  const existingItems = renumberByDay(workspace.draft.items, durationDays);
+  const addition = buildInitialPlanPdfDraft([item], durationDays).items[0];
+  const lastOrder = existingItems
+    .filter((candidate) => candidate.day === addition.day)
+    .reduce((maximum, candidate) => Math.max(maximum, candidate.order), 0);
+  const updatedAt = timestamp(now);
+
+  return {
+    ...workspace,
+    draft: {
+      ...workspace.draft,
+      items: renumberByDay(
+        [
+          ...existingItems,
+          { ...addition, order: lastOrder + 1 },
+        ],
+        durationDays,
+      ),
+    },
+    knownSourceItemIds: [...workspace.knownSourceItemIds, item.id],
+    recentlyAddedItemId: item.id,
+    updatedAt,
+  };
+}
+
+export function undoRecentlyAddedPlanPdfWorkspaceItem(
+  workspace: PlanPdfWorkspace,
+  durationDays: number,
+  now?: string,
+): PlanPdfWorkspace {
+  const itemId = workspace.recentlyAddedItemId;
+  if (!itemId) return workspace;
+
+  return {
+    ...workspace,
+    draft: {
+      ...workspace.draft,
+      items: renumberByDay(
+        workspace.draft.items.filter((item) => item.id !== itemId),
+        durationDays,
+      ),
+    },
+    excludedItems: workspace.excludedItems
+      .filter(({ item }) => item.id !== itemId)
+      .map((record) => structuredClone(record)),
+    knownSourceItemIds: workspace.knownSourceItemIds
+      .filter((id) => id !== itemId),
+    recentlyAddedItemId: null,
+    updatedAt: timestamp(now),
+  };
+}
+
 export function syncRemovedPlanPdfSourceItems(
   workspace: PlanPdfWorkspace,
   sourceItems: TravelPlanItem[],
@@ -264,6 +331,10 @@ export function syncRemovedPlanPdfSourceItems(
       .map((record) => structuredClone(record)),
     knownSourceItemIds: workspace.knownSourceItemIds
       .filter((id) => !removedIds.has(id)),
+    recentlyAddedItemId: workspace.recentlyAddedItemId
+      && removedIds.has(workspace.recentlyAddedItemId)
+      ? null
+      : workspace.recentlyAddedItemId,
     updatedAt,
   };
 }

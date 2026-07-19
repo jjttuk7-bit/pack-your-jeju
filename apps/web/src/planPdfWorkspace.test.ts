@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanPdfDraft } from './planPdf';
 import {
+  addCustomPlanPdfWorkspaceItem,
   addPendingPlanPdfItems,
   createPlanPdfWorkspace,
   excludePlanPdfWorkspaceItem,
   findPendingPlanPdfSourceItems,
   syncRemovedPlanPdfSourceItems,
+  undoRecentlyAddedPlanPdfWorkspaceItem,
   undoExcludedPlanPdfWorkspaceItem,
   updatePlanPdfWorkspaceDraft,
 } from './planPdfWorkspace';
@@ -49,6 +51,7 @@ describe('planPdfWorkspace', () => {
     expect(workspace.draft.items[0]).not.toBe(initialDraft.items[0]);
     expect(workspace.knownSourceItemIds).toEqual(['a', 'b']);
     expect(workspace.excludedItems).toEqual([]);
+    expect(workspace.recentlyAddedItemId).toBeNull();
     expect(workspace.composition).toBeNull();
     expect(workspace.updatedAt).toBe('2026-07-19T00:00:00.000Z');
   });
@@ -256,6 +259,152 @@ describe('planPdfWorkspace', () => {
     ]);
   });
 
+  it('사용자 일정을 선택한 Day 마지막에 추가하고 최근 추가 ID를 기록한다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [
+        sourceItem('a'),
+        sourceItem('b', { day: 2 }),
+        sourceItem('c', { day: 2 }),
+      ],
+      durationDays: 2,
+      now: '2026-07-19T00:00:00.000Z',
+    });
+    const customItem = sourceItem('custom-1', {
+      name: '렌터카 반납',
+      moment: 'user_added',
+      source: 'user_added',
+      day: 2,
+      startTime: '18:30',
+      fixed: true,
+      note: '연료를 채운 뒤 반납',
+    });
+
+    const added = addCustomPlanPdfWorkspaceItem(
+      workspace,
+      customItem,
+      2,
+      '2026-07-19T01:00:00.000Z',
+    );
+
+    expect(added.draft.items.map(({ id, day, order, pdfMemo }) => ({
+      id,
+      day,
+      order,
+      pdfMemo,
+    }))).toEqual([
+      { id: 'a', day: 1, order: 1, pdfMemo: '메모 a' },
+      { id: 'b', day: 2, order: 1, pdfMemo: '메모 b' },
+      { id: 'c', day: 2, order: 2, pdfMemo: '메모 c' },
+      {
+        id: 'custom-1',
+        day: 2,
+        order: 3,
+        pdfMemo: '연료를 채운 뒤 반납',
+      },
+    ]);
+    expect(added.draft.items.at(-1)).toMatchObject(customItem);
+    expect(added.knownSourceItemIds).toEqual(['a', 'b', 'c', 'custom-1']);
+    expect(added.recentlyAddedItemId).toBe('custom-1');
+    expect(added.updatedAt).toBe('2026-07-19T01:00:00.000Z');
+    expect(workspace.draft.items).toHaveLength(3);
+  });
+
+  it('사용자 일정 ID가 초안이나 알려진 원본에 이미 있으면 중복 추가하지 않는다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [sourceItem('a')],
+      durationDays: 1,
+    });
+    const draftDuplicate = sourceItem('a', {
+      moment: 'user_added',
+      source: 'user_added',
+    });
+
+    expect(addCustomPlanPdfWorkspaceItem(workspace, draftDuplicate, 1))
+      .toBe(workspace);
+
+    const knownOnlyWorkspace = {
+      ...workspace,
+      draft: { ...workspace.draft, items: [] },
+    };
+    expect(addCustomPlanPdfWorkspaceItem(knownOnlyWorkspace, draftDuplicate, 1))
+      .toBe(knownOnlyWorkspace);
+  });
+
+  it('최근 추가한 사용자 일정을 모든 작업 초안 참조에서 제거하고 순서를 다시 매긴다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [sourceItem('a'), sourceItem('b')],
+      durationDays: 1,
+      now: '2026-07-19T00:00:00.000Z',
+    });
+    const added = addCustomPlanPdfWorkspaceItem(
+      workspace,
+      sourceItem('custom-1', {
+        moment: 'user_added',
+        source: 'user_added',
+        note: '직접 입력',
+      }),
+      1,
+    );
+    const workspaceWithAllReferences = {
+      ...added,
+      excludedItems: [{
+        item: structuredClone(
+          added.draft.items.find((item) => item.id === 'custom-1')!,
+        ),
+        excludedAt: '2026-07-19T00:30:00.000Z',
+      }],
+    };
+
+    const undone = undoRecentlyAddedPlanPdfWorkspaceItem(
+      workspaceWithAllReferences,
+      1,
+      '2026-07-19T01:00:00.000Z',
+    );
+
+    expect(undone.draft.items.map(({ id, order }) => ({ id, order }))).toEqual([
+      { id: 'a', order: 1 },
+      { id: 'b', order: 2 },
+    ]);
+    expect(undone.excludedItems).toEqual([]);
+    expect(undone.knownSourceItemIds).toEqual(['a', 'b']);
+    expect(undone.recentlyAddedItemId).toBeNull();
+    expect(undone.updatedAt).toBe('2026-07-19T01:00:00.000Z');
+    expect(workspaceWithAllReferences.recentlyAddedItemId).toBe('custom-1');
+  });
+
+  it('최근 사용자 일정 참조가 일부만 남아도 안전하게 정리한다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [sourceItem('a')],
+      durationDays: 1,
+    });
+    const added = addCustomPlanPdfWorkspaceItem(
+      workspace,
+      sourceItem('custom-1', {
+        moment: 'user_added',
+        source: 'user_added',
+      }),
+      1,
+    );
+    const partiallyMissing = {
+      ...added,
+      draft: {
+        ...added.draft,
+        items: added.draft.items.filter((item) => item.id !== 'custom-1'),
+      },
+    };
+
+    const undone = undoRecentlyAddedPlanPdfWorkspaceItem(
+      partiallyMissing,
+      1,
+      '2026-07-19T01:00:00.000Z',
+    );
+
+    expect(undone.draft.items.map((item) => item.id)).toEqual(['a']);
+    expect(undone.knownSourceItemIds).toEqual(['a']);
+    expect(undone.recentlyAddedItemId).toBeNull();
+    expect(undone.updatedAt).toBe('2026-07-19T01:00:00.000Z');
+  });
+
   it('순서를 다시 매길 때 잘못된 Day를 여행 기간 안으로 보정한다', () => {
     const sourceItems = [sourceItem('a'), sourceItem('b'), sourceItem('c')];
     const initialDraft: PlanPdfDraft = {
@@ -309,6 +458,31 @@ describe('planPdfWorkspace', () => {
     expect(workspace.knownSourceItemIds).toEqual(['a', 'b', 'c']);
   });
 
+  it('원본 동기화가 최근 사용자 일정을 제거하면 최근 추가 ID도 비운다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [sourceItem('a')],
+      durationDays: 1,
+    });
+    const added = addCustomPlanPdfWorkspaceItem(
+      workspace,
+      sourceItem('custom-1', {
+        moment: 'user_added',
+        source: 'user_added',
+      }),
+      1,
+    );
+
+    const synced = syncRemovedPlanPdfSourceItems(
+      added,
+      [sourceItem('a')],
+      '2026-07-19T01:00:00.000Z',
+    );
+
+    expect(synced.draft.items.map((item) => item.id)).toEqual(['a']);
+    expect(synced.knownSourceItemIds).toEqual(['a']);
+    expect(synced.recentlyAddedItemId).toBeNull();
+  });
+
   it('대상이 없거나 변경이 없으면 동일 객체와 시각을 유지한다', () => {
     const workspace = createPlanPdfWorkspace({
       sourceItems: [sourceItem('a')],
@@ -321,6 +495,8 @@ describe('planPdfWorkspace', () => {
     expect(addPendingPlanPdfItems(workspace, [sourceItem('a')], ['a'], 1))
       .toBe(workspace);
     expect(syncRemovedPlanPdfSourceItems(workspace, [sourceItem('a')]))
+      .toBe(workspace);
+    expect(undoRecentlyAddedPlanPdfWorkspaceItem(workspace, 1))
       .toBe(workspace);
   });
 });
