@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
 from apps.api.main import app
+from apps.api.routes.plan_pdf import PlanPdfItemInput
 
 
 client = TestClient(app)
@@ -109,6 +110,29 @@ def test_plan_pdf_rejects_invalid_start_time():
     response = client.post("/plan/pdf", json=invalid_time)
 
     assert response.status_code == 422
+
+
+def test_plan_pdf_rejects_start_time_with_unicode_digit():
+    invalid_time = _valid_request()
+    invalid_time["items"][0]["start_time"] = "18:3٣"
+
+    response = client.post("/plan/pdf", json=invalid_time)
+
+    assert response.status_code == 422
+
+
+def test_plan_pdf_accepts_legacy_item_and_uses_schedule_defaults():
+    legacy_request = _valid_request()
+    legacy_item = legacy_request["items"][-1]
+    legacy_item.pop("start_time")
+    legacy_item.pop("fixed")
+
+    response = client.post("/plan/pdf", json=legacy_request)
+    parsed_item = PlanPdfItemInput.model_validate(legacy_item)
+
+    assert response.status_code == 200
+    assert parsed_item.start_time is None
+    assert parsed_item.fixed is False
 
 
 def test_plan_pdf_returns_passport_pdf_with_selected_places_and_evidence():

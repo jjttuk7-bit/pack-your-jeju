@@ -29,7 +29,7 @@ class PlanPdfItemInput(BaseModel):
     order: int = Field(ge=1, le=100)
     start_time: str | None = Field(
         default=None,
-        pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$",
+        pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
     )
     fixed: bool = False
     source: Literal["public_data", "web_search", "user_added"]
