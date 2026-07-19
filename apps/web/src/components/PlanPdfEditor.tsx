@@ -7,7 +7,9 @@ import {
   Loader2,
   MapPin,
   NotebookPen,
+  RotateCcw,
   ShieldCheck,
+  Trash2,
   X,
 } from 'lucide-react';
 
@@ -36,7 +38,14 @@ interface Props {
   packingItems: string[];
   initialDraft?: PlanPdfDraft | null;
   composition?: HarubanPlanDraft | null;
+  pendingSourceItems?: TravelPlanItem[];
+  canUndoExclude?: boolean;
+  savedAt?: string | null;
+  workspaceRevision?: string;
   onDraftChange?: (draft: PlanPdfDraft) => void;
+  onExcludeItem?: (itemId: string) => void;
+  onUndoExclude?: () => void;
+  onAddPendingItems?: (itemIds: string[]) => void;
   onClose: () => void;
 }
 
@@ -61,7 +70,14 @@ export default function PlanPdfEditor({
   packingItems,
   initialDraft,
   composition,
+  pendingSourceItems = [],
+  canUndoExclude = false,
+  savedAt,
+  workspaceRevision,
   onDraftChange,
+  onExcludeItem,
+  onUndoExclude,
+  onAddPendingItems,
   onClose,
 }: Props) {
   const [draft, setDraft] = useState<PlanPdfDraft>(() => (
@@ -73,7 +89,9 @@ export default function PlanPdfEditor({
   onDraftChangeRef.current = onDraftChange;
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const pendingIdsKey = pendingSourceItems.map((item) => item.id).join('\u0000');
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +111,12 @@ export default function PlanPdfEditor({
       window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, info.durationDays, selectedPlanItems]);
+  }, [open, info.durationDays, workspaceRevision]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedPendingIds(pendingSourceItems.map((item) => item.id));
+  }, [open, pendingIdsKey]);
 
   useEffect(() => {
     if (!open || !onDraftChangeRef.current) return;
@@ -259,6 +282,50 @@ export default function PlanPdfEditor({
               )}
             </section>
           )}
+          {pendingSourceItems.length > 0 && (
+            <section className="mb-5 rounded-[22px] border border-mint/25 bg-[#E7F4EF] p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-serif-kr text-[14px] font-bold text-basalt">
+                    새로 담은 장소 {pendingSourceItems.length}곳이 있어요
+                  </h3>
+                  <p className="mt-1 text-[10px] text-stone-600">
+                    PDF 초안에 넣을 장소만 골라주세요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={selectedPendingIds.length === 0}
+                  onClick={() => onAddPendingItems?.(selectedPendingIds)}
+                  className="min-h-10 rounded-xl bg-mint px-4 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  선택한 장소 초안에 추가
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {pendingSourceItems.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex min-h-11 items-center gap-2 rounded-xl border border-white/80 bg-white/75 px-3 py-2 text-[11px] font-semibold text-basalt"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPendingIds.includes(item.id)}
+                      onChange={(event) => {
+                        setSelectedPendingIds((current) => (
+                          event.target.checked
+                            ? [...current, item.id]
+                            : current.filter((id) => id !== item.id)
+                        ));
+                      }}
+                      aria-label={`${item.name} 초안에 추가`}
+                    />
+                    <span>{item.name}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
             <div className="space-y-5">
               <label className="block rounded-[22px] border border-earth bg-white/85 p-4 shadow-sm">
@@ -285,10 +352,10 @@ export default function PlanPdfEditor({
                 <div className="rounded-[24px] border border-dashed border-earth bg-white/70 px-6 py-16 text-center">
                   <MapPin className="mx-auto h-8 w-8 text-stone-300" />
                   <p className="mt-3 font-serif-kr text-[16px] font-bold text-stone-700">
-                    선택한 장소가 없습니다
+                    PDF 초안에 담긴 장소가 없습니다
                   </p>
                   <p className="mt-1 text-[11px] text-stone-500">
-                    후보 카드나 하루방 추천에서 장소를 먼저 플랜에 담아주세요.
+                    나가서 장소를 더 살펴보거나 제외한 장소를 되돌려 주세요.
                   </p>
                 </div>
               ) : (
@@ -332,6 +399,7 @@ export default function PlanPdfEditor({
                               onChangeDay={changeDay}
                               onMove={moveItem}
                               onChangeMemo={updateMemo}
+                              onExclude={onExcludeItem}
                             />
                           ))
                         )}
@@ -381,17 +449,37 @@ export default function PlanPdfEditor({
             <p className="mb-2 text-center text-[10.5px] text-rose-700">{error}</p>
           ) : null}
           <div className="flex items-center justify-between gap-3">
-            <p className="hidden text-[10.5px] text-stone-500 sm:block">
-              {draft.items.length}곳 · {info.durationDays}일 · PDF에서 지도 QR 제공
-            </p>
+            <div className="hidden sm:block">
+              <p
+                role="status"
+                aria-live="polite"
+                className="text-[10.5px] font-semibold text-mint"
+              >
+                변경사항 임시저장됨
+                {savedAt ? <span className="sr-only"> · {savedAt}</span> : null}
+              </p>
+              <p className="text-[9.5px] text-stone-500">
+                {draft.items.length}곳 · {info.durationDays}일 · PDF에서 지도 QR 제공
+              </p>
+            </div>
             <div className="ml-auto flex gap-2">
+              {canUndoExclude && (
+                <button
+                  type="button"
+                  onClick={onUndoExclude}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-2xl border border-mint/30 bg-[#E7F4EF] px-4 text-[11px] font-bold text-mint"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  제외 되돌리기
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closeEditor}
                 disabled={generating}
                 className="min-h-11 rounded-2xl border border-earth bg-white px-4 text-[12px] font-bold text-basalt transition hover:bg-[#FDF6EA] disabled:opacity-50"
               >
-                취소
+                나가서 장소 더 보기
               </button>
               <button
                 type="button"
@@ -430,6 +518,7 @@ function PlanItemEditor({
   onChangeDay,
   onMove,
   onChangeMemo,
+  onExclude,
 }: {
   item: PlanPdfDraftItem;
   durationDays: number;
@@ -439,6 +528,7 @@ function PlanItemEditor({
   onChangeDay: (itemId: string, day: number) => void;
   onMove: (itemId: string, direction: 'up' | 'down') => void;
   onChangeMemo: (itemId: string, memo: string) => void;
+  onExclude?: (itemId: string) => void;
 }) {
   return (
     <article className="rounded-[20px] border border-earth/90 bg-[#FFFCF7] p-4">
@@ -494,6 +584,17 @@ function PlanItemEditor({
           </div>
 
           <div className="mt-2 flex items-center justify-end gap-1.5">
+            {onExclude && (
+              <button
+                type="button"
+                aria-label={`${item.name} 초안에서 제외`}
+                onClick={() => onExclude(item.id)}
+                className="mr-auto inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 text-[10px] font-bold text-rose-700 transition hover:bg-rose-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                초안에서 제외
+              </button>
+            )}
             <button
               type="button"
               disabled={isFirst}

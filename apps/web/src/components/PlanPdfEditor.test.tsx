@@ -54,20 +54,30 @@ const composition: HarubanPlanDraft = {
   warnings: ['사용자 추가 장소는 위치 확인이 필요해요.'],
 };
 
+function renderEditor(
+  overrides: Partial<React.ComponentProps<typeof PlanPdfEditor>> = {},
+) {
+  const props: React.ComponentProps<typeof PlanPdfEditor> = {
+    open: true,
+    info,
+    selectedMomentIds: [],
+    selectedPlanItems,
+    packingItems: [],
+    initialDraft,
+    composition,
+    onClose: vi.fn(),
+    ...overrides,
+  };
+
+  return {
+    ...render(<PlanPdfEditor {...props} />),
+    props,
+  };
+}
+
 describe('PlanPdfEditor Haruban draft', () => {
   it('opens with the composed draft and explains weather, route, and warnings', () => {
-    render(
-      <PlanPdfEditor
-        open
-        info={info}
-        selectedMomentIds={[]}
-        selectedPlanItems={selectedPlanItems}
-        packingItems={[]}
-        initialDraft={initialDraft}
-        composition={composition}
-        onClose={vi.fn()}
-      />,
-    );
+    renderEditor();
 
     expect(screen.getByText('하루방 추천 초안')).toBeInTheDocument();
     expect(screen.getByDisplayValue('하루방이 조합한 제주 여행')).toBeInTheDocument();
@@ -79,19 +89,7 @@ describe('PlanPdfEditor Haruban draft', () => {
 
   it('reports memo edits to the active composed draft', async () => {
     const onDraftChange = vi.fn();
-    render(
-      <PlanPdfEditor
-        open
-        info={info}
-        selectedMomentIds={[]}
-        selectedPlanItems={selectedPlanItems}
-        packingItems={[]}
-        initialDraft={initialDraft}
-        composition={composition}
-        onDraftChange={onDraftChange}
-        onClose={vi.fn()}
-      />,
-    );
+    renderEditor({onDraftChange});
 
     fireEvent.change(screen.getByDisplayValue('초기 메모'), {
       target: {value: '우산을 챙겨 출발'},
@@ -105,5 +103,109 @@ describe('PlanPdfEditor Haruban draft', () => {
         })],
       }));
     });
+  });
+
+  it('excludes a place only from the PDF draft and can undo it', () => {
+    const onExcludeItem = vi.fn();
+    const onUndoExclude = vi.fn();
+    renderEditor({
+      onExcludeItem,
+      onUndoExclude,
+      canUndoExclude: true,
+    });
+
+    fireEvent.click(screen.getByRole('button', {
+      name: '제주 숲 초안에서 제외',
+    }));
+    expect(onExcludeItem).toHaveBeenCalledWith('forest');
+
+    fireEvent.click(screen.getByRole('button', {name: '제외 되돌리기'}));
+    expect(onUndoExclude).toHaveBeenCalledOnce();
+  });
+
+  it('shows newly saved places and adds only the selected IDs', () => {
+    const onAddPendingItems = vi.fn();
+    const pendingSourceItems = [
+      {
+        ...selectedPlanItems[0],
+        id: 'cafe',
+        name: '제주 카페',
+      },
+      {
+        ...selectedPlanItems[0],
+        id: 'oreum',
+        name: '제주 오름',
+      },
+    ];
+    renderEditor({pendingSourceItems, onAddPendingItems});
+
+    expect(screen.getByText('새로 담은 장소 2곳이 있어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', {name: '제주 오름 초안에 추가'}));
+    fireEvent.click(screen.getByRole('button', {name: '선택한 장소 초안에 추가'}));
+
+    expect(onAddPendingItems).toHaveBeenCalledWith(['cafe']);
+  });
+
+  it('announces temporary saving and uses the leave-to-browse label', () => {
+    renderEditor({savedAt: '2026-07-19T01:00:00.000Z'});
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('변경사항 임시저장됨');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('button', {name: '나가서 장소 더 보기'}))
+      .toBeInTheDocument();
+  });
+
+  it('disables PDF generation when the workspace draft has no places', () => {
+    renderEditor({
+      initialDraft: {
+        title: '빈 초안',
+        items: [],
+      },
+      composition: null,
+    });
+
+    expect(screen.getByText('PDF 초안에 담긴 장소가 없습니다')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'PDF 만들기'})).toBeDisabled();
+  });
+
+  it('keeps the close button and Escape close contracts', () => {
+    const onClose = vi.fn();
+    renderEditor({onClose});
+
+    fireEvent.keyDown(window, {key: 'Escape'});
+    expect(onClose).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', {name: 'PDF 편집창 닫기'}));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('resyncs local edits only when the workspace revision changes', () => {
+    const {rerender, props} = renderEditor({workspaceRevision: '0'});
+    fireEvent.change(screen.getByDisplayValue('초기 메모'), {
+      target: {value: '입력 중인 메모'},
+    });
+
+    const restoredDraft = {
+      ...initialDraft,
+      items: [{...initialDraft.items[0], pdfMemo: '부모가 복원한 메모'}],
+    };
+    rerender(
+      <PlanPdfEditor
+        {...props}
+        initialDraft={restoredDraft}
+        workspaceRevision="0"
+      />,
+    );
+    expect(screen.getByDisplayValue('입력 중인 메모')).toBeInTheDocument();
+
+    rerender(
+      <PlanPdfEditor
+        {...props}
+        initialDraft={restoredDraft}
+        workspaceRevision="1"
+      />,
+    );
+    expect(screen.getByDisplayValue('부모가 복원한 메모')).toBeInTheDocument();
   });
 });
