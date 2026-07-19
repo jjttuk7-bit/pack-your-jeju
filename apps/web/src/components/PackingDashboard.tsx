@@ -258,6 +258,7 @@ export default function PackingDashboard(props: Props) {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [pdfWorkspace, setPdfWorkspace] = useState<PlanPdfWorkspace | null>(null);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const [pendingRecompose, setPendingRecompose] = useState(false);
   const [harubanCompositionStatus, setHarubanCompositionStatus] = useState<
     'idle' | 'weather' | 'route' | 'done'
   >('idle');
@@ -408,6 +409,14 @@ export default function PackingDashboard(props: Props) {
     setPdfWorkspace(nextWorkspace);
     setWorkspaceRevision((value) => value + 1);
   }, [pdfWorkspace, selectedPlanItems]);
+  useEffect(() => {
+    if (!pendingRecompose) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingRecompose(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pendingRecompose]);
   const visibleWeatherReport = useMemo(() => {
     if (!weatherReport) return null;
     const dismissed = new Set(weatherDismissedFingerprints);
@@ -508,7 +517,7 @@ export default function PackingDashboard(props: Props) {
     setPlanPdfEditorOpen(true);
   };
 
-  const handleComposeHarubanPlan = async () => {
+  const composeHarubanPlan = async () => {
     if (selectedPlanItems.length === 0 || harubanCompositionStatus === 'weather'
       || harubanCompositionStatus === 'route') return;
 
@@ -625,6 +634,16 @@ export default function PackingDashboard(props: Props) {
     }));
     setWorkspaceRevision((value) => value + 1);
     setHarubanCompositionStatus('done');
+  };
+
+  const handleComposeHarubanPlan = () => {
+    if (selectedPlanItems.length === 0 || harubanCompositionStatus === 'weather'
+      || harubanCompositionStatus === 'route') return;
+    if (pdfWorkspace) {
+      setPendingRecompose(true);
+      return;
+    }
+    void composeHarubanPlan();
   };
 
   const handleRequestRoute = async () => {
@@ -1229,6 +1248,54 @@ export default function PackingDashboard(props: Props) {
       </div>
         </main>
       </div>
+      {pendingRecompose && (
+        <div
+          className="fixed inset-0 z-[110] grid place-items-center bg-basalt/55 p-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setPendingRecompose(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-recompose-dialog-title"
+            className="w-full max-w-md rounded-[26px] border border-white/70 bg-[#FFFDF8] p-6 shadow-[0_28px_80px_rgba(45,42,38,0.32)]"
+          >
+            <span className="inline-flex rounded-full bg-[#FFF0E8] px-3 py-1 text-[10px] font-bold text-citrus-2">
+              초안 교체 확인
+            </span>
+            <h2
+              id="pdf-recompose-dialog-title"
+              className="mt-3 font-serif-kr text-[20px] font-bold text-basalt"
+            >
+              PDF 초안 다시 조합
+            </h2>
+            <p className="mt-2 text-[12px] leading-relaxed text-basalt-2">
+              현재 편집 내용과 제외한 장소가 새 초안으로 교체됩니다.
+            </p>
+            <div className="mt-6 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setPendingRecompose(false)}
+                className="min-h-11 rounded-2xl border border-earth bg-white px-4 text-[12px] font-bold text-basalt transition hover:bg-[#FDF6EA]"
+              >
+                기존 초안 유지
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingRecompose(false);
+                  void composeHarubanPlan();
+                }}
+                className="min-h-11 rounded-2xl bg-citrus px-4 text-[12px] font-bold text-white transition hover:bg-citrus-2"
+              >
+                새 초안으로 교체
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {planPdfEditorOpen && (
         <Suspense fallback={<PdfEditorLoadingFallback />}>
           <PlanPdfEditor

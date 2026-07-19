@@ -495,4 +495,42 @@ describe('PackingDashboard pack journey guide', () => {
       .toBeGreaterThan(0);
     expect(screen.getByDisplayValue('하루방 초안 메모')).toBeInTheDocument();
   }, 30_000);
+
+  it('asks before replacing an edited PDF workspace with a Haruban draft', async () => {
+    vi.mocked(requestWeatherReport).mockResolvedValue(weatherReport);
+    vi.mocked(requestRoutePlan).mockResolvedValue(routeReport);
+    renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+      target: {value: '기존 메모'},
+    });
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+
+    const weatherCallsBeforeCompose = vi.mocked(requestWeatherReport).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', {name: /하루방 플랜 조합/}));
+    expect(screen.getByRole('dialog', {name: 'PDF 초안 다시 조합'}))
+      .toBeInTheDocument();
+    expect(requestWeatherReport).toHaveBeenCalledTimes(weatherCallsBeforeCompose);
+
+    fireEvent.click(screen.getByRole('button', {name: '기존 초안 유지'}));
+    expect(screen.queryByRole('dialog', {name: 'PDF 초안 다시 조합'}))
+      .not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /여행 플랜 PDF/}));
+    expect(await screen.findByDisplayValue('기존 메모')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+
+    fireEvent.click(screen.getByRole('button', {name: /하루방 플랜 조합/}));
+    fireEvent.keyDown(window, {key: 'Escape'});
+    expect(screen.queryByRole('dialog', {name: 'PDF 초안 다시 조합'}))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: /하루방 플랜 조합/}));
+    fireEvent.click(screen.getByRole('button', {name: '새 초안으로 교체'}));
+    expect(
+      await screen.findByText('하루방이 여행 플랜 초안을 만들었어요.'),
+    ).toBeInTheDocument();
+    expect(requestWeatherReport)
+      .toHaveBeenCalledTimes(weatherCallsBeforeCompose + 1);
+  }, 30_000);
 });
