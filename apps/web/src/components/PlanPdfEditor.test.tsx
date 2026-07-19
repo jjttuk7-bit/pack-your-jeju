@@ -1,4 +1,5 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {useState} from 'react';
 import {describe, expect, it, vi} from 'vitest';
 
 import type {PlanPdfDraft} from '../planPdf';
@@ -76,15 +77,39 @@ function renderEditor(
 }
 
 describe('PlanPdfEditor Haruban draft', () => {
-  it('adds a custom schedule from the selected Day form and resets it', () => {
+  it('adds a custom schedule from the selected Day form and resets it', async () => {
     const onAddCustomSchedule = vi.fn();
-    renderEditor({onAddCustomSchedule});
+    function RevisionHarness() {
+      const [workspaceRevision, setWorkspaceRevision] = useState('0');
+      return (
+        <PlanPdfEditor
+          open
+          info={info}
+          selectedMomentIds={[]}
+          selectedPlanItems={selectedPlanItems}
+          packingItems={[]}
+          initialDraft={initialDraft}
+          composition={composition}
+          workspaceRevision={workspaceRevision}
+          onAddCustomSchedule={(input) => {
+            onAddCustomSchedule(input);
+            setWorkspaceRevision('1');
+          }}
+          onClose={vi.fn()}
+        />
+      );
+    }
+    render(<RevisionHarness />);
 
+    const dayTwoTrigger = screen.getByRole('button', {
+      name: 'Day 2 일정 직접 추가',
+    });
     expect(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}))
       .toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: 'Day 2 일정 직접 추가'}));
+    fireEvent.click(dayTwoTrigger);
 
     const nameInput = screen.getByLabelText('일정명');
+    await waitFor(() => expect(nameInput).toHaveFocus());
     expect(nameInput).toBeRequired();
     expect(nameInput).toHaveAttribute('maxlength', '80');
     expect(screen.getByLabelText('Day')).toHaveValue('2');
@@ -110,6 +135,9 @@ describe('PlanPdfEditor Haruban draft', () => {
       note: '주유 후 반납',
     });
     expect(screen.queryByLabelText('일정명')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', {
+      name: 'Day 2 일정 직접 추가',
+    })).toHaveFocus());
 
     fireEvent.click(screen.getByRole('button', {name: 'Day 2 일정 직접 추가'}));
     expect(screen.getByLabelText('일정명')).toHaveValue('');
@@ -122,7 +150,12 @@ describe('PlanPdfEditor Haruban draft', () => {
     fireEvent.click(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}));
     fireEvent.change(screen.getByLabelText('일정명'), {target: {value: '   '}});
 
-    expect(screen.getByText('일정명을 입력해 주세요.')).toBeVisible();
+    const nameInput = screen.getByLabelText('일정명');
+    const guidance = screen.getByText('일정명을 입력해 주세요.');
+    expect(guidance).toBeVisible();
+    expect(guidance).toHaveAttribute('id', 'custom-name-guidance-1');
+    expect(nameInput).toHaveAttribute('aria-describedby', guidance.id);
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', {name: '일정 추가'})).toBeDisabled();
   });
 
@@ -146,19 +179,31 @@ describe('PlanPdfEditor Haruban draft', () => {
     expect(onAddCustomSchedule).not.toHaveBeenCalled();
   });
 
-  it('closes only the open custom schedule form with Escape or cancel', () => {
+  it('closes only the open custom schedule form with Escape or cancel', async () => {
     const onClose = vi.fn();
     renderEditor({onClose, onAddCustomSchedule: vi.fn()});
 
-    fireEvent.click(screen.getByRole('button', {name: 'Day 2 일정 직접 추가'}));
+    const dayTwoTrigger = screen.getByRole('button', {
+      name: 'Day 2 일정 직접 추가',
+    });
+    fireEvent.click(dayTwoTrigger);
     fireEvent.keyDown(window, {key: 'Escape'});
     expect(screen.queryByLabelText('일정명')).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('button', {
+      name: 'Day 2 일정 직접 추가',
+    })).toHaveFocus());
 
-    fireEvent.click(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}));
+    const dayOneTrigger = screen.getByRole('button', {
+      name: 'Day 1 일정 직접 추가',
+    });
+    fireEvent.click(dayOneTrigger);
     fireEvent.click(screen.getByRole('button', {name: '취소'}));
     expect(screen.queryByLabelText('일정명')).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('button', {
+      name: 'Day 1 일정 직접 추가',
+    })).toHaveFocus());
 
     fireEvent.keyDown(window, {key: 'Escape'});
     expect(onClose).toHaveBeenCalledOnce();
@@ -171,7 +216,8 @@ describe('PlanPdfEditor Haruban draft', () => {
       onUndoCustomSchedule,
     });
 
-    expect(screen.getByText('일정을 내 여행플랜에도 추가했어요')).toBeVisible();
+    expect(screen.getByRole('status'))
+      .toHaveTextContent('일정을 내 여행플랜에도 추가했어요');
     fireEvent.click(screen.getByRole('button', {name: '추가한 일정 되돌리기'}));
     expect(onUndoCustomSchedule).toHaveBeenCalledOnce();
   });

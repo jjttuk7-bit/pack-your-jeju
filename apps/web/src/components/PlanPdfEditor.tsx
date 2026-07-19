@@ -104,7 +104,18 @@ export default function PlanPdfEditor({
   );
   const [customScheduleTimeError, setCustomScheduleTimeError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const customScheduleNameInputRef = useRef<HTMLInputElement>(null);
+  const customScheduleTriggerRefs = useRef(new Map<number, HTMLButtonElement>());
   const pendingIdsKey = pendingSourceItems.map((item) => item.id).join('\u0000');
+
+  const restoreCustomScheduleTriggerFocus = (day: number) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const trigger = customScheduleTriggerRefs.current.get(day);
+        if (trigger?.isConnected) trigger.focus();
+      });
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -135,6 +146,14 @@ export default function PlanPdfEditor({
   }, [open, pendingIdsKey]);
 
   useEffect(() => {
+    if (customScheduleDay === null) return;
+    const focusFrame = window.requestAnimationFrame(() => {
+      customScheduleNameInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [customScheduleDay]);
+
+  useEffect(() => {
     if (!open || !onDraftChangeRef.current) return;
     onDraftChangeRef.current(structuredClone(draft));
   }, [draft, open]);
@@ -144,10 +163,12 @@ export default function PlanPdfEditor({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || generating) return;
       if (customScheduleDay !== null) {
+        const dayToRestore = customScheduleDay;
         event.preventDefault();
         setCustomScheduleDay(null);
         setCustomScheduleInput(emptyCustomScheduleInput(1));
         setCustomScheduleTimeError(null);
+        restoreCustomScheduleTriggerFocus(dayToRestore);
         return;
       }
       onClose();
@@ -176,9 +197,13 @@ export default function PlanPdfEditor({
   };
 
   const closeCustomScheduleForm = () => {
+    const dayToRestore = customScheduleDay;
     setCustomScheduleDay(null);
     setCustomScheduleInput(emptyCustomScheduleInput(1));
     setCustomScheduleTimeError(null);
+    if (dayToRestore !== null) {
+      restoreCustomScheduleTriggerFocus(dayToRestore);
+    }
   };
 
   const addCustomSchedule = (event: React.FormEvent<HTMLFormElement>) => {
@@ -480,6 +505,15 @@ export default function PlanPdfEditor({
                                 <input
                                   id={`custom-name-${day}`}
                                   aria-label="일정명"
+                                  aria-describedby={
+                                    !customScheduleInput.name.trim()
+                                      ? `custom-name-guidance-${day}`
+                                      : undefined
+                                  }
+                                  aria-invalid={
+                                    !customScheduleInput.name.trim() ? true : undefined
+                                  }
+                                  ref={customScheduleNameInputRef}
                                   required
                                   maxLength={80}
                                   value={customScheduleInput.name}
@@ -572,7 +606,10 @@ export default function PlanPdfEditor({
                               </label>
                             </div>
                             {!customScheduleInput.name.trim() ? (
-                              <p className="mt-3 text-[9.5px] font-semibold text-citrus-2">
+                              <p
+                                id={`custom-name-guidance-${day}`}
+                                className="mt-3 text-[9.5px] font-semibold text-citrus-2"
+                              >
                                 일정명을 입력해 주세요.
                               </p>
                             ) : null}
@@ -596,6 +633,9 @@ export default function PlanPdfEditor({
                         ) : (
                           <button
                             type="button"
+                            ref={(element) => {
+                              if (element) customScheduleTriggerRefs.current.set(day, element);
+                            }}
                             aria-label={`Day ${day} 일정 직접 추가`}
                             onClick={() => openCustomScheduleForm(day)}
                             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-mint/35 bg-[#F4FAF7] px-4 text-[11px] font-bold text-mint outline-none hover:border-mint/60 hover:bg-[#E7F4EF] focus-visible:ring-2 focus-visible:ring-mint/30"
@@ -657,15 +697,15 @@ export default function PlanPdfEditor({
               >
                 변경사항 임시저장됨
                 {savedAt ? <span className="sr-only"> · {savedAt}</span> : null}
+                {canUndoCustomSchedule ? (
+                  <span className="mt-1 block text-citrus-2">
+                    일정을 내 여행플랜에도 추가했어요
+                  </span>
+                ) : null}
               </p>
               <p className="hidden text-[9.5px] text-stone-500 sm:block">
                 {draft.items.length}곳 · {info.durationDays}일 · PDF에서 지도 QR 제공
               </p>
-              {canUndoCustomSchedule ? (
-                <p className="mt-1 text-[9.5px] font-semibold text-citrus-2">
-                  일정을 내 여행플랜에도 추가했어요
-                </p>
-              ) : null}
             </div>
             <div className="ml-auto flex flex-wrap justify-end gap-2">
               {canUndoCustomSchedule && (
