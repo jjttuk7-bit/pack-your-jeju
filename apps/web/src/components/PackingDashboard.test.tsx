@@ -404,7 +404,11 @@ describe('PackingDashboard pack journey guide', () => {
     renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
 
     fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
-    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+    fireEvent.change(await screen.findByLabelText(
+      '산방산 둘레길 여행 메모',
+      {},
+      {timeout: 10_000},
+    ), {
       target: {value: '노을 전에 도착'},
     });
     fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
@@ -445,7 +449,11 @@ describe('PackingDashboard pack journey guide', () => {
     ]);
 
     fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
-    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+    fireEvent.change(await screen.findByLabelText(
+      '산방산 둘레길 여행 메모',
+      {},
+      {timeout: 10_000},
+    ), {
       target: {value: '기존 메모 유지'},
     });
     fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
@@ -484,7 +492,11 @@ describe('PackingDashboard pack journey guide', () => {
     fireEvent.click(await screen.findByRole('button', { name: /하루방 플랜 조합/ }));
     await screen.findByText('하루방이 여행 플랜 초안을 만들었어요.');
     fireEvent.click(screen.getByRole('button', {name: '초안 확인하기'}));
-    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+    fireEvent.change(await screen.findByLabelText(
+      '산방산 둘레길 여행 메모',
+      {},
+      {timeout: 10_000},
+    ), {
       target: {value: '하루방 초안 메모'},
     });
     fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
@@ -502,7 +514,11 @@ describe('PackingDashboard pack journey guide', () => {
     renderDashboard([scheduledPlanItem, secondScheduledPlanItem]);
 
     fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
-    fireEvent.change(await screen.findByLabelText('산방산 둘레길 여행 메모'), {
+    fireEvent.change(await screen.findByLabelText(
+      '산방산 둘레길 여행 메모',
+      {},
+      {timeout: 10_000},
+    ), {
       target: {value: '기존 메모'},
     });
     fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));

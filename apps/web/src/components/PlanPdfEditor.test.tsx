@@ -152,6 +152,7 @@ describe('PlanPdfEditor Haruban draft', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('변경사항 임시저장됨');
     expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status.parentElement).not.toHaveClass('hidden');
     expect(screen.getByRole('button', {name: '나가서 장소 더 보기'}))
       .toBeInTheDocument();
   });

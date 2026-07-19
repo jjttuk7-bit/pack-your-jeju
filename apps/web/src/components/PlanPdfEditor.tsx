@@ -448,8 +448,8 @@ export default function PlanPdfEditor({
           {error ? (
             <p className="mb-2 text-center text-[10.5px] text-rose-700">{error}</p>
           ) : null}
-          <div className="flex items-center justify-between gap-3">
-            <div className="hidden sm:block">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div className="min-w-0">
               <p
                 role="status"
                 aria-live="polite"
@@ -458,7 +458,7 @@ export default function PlanPdfEditor({
                 변경사항 임시저장됨
                 {savedAt ? <span className="sr-only"> · {savedAt}</span> : null}
               </p>
-              <p className="text-[9.5px] text-stone-500">
+              <p className="hidden text-[9.5px] text-stone-500 sm:block">
                 {draft.items.length}곳 · {info.durationDays}일 · PDF에서 지도 QR 제공
               </p>
             </div>
