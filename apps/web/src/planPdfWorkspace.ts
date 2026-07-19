@@ -40,12 +40,23 @@ function renumberByDay(
   durationDays?: number,
 ): PlanPdfDraftItem[] {
   const maximumDay = normalizedDays(
-    durationDays ?? Math.max(1, ...items.map((item) => item.day)),
+    durationDays ?? Math.max(
+      1,
+      ...items
+        .map((item) => item.day)
+        .filter((day) => Number.isFinite(day)),
+    ),
   );
   const result: PlanPdfDraftItem[] = [];
+  const normalizedItems = items.map((item) => ({
+    ...item,
+    day: Number.isFinite(item.day)
+      ? Math.min(maximumDay, Math.max(1, Math.floor(item.day)))
+      : 1,
+  }));
 
   for (let day = 1; day <= maximumDay; day += 1) {
-    items
+    normalizedItems
       .filter((item) => item.day === day)
       .sort((left, right) => left.order - right.order)
       .forEach((item, index) => {
@@ -61,6 +72,10 @@ function compositionDraft(composition: HarubanPlanDraft): PlanPdfDraft {
     title: composition.title,
     items: composition.items,
   };
+}
+
+function draftsEqual(left: PlanPdfDraft, right: PlanPdfDraft): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function createPlanPdfWorkspace({
@@ -88,9 +103,18 @@ export function updatePlanPdfWorkspaceDraft(
   draft: PlanPdfDraft,
   now?: string,
 ): PlanPdfWorkspace {
+  const currentItemIds = new Set(workspace.draft.items.map((item) => item.id));
+  const nextDraft = {
+    ...structuredClone(draft),
+    items: draft.items
+      .filter((item) => currentItemIds.has(item.id))
+      .map((item) => structuredClone(item)),
+  };
+  if (draftsEqual(workspace.draft, nextDraft)) return workspace;
+
   return {
     ...workspace,
-    draft: structuredClone(draft),
+    draft: nextDraft,
     updatedAt: timestamp(now),
   };
 }
@@ -179,8 +203,9 @@ export function addPendingPlanPdfItems(
   if (selectedIds.length === 0) return workspace;
 
   const selectedItems = selectedIds.map((id) => pendingById.get(id)!);
+  const existingItems = renumberByDay(workspace.draft.items, durationDays);
   const lastOrderByDay = new Map<number, number>();
-  workspace.draft.items.forEach((item) => {
+  existingItems.forEach((item) => {
     lastOrderByDay.set(
       item.day,
       Math.max(lastOrderByDay.get(item.day) ?? 0, item.order),
@@ -200,7 +225,7 @@ export function addPendingPlanPdfItems(
       ...workspace.draft,
       items: renumberByDay(
         [
-          ...workspace.draft.items.map((item) => structuredClone(item)),
+          ...existingItems,
           ...additions,
         ],
         durationDays,

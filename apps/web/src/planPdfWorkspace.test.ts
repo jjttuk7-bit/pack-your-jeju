@@ -77,6 +77,49 @@ describe('planPdfWorkspace', () => {
     expect(workspace.draft.title).not.toBe('수정 제목');
   });
 
+  it('구조적으로 같은 초안 갱신은 동일 작업 공간과 시각을 유지한다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [sourceItem('a')],
+      durationDays: 1,
+      now: '2026-07-19T00:00:00.000Z',
+    });
+
+    const updated = updatePlanPdfWorkspaceDraft(
+      workspace,
+      structuredClone(workspace.draft),
+      '2026-07-19T01:00:00.000Z',
+    );
+
+    expect(updated).toBe(workspace);
+    expect(updated.updatedAt).toBe('2026-07-19T00:00:00.000Z');
+  });
+
+  it('제외 전의 오래된 편집 콜백이 제외 장소를 다시 넣지 못하게 한다', () => {
+    const workspace = createPlanPdfWorkspace({
+      sourceItems: [sourceItem('a'), sourceItem('b')],
+      durationDays: 1,
+    });
+    const staleDraft = structuredClone(workspace.draft);
+    const excluded = excludePlanPdfWorkspaceItem(workspace, 'a');
+
+    const updated = updatePlanPdfWorkspaceDraft(excluded, {
+      ...staleDraft,
+      title: '유효한 제목 수정',
+      items: staleDraft.items.map((item) => (
+        item.id === 'b' ? { ...item, pdfMemo: '유효한 메모 수정' } : item
+      )),
+    });
+
+    expect(updated.draft.title).toBe('유효한 제목 수정');
+    expect(updated.draft.items.map((item) => item.id)).toEqual(['b']);
+    expect(updated.draft.items[0].pdfMemo).toBe('유효한 메모 수정');
+    expect(updated.excludedItems.map(({ item }) => item.id)).toEqual(['a']);
+
+    const restored = undoExcludedPlanPdfWorkspaceItem(updated, 1);
+    expect(restored.draft.items.filter((item) => item.id === 'a')).toHaveLength(1);
+    expect(restored.excludedItems).toEqual([]);
+  });
+
   it('원본은 유지한 채 작업 초안에서만 제외하고 Day 순서를 다시 매긴다', () => {
     const sourceItems = [
       sourceItem('a'),
@@ -210,6 +253,38 @@ describe('planPdfWorkspace', () => {
       { id: 'a', order: 1 },
       { id: 'b', order: 2 },
       { id: 'c', order: 3 },
+    ]);
+  });
+
+  it('순서를 다시 매길 때 잘못된 Day를 여행 기간 안으로 보정한다', () => {
+    const sourceItems = [sourceItem('a'), sourceItem('b'), sourceItem('c')];
+    const initialDraft: PlanPdfDraft = {
+      title: 'Day 경계 초안',
+      items: [
+        { ...sourceItems[0], day: Number.NaN, order: 1, pdfMemo: '' },
+        { ...sourceItems[1], day: -3, order: 2, pdfMemo: '' },
+        { ...sourceItems[2], day: 99, order: 3, pdfMemo: '' },
+      ],
+    };
+    const workspace = createPlanPdfWorkspace({
+      sourceItems,
+      durationDays: 2,
+      initialDraft,
+    });
+    const nextSourceItems = [...sourceItems, sourceItem('d', { day: 2 })];
+
+    const updated = addPendingPlanPdfItems(
+      workspace,
+      nextSourceItems,
+      ['d'],
+      2,
+    );
+
+    expect(updated.draft.items.map(({ id, day }) => ({ id, day }))).toEqual([
+      { id: 'a', day: 1 },
+      { id: 'b', day: 1 },
+      { id: 'c', day: 2 },
+      { id: 'd', day: 2 },
     ]);
   });
 
