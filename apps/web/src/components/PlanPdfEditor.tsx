@@ -7,6 +7,7 @@ import {
   Loader2,
   MapPin,
   NotebookPen,
+  Plus,
   RotateCcw,
   ShieldCheck,
   Trash2,
@@ -21,6 +22,7 @@ import {
   movePlanPdfItem,
   type PlanPdfDraft,
   type PlanPdfDraftItem,
+  type PlanPdfCustomScheduleInput,
 } from '../planPdf';
 import type {
   HarubanPlanDraft,
@@ -40,11 +42,14 @@ interface Props {
   composition?: HarubanPlanDraft | null;
   pendingSourceItems?: TravelPlanItem[];
   canUndoExclude?: boolean;
+  canUndoCustomSchedule?: boolean;
   savedAt?: string | null;
   workspaceRevision?: string;
   onDraftChange?: (draft: PlanPdfDraft) => void;
   onExcludeItem?: (itemId: string) => void;
   onUndoExclude?: () => void;
+  onAddCustomSchedule?: (input: PlanPdfCustomScheduleInput) => void;
+  onUndoCustomSchedule?: () => void;
   onAddPendingItems?: (itemIds: string[]) => void;
   onClose: () => void;
 }
@@ -72,11 +77,14 @@ export default function PlanPdfEditor({
   composition,
   pendingSourceItems = [],
   canUndoExclude = false,
+  canUndoCustomSchedule = false,
   savedAt,
   workspaceRevision,
   onDraftChange,
   onExcludeItem,
   onUndoExclude,
+  onAddCustomSchedule,
+  onUndoCustomSchedule,
   onAddPendingItems,
   onClose,
 }: Props) {
@@ -90,6 +98,11 @@ export default function PlanPdfEditor({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([]);
+  const [customScheduleDay, setCustomScheduleDay] = useState<number | null>(null);
+  const [customScheduleInput, setCustomScheduleInput] = useState<PlanPdfCustomScheduleInput>(
+    () => emptyCustomScheduleInput(1),
+  );
+  const [customScheduleTimeError, setCustomScheduleTimeError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const pendingIdsKey = pendingSourceItems.map((item) => item.id).join('\u0000');
 
@@ -102,6 +115,9 @@ export default function PlanPdfEditor({
     );
     setGenerating(false);
     setError(null);
+    setCustomScheduleDay(null);
+    setCustomScheduleInput(emptyCustomScheduleInput(1));
+    setCustomScheduleTimeError(null);
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -126,11 +142,19 @@ export default function PlanPdfEditor({
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !generating) onClose();
+      if (event.key !== 'Escape' || generating) return;
+      if (customScheduleDay !== null) {
+        event.preventDefault();
+        setCustomScheduleDay(null);
+        setCustomScheduleInput(emptyCustomScheduleInput(1));
+        setCustomScheduleTimeError(null);
+        return;
+      }
+      onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, generating, onClose]);
+  }, [open, generating, customScheduleDay, onClose]);
 
   const itemsByDay = useMemo(() => {
     const grouped = new Map<number, PlanPdfDraftItem[]>();
@@ -143,6 +167,32 @@ export default function PlanPdfEditor({
 
   const closeEditor = () => {
     if (!generating) onClose();
+  };
+
+  const openCustomScheduleForm = (day: number) => {
+    setCustomScheduleDay(day);
+    setCustomScheduleInput(emptyCustomScheduleInput(day));
+    setCustomScheduleTimeError(null);
+  };
+
+  const closeCustomScheduleForm = () => {
+    setCustomScheduleDay(null);
+    setCustomScheduleInput(emptyCustomScheduleInput(1));
+    setCustomScheduleTimeError(null);
+  };
+
+  const addCustomSchedule = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!customScheduleInput.name.trim()) return;
+    if (
+      customScheduleInput.startTime
+      && !PLAN_TIME_PATTERN.test(customScheduleInput.startTime)
+    ) {
+      setCustomScheduleTimeError('시간은 00:00부터 23:59 사이로 입력해 주세요.');
+      return;
+    }
+    onAddCustomSchedule?.(customScheduleInput);
+    closeCustomScheduleForm();
   };
 
   const updateMemo = (itemId: string, pdfMemo: string) => {
@@ -358,8 +408,8 @@ export default function PlanPdfEditor({
                     나가서 장소를 더 살펴보거나 제외한 장소를 되돌려 주세요.
                   </p>
                 </div>
-              ) : (
-                Array.from({ length: info.durationDays }, (_, index) => index + 1).map((day) => {
+              ) : null}
+              {Array.from({ length: info.durationDays }, (_, index) => index + 1).map((day) => {
                   const dayItems = itemsByDay.get(day) ?? [];
                   return (
                     <section
@@ -403,11 +453,161 @@ export default function PlanPdfEditor({
                             />
                           ))
                         )}
+                        {customScheduleDay === day ? (
+                          <form
+                            onSubmit={addCustomSchedule}
+                            className="rounded-[20px] border border-mint/25 bg-[#E7F4EF] p-4 shadow-sm"
+                            aria-label={`Day ${day} 일정 직접 추가`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-serif-kr text-[14px] font-bold text-basalt">
+                                  내 일정 직접 적기
+                                </p>
+                                <p className="mt-1 text-[10px] leading-relaxed text-stone-600">
+                                  추가하면 내 여행플랜과 PDF 초안에 함께 담겨요.
+                                </p>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[9px] font-bold text-mint">
+                                Day {day}
+                              </span>
+                            </div>
+                            <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+                              <label className="min-w-0 sm:col-span-2" htmlFor={`custom-name-${day}`}>
+                                <span className="text-[10px] font-bold text-basalt">
+                                  일정명 <span className="text-citrus-2">(필수)</span>
+                                </span>
+                                <input
+                                  id={`custom-name-${day}`}
+                                  aria-label="일정명"
+                                  required
+                                  maxLength={80}
+                                  value={customScheduleInput.name}
+                                  onChange={(event) => setCustomScheduleInput((current) => ({
+                                    ...current,
+                                    name: event.target.value,
+                                  }))}
+                                  className="mt-1.5 min-h-11 w-full min-w-0 rounded-xl border border-earth bg-white px-3 text-[12px] text-basalt outline-none placeholder:text-stone-300 focus-visible:border-mint focus-visible:ring-2 focus-visible:ring-mint/25"
+                                  placeholder="예: 렌터카 반납"
+                                />
+                              </label>
+                              <label className="min-w-0" htmlFor={`custom-day-${day}`}>
+                                <span className="text-[10px] font-bold text-basalt">Day</span>
+                                <select
+                                  id={`custom-day-${day}`}
+                                  value={customScheduleInput.day}
+                                  onChange={(event) => setCustomScheduleInput((current) => ({
+                                    ...current,
+                                    day: Number(event.target.value),
+                                  }))}
+                                  className="mt-1.5 min-h-11 w-full min-w-0 rounded-xl border border-earth bg-white px-3 text-[12px] font-bold text-basalt outline-none focus-visible:border-mint focus-visible:ring-2 focus-visible:ring-mint/25"
+                                >
+                                  {Array.from(
+                                    {length: info.durationDays},
+                                    (_, index) => index + 1,
+                                  ).map((optionDay) => (
+                                    <option key={optionDay} value={optionDay}>Day {optionDay}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="min-w-0" htmlFor={`custom-time-${day}`}>
+                                <span className="text-[10px] font-bold text-basalt">시간</span>
+                                <input
+                                  id={`custom-time-${day}`}
+                                  type="time"
+                                  value={customScheduleInput.startTime}
+                                  aria-invalid={customScheduleTimeError ? true : undefined}
+                                  aria-describedby={
+                                    customScheduleTimeError
+                                      ? `custom-time-error-${day}`
+                                      : undefined
+                                  }
+                                  onChange={(event) => {
+                                    setCustomScheduleInput((current) => ({
+                                      ...current,
+                                      startTime: event.target.value,
+                                    }));
+                                    setCustomScheduleTimeError(null);
+                                  }}
+                                  className="mt-1.5 min-h-11 w-full min-w-0 rounded-xl border border-earth bg-white px-3 text-[12px] text-basalt outline-none focus-visible:border-mint focus-visible:ring-2 focus-visible:ring-mint/25"
+                                />
+                                {customScheduleTimeError ? (
+                                  <span
+                                    id={`custom-time-error-${day}`}
+                                    role="alert"
+                                    className="mt-1.5 block text-[9.5px] font-semibold text-rose-700"
+                                  >
+                                    {customScheduleTimeError}
+                                  </span>
+                                ) : null}
+                              </label>
+                              <label className="min-w-0 sm:col-span-2" htmlFor={`custom-address-${day}`}>
+                                <span className="text-[10px] font-bold text-basalt">장소 또는 주소</span>
+                                <input
+                                  id={`custom-address-${day}`}
+                                  maxLength={200}
+                                  value={customScheduleInput.address}
+                                  onChange={(event) => setCustomScheduleInput((current) => ({
+                                    ...current,
+                                    address: event.target.value,
+                                  }))}
+                                  className="mt-1.5 min-h-11 w-full min-w-0 rounded-xl border border-earth bg-white px-3 text-[12px] text-basalt outline-none placeholder:text-stone-300 focus-visible:border-mint focus-visible:ring-2 focus-visible:ring-mint/25"
+                                  placeholder="선택 입력"
+                                />
+                              </label>
+                              <label className="min-w-0 sm:col-span-2" htmlFor={`custom-note-${day}`}>
+                                <span className="text-[10px] font-bold text-basalt">일정 메모</span>
+                                <textarea
+                                  id={`custom-note-${day}`}
+                                  maxLength={800}
+                                  rows={3}
+                                  value={customScheduleInput.note}
+                                  onChange={(event) => setCustomScheduleInput((current) => ({
+                                    ...current,
+                                    note: event.target.value,
+                                  }))}
+                                  className="mt-1.5 min-h-20 w-full min-w-0 resize-y rounded-xl border border-earth bg-white px-3 py-2.5 text-[12px] leading-relaxed text-basalt outline-none placeholder:text-stone-300 focus-visible:border-mint focus-visible:ring-2 focus-visible:ring-mint/25"
+                                  placeholder="선택 입력"
+                                />
+                              </label>
+                            </div>
+                            {!customScheduleInput.name.trim() ? (
+                              <p className="mt-3 text-[9.5px] font-semibold text-citrus-2">
+                                일정명을 입력해 주세요.
+                              </p>
+                            ) : null}
+                            <div className="mt-3 flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={closeCustomScheduleForm}
+                                className="min-h-11 rounded-xl border border-earth bg-white px-4 text-[11px] font-bold text-stone-600 outline-none hover:bg-[#FDF6EA] focus-visible:ring-2 focus-visible:ring-mint/30"
+                              >
+                                취소
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={!customScheduleInput.name.trim()}
+                                className="min-h-11 rounded-xl bg-mint px-5 text-[11px] font-bold text-white outline-none hover:bg-[#245E58] focus-visible:ring-2 focus-visible:ring-mint/35 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
+                              >
+                                일정 추가
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`Day ${day} 일정 직접 추가`}
+                            onClick={() => openCustomScheduleForm(day)}
+                            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-mint/35 bg-[#F4FAF7] px-4 text-[11px] font-bold text-mint outline-none hover:border-mint/60 hover:bg-[#E7F4EF] focus-visible:ring-2 focus-visible:ring-mint/30"
+                          >
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                            일정 직접 추가
+                          </button>
+                        )}
                       </div>
                     </section>
                   );
-                })
-              )}
+                })}
             </div>
 
             <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
@@ -461,8 +661,24 @@ export default function PlanPdfEditor({
               <p className="hidden text-[9.5px] text-stone-500 sm:block">
                 {draft.items.length}곳 · {info.durationDays}일 · PDF에서 지도 QR 제공
               </p>
+              {canUndoCustomSchedule ? (
+                <p className="mt-1 text-[9.5px] font-semibold text-citrus-2">
+                  일정을 내 여행플랜에도 추가했어요
+                </p>
+              ) : null}
             </div>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex flex-wrap justify-end gap-2">
+              {canUndoCustomSchedule && (
+                <button
+                  type="button"
+                  aria-label="추가한 일정 되돌리기"
+                  onClick={onUndoCustomSchedule}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-2xl border border-citrus/25 bg-[#FFF3E7] px-4 text-[11px] font-bold text-citrus-2"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  추가한 일정 되돌리기
+                </button>
+              )}
               {canUndoExclude && (
                 <button
                   type="button"
@@ -540,9 +756,18 @@ function PlanItemEditor({
               <h4 className="truncate font-serif-kr text-[14px] font-bold text-basalt">
                 {item.name}
               </h4>
+              {item.startTime ? (
+                <p className="mt-0.5 text-[9.5px] font-bold text-mint">
+                  {item.startTime} · {item.fixed ? '고정 일정' : '시간 지정'}
+                </p>
+              ) : null}
               <p className="mt-0.5 flex items-center gap-1 truncate text-[9.5px] text-stone-500">
                 <MapPin className="h-3 w-3 shrink-0" />
-                {item.address || '주소는 여행 전 확인해 주세요.'}
+                {item.address || (
+                  item.source === 'user_added'
+                    ? '사용자가 직접 입력한 일정입니다.'
+                    : '주소는 여행 전 확인해 주세요.'
+                )}
               </p>
             </div>
             <span className={`rounded-full border px-2.5 py-1 text-[8.5px] font-bold ${SOURCE_TONES[item.source]}`}>
@@ -613,4 +838,17 @@ function PlanItemEditor({
       </div>
     </article>
   );
+}
+
+
+const PLAN_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+function emptyCustomScheduleInput(day: number): PlanPdfCustomScheduleInput {
+  return {
+    name: '',
+    day,
+    startTime: '',
+    address: '',
+    note: '',
+  };
 }

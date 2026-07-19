@@ -76,6 +76,139 @@ function renderEditor(
 }
 
 describe('PlanPdfEditor Haruban draft', () => {
+  it('adds a custom schedule from the selected Day form and resets it', () => {
+    const onAddCustomSchedule = vi.fn();
+    renderEditor({onAddCustomSchedule});
+
+    expect(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Day 2 일정 직접 추가'}));
+
+    const nameInput = screen.getByLabelText('일정명');
+    expect(nameInput).toBeRequired();
+    expect(nameInput).toHaveAttribute('maxlength', '80');
+    expect(screen.getByLabelText('Day')).toHaveValue('2');
+    expect(screen.getByLabelText('시간')).toHaveAttribute('type', 'time');
+    expect(screen.getByLabelText('장소 또는 주소')).toHaveAttribute('maxlength', '200');
+    expect(screen.getByLabelText('일정 메모')).toHaveAttribute('maxlength', '800');
+
+    fireEvent.change(nameInput, {target: {value: '렌터카 반납'}});
+    fireEvent.change(screen.getByLabelText('시간'), {target: {value: '18:30'}});
+    fireEvent.change(screen.getByLabelText('장소 또는 주소'), {
+      target: {value: '제주공항'},
+    });
+    fireEvent.change(screen.getByLabelText('일정 메모'), {
+      target: {value: '주유 후 반납'},
+    });
+    fireEvent.click(screen.getByRole('button', {name: '일정 추가'}));
+
+    expect(onAddCustomSchedule).toHaveBeenCalledWith({
+      name: '렌터카 반납',
+      day: 2,
+      startTime: '18:30',
+      address: '제주공항',
+      note: '주유 후 반납',
+    });
+    expect(screen.queryByLabelText('일정명')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Day 2 일정 직접 추가'}));
+    expect(screen.getByLabelText('일정명')).toHaveValue('');
+    expect(screen.getByLabelText('Day')).toHaveValue('2');
+  });
+
+  it('explains why a blank title cannot be submitted', () => {
+    renderEditor({onAddCustomSchedule: vi.fn()});
+
+    fireEvent.click(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}));
+    fireEvent.change(screen.getByLabelText('일정명'), {target: {value: '   '}});
+
+    expect(screen.getByText('일정명을 입력해 주세요.')).toBeVisible();
+    expect(screen.getByRole('button', {name: '일정 추가'})).toBeDisabled();
+  });
+
+  it('rejects an invalid nonblank time with a linked error', () => {
+    const onAddCustomSchedule = vi.fn();
+    renderEditor({onAddCustomSchedule});
+
+    fireEvent.click(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}));
+    fireEvent.change(screen.getByLabelText('일정명'), {
+      target: {value: '숙소 체크인'},
+    });
+    const timeInput = screen.getByLabelText('시간');
+    timeInput.setAttribute('type', 'text');
+    fireEvent.change(timeInput, {target: {value: '25:00'}});
+    fireEvent.click(screen.getByRole('button', {name: '일정 추가'}));
+
+    const timeError = screen.getByText('시간은 00:00부터 23:59 사이로 입력해 주세요.');
+    expect(timeError).toBeVisible();
+    expect(timeInput).toHaveAttribute('aria-describedby', timeError.id);
+    expect(timeInput).toHaveAttribute('aria-invalid', 'true');
+    expect(onAddCustomSchedule).not.toHaveBeenCalled();
+  });
+
+  it('closes only the open custom schedule form with Escape or cancel', () => {
+    const onClose = vi.fn();
+    renderEditor({onClose, onAddCustomSchedule: vi.fn()});
+
+    fireEvent.click(screen.getByRole('button', {name: 'Day 2 일정 직접 추가'}));
+    fireEvent.keyDown(window, {key: 'Escape'});
+    expect(screen.queryByLabelText('일정명')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Day 1 일정 직접 추가'}));
+    fireEvent.click(screen.getByRole('button', {name: '취소'}));
+    expect(screen.queryByLabelText('일정명')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, {key: 'Escape'});
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('offers a separate undo for the recently added custom schedule', () => {
+    const onUndoCustomSchedule = vi.fn();
+    renderEditor({
+      canUndoCustomSchedule: true,
+      onUndoCustomSchedule,
+    });
+
+    expect(screen.getByText('일정을 내 여행플랜에도 추가했어요')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', {name: '추가한 일정 되돌리기'}));
+    expect(onUndoCustomSchedule).toHaveBeenCalledOnce();
+  });
+
+  it('labels timed and addressless user-added schedule cards', () => {
+    renderEditor({
+      initialDraft: {
+        ...initialDraft,
+        items: [
+          {
+            ...initialDraft.items[0],
+            id: 'fixed',
+            name: '렌터카 반납',
+            source: 'user_added',
+            moment: 'user_added',
+            startTime: '18:30',
+            fixed: true,
+            address: null,
+          },
+          {
+            ...initialDraft.items[0],
+            id: 'timed',
+            name: '기념품 사기',
+            source: 'user_added',
+            moment: 'user_added',
+            startTime: '16:00',
+            fixed: false,
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByText('18:30 · 고정 일정')).toBeVisible();
+    expect(screen.getByText('16:00 · 시간 지정')).toBeVisible();
+    expect(screen.getAllByText('사용자가 직접 입력한 일정입니다.')).toHaveLength(2);
+  });
+
   it('opens with the composed draft and explains weather, route, and warnings', () => {
     renderEditor();
 
