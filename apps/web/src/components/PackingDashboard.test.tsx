@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -142,8 +143,12 @@ const routeReport: RoutePlanResponse = {
 
 function dashboardElement(
   selectedPlanItems: TravelPlanItem[] = [],
-  onUpdatePlanSchedule = noop,
-  onRemovePlanItem = noop,
+  onUpdatePlanSchedule: (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => void = noop,
+  onRemovePlanItem: (itemId: string) => void = noop,
+  onAddCustomPlanItem: (item: TravelPlanItem) => void = noop,
 ) {
   return (
     <PackingDashboard
@@ -184,7 +189,7 @@ function dashboardElement(
       onAddCustomMemory={noop}
       onRemoveCustomMemory={noop}
       onTogglePlanItem={noop}
-      onAddCustomPlanItem={noop}
+      onAddCustomPlanItem={onAddCustomPlanItem}
       onRemovePlanItem={onRemovePlanItem}
       onUpdatePlanSchedule={onUpdatePlanSchedule}
       onApplyWeatherProposal={noop}
@@ -202,14 +207,64 @@ function dashboardElement(
 
 function renderDashboard(
   selectedPlanItems: TravelPlanItem[] = [],
-  onUpdatePlanSchedule = noop,
-  onRemovePlanItem = noop,
+  onUpdatePlanSchedule: (
+    itemId: string,
+    patch: Partial<Pick<TravelPlanItem, 'day' | 'daypart' | 'startTime' | 'fixed'>>,
+  ) => void = noop,
+  onRemovePlanItem: (itemId: string) => void = noop,
+  onAddCustomPlanItem: (item: TravelPlanItem) => void = noop,
 ) {
   return render(dashboardElement(
     selectedPlanItems,
     onUpdatePlanSchedule,
     onRemovePlanItem,
+    onAddCustomPlanItem,
   ));
+}
+
+function CustomScheduleDashboard({
+  onAddCustomPlanItem,
+  onRemovePlanItem,
+}: {
+  onAddCustomPlanItem: (item: TravelPlanItem) => void;
+  onRemovePlanItem: (itemId: string) => void;
+}) {
+  const [items, setItems] = useState<TravelPlanItem[]>([
+    scheduledPlanItem,
+    secondScheduledPlanItem,
+  ]);
+
+  return dashboardElement(
+    items,
+    noop,
+    (itemId) => {
+      onRemovePlanItem(itemId);
+      setItems((current) => current.filter((item) => item.id !== itemId));
+    },
+    (item) => {
+      onAddCustomPlanItem(item);
+      setItems((current) => [...current, item]);
+    },
+  );
+}
+
+async function addDayTwoCustomSchedule() {
+  fireEvent.click(await screen.findByRole('button', {
+    name: 'Day 2 일정 직접 추가',
+  }));
+  fireEvent.change(screen.getByLabelText('일정명'), {
+    target: {value: '렌터카 반납'},
+  });
+  fireEvent.change(screen.getByLabelText('시간'), {
+    target: {value: '18:30'},
+  });
+  fireEvent.change(screen.getByLabelText('장소 또는 주소'), {
+    target: {value: '제주공항 렌터카하우스'},
+  });
+  fireEvent.change(screen.getByLabelText('일정 메모'), {
+    target: {value: '출발 2시간 전 도착'},
+  });
+  fireEvent.click(screen.getByRole('button', {name: '일정 추가'}));
 }
 
 describe('PackingDashboard pack journey guide', () => {
@@ -415,6 +470,93 @@ describe('PackingDashboard pack journey guide', () => {
     fireEvent.click(screen.getByRole('button', {name: /여행 플랜 PDF/}));
 
     expect(await screen.findByDisplayValue('노을 전에 도착')).toBeInTheDocument();
+  }, 30_000);
+
+  it('adds a fixed custom schedule to both plans and undoes it with the same id', async () => {
+    const onAddCustomPlanItem = vi.fn();
+    const onRemovePlanItem = vi.fn();
+    render(
+      <CustomScheduleDashboard
+        onAddCustomPlanItem={onAddCustomPlanItem}
+        onRemovePlanItem={onRemovePlanItem}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    await addDayTwoCustomSchedule();
+
+    await waitFor(() => expect(onAddCustomPlanItem).toHaveBeenCalledOnce());
+    const createdItem = onAddCustomPlanItem.mock.calls[0][0] as TravelPlanItem;
+    expect(createdItem).toMatchObject({
+      id: expect.stringMatching(/^pdf-user-/),
+      name: '렌터카 반납',
+      day: 2,
+      startTime: '18:30',
+      fixed: true,
+      source: 'user_added',
+      address: '제주공항 렌터카하우스',
+      note: '출발 2시간 전 도착',
+    });
+    expect(await screen.findByRole('heading', {name: '렌터카 반납'}))
+      .toBeInTheDocument();
+    expect(screen.getByText('18:30 · 고정 일정')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '추가한 일정 되돌리기'}));
+
+    expect(onRemovePlanItem).toHaveBeenCalledOnce();
+    expect(onRemovePlanItem).toHaveBeenCalledWith(createdItem.id);
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', {name: '렌터카 반납'}))
+        .not.toBeInTheDocument();
+    });
+  }, 30_000);
+
+  it('keeps a custom schedule after closing and reopening the PDF editor', async () => {
+    const onAddCustomPlanItem = vi.fn();
+    render(
+      <CustomScheduleDashboard
+        onAddCustomPlanItem={onAddCustomPlanItem}
+        onRemovePlanItem={noop}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    await addDayTwoCustomSchedule();
+    expect(await screen.findByRole('heading', {name: '렌터카 반납'}))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '나가서 장소 더 보기'}));
+    fireEvent.click(screen.getByRole('button', {name: /여행 플랜 PDF/}));
+
+    expect(await screen.findByRole('heading', {name: '렌터카 반납'}))
+      .toBeInTheDocument();
+    expect(onAddCustomPlanItem).toHaveBeenCalledOnce();
+  }, 30_000);
+
+  it('excludes a custom schedule only from the PDF workspace', async () => {
+    const onAddCustomPlanItem = vi.fn();
+    const onRemovePlanItem = vi.fn();
+    render(
+      <CustomScheduleDashboard
+        onAddCustomPlanItem={onAddCustomPlanItem}
+        onRemovePlanItem={onRemovePlanItem}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', {name: /여행 플랜 PDF/}));
+    await addDayTwoCustomSchedule();
+    expect(await screen.findByRole('heading', {name: '렌터카 반납'}))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {
+      name: '렌터카 반납 초안에서 제외',
+    }));
+
+    expect(onRemovePlanItem).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', {name: '렌터카 반납'}))
+        .not.toBeInTheDocument();
+    });
   }, 30_000);
 
   it('excludes only from the PDF workspace and shares the remaining items', async () => {

@@ -73,14 +73,20 @@ import {
 import { createHarubanPlanDraft } from '../harubanPlanComposer';
 import {
   addPendingPlanPdfItems,
+  addCustomPlanPdfWorkspaceItem,
   createPlanPdfWorkspace,
   excludePlanPdfWorkspaceItem,
   findPendingPlanPdfSourceItems,
   syncRemovedPlanPdfSourceItems,
+  undoRecentlyAddedPlanPdfWorkspaceItem,
   undoExcludedPlanPdfWorkspaceItem,
   updatePlanPdfWorkspaceDraft,
   type PlanPdfWorkspace,
 } from '../planPdfWorkspace';
+import {
+  buildPlanPdfCustomScheduleItem,
+  type PlanPdfCustomScheduleInput,
+} from '../planPdf';
 
 const PlanPdfEditor = lazy(() => import('./PlanPdfEditor'));
 
@@ -194,6 +200,7 @@ const PLAN_SIDEBAR_DEFAULT_WIDTH = 460;
 const PLAN_SIDEBAR_MIN_WIDTH = 360;
 const PLAN_SIDEBAR_MAX_WIDTH = 680;
 const PLAN_CONTENT_MIN_WIDTH = 520;
+let nextPlanPdfUserItemSequence = 0;
 const DAYPART_OPTIONS: Array<{value: Daypart; label: string; startTime: string}> = [
   {value: 'morning', label: '오전', startTime: '09:00'},
   {value: 'afternoon', label: '오후', startTime: '14:00'},
@@ -204,6 +211,13 @@ function savedPlanSidebarWidth(): number {
   const saved = Number(window.localStorage.getItem(PLAN_SIDEBAR_STORAGE_KEY));
   if (!Number.isFinite(saved)) return PLAN_SIDEBAR_DEFAULT_WIDTH;
   return Math.min(Math.max(saved, PLAN_SIDEBAR_MIN_WIDTH), PLAN_SIDEBAR_MAX_WIDTH);
+}
+
+function createPlanPdfUserItemId(): string {
+  const generatedId = typeof globalThis.crypto?.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}-${nextPlanPdfUserItemSequence += 1}`;
+  return `pdf-user-${generatedId}`;
 }
 
 export default function PackingDashboard(props: Props) {
@@ -515,6 +529,33 @@ export default function PackingDashboard(props: Props) {
       durationDays: info.durationDays,
     }));
     setPlanPdfEditorOpen(true);
+  };
+
+  const handleAddPlanPdfCustomSchedule = (input: PlanPdfCustomScheduleInput) => {
+    if (!pdfWorkspace) return;
+    const item = buildPlanPdfCustomScheduleItem(
+      input,
+      createPlanPdfUserItemId(),
+      info.durationDays,
+    );
+    if (!item) return;
+
+    onAddCustomPlanItem(item);
+    setPdfWorkspace((current) => current
+      ? addCustomPlanPdfWorkspaceItem(current, item, info.durationDays)
+      : current);
+    setWorkspaceRevision((value) => value + 1);
+  };
+
+  const handleUndoPlanPdfCustomSchedule = () => {
+    const itemId = pdfWorkspace?.recentlyAddedItemId;
+    if (!itemId) return;
+
+    onRemovePlanItem(itemId);
+    setPdfWorkspace((current) => current
+      ? undoRecentlyAddedPlanPdfWorkspaceItem(current, info.durationDays)
+      : current);
+    setWorkspaceRevision((value) => value + 1);
   };
 
   const composeHarubanPlan = async () => {
@@ -1308,6 +1349,7 @@ export default function PackingDashboard(props: Props) {
             composition={harubanDraft}
             pendingSourceItems={pendingPlanPdfSourceItems}
             canUndoExclude={Boolean(pdfWorkspace?.excludedItems.length)}
+            canUndoCustomSchedule={Boolean(pdfWorkspace?.recentlyAddedItemId)}
             savedAt={pdfWorkspace?.updatedAt ?? null}
             workspaceRevision={String(workspaceRevision)}
             onDraftChange={(nextDraft) => {
@@ -1330,6 +1372,8 @@ export default function PackingDashboard(props: Props) {
                 : current);
               setWorkspaceRevision((value) => value + 1);
             }}
+            onAddCustomSchedule={handleAddPlanPdfCustomSchedule}
+            onUndoCustomSchedule={handleUndoPlanPdfCustomSchedule}
             onAddPendingItems={(itemIds) => {
               setPdfWorkspace((current) => current
                 ? addPendingPlanPdfItems(
